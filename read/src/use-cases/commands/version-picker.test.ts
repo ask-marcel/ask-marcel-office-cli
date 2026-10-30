@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { execute } from './download-drive-item-version.ts';
+import { createExecute } from './download-drive-item-version.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const execute = createExecute(CONVERTERS);
 
 const VERSIONS = '/drives/d1/items/i1/versions?$select=id,lastModifiedDateTime';
 

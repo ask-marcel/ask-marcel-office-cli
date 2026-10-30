@@ -14,7 +14,10 @@ import {
   buildSampleXlsx,
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
-import { execute } from './read-mail-attachment.ts';
+import { createExecute } from './read-mail-attachment.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const execute = createExecute(CONVERTERS);
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const graphReturning = (attachment: Record<string, unknown>): GraphClient => fakeGraphClient({ get: async () => ok(attachment) });

@@ -8,6 +8,7 @@ import { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, fetchInlineImageByte
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { embedInlineImages } from './inline-image-embedder.ts';
 import { extractSignatureBlock } from './signature-extractor.ts';
+import type { Converters } from '../ports/converters.ts';
 
 const schema = z.object({
   messageId: z.string().optional(),
@@ -92,29 +93,31 @@ const readCandidates = async (graph: ReadGraph, messageId: string | undefined): 
   return ok(ids);
 };
 
-const execute: ReadCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId } = parsed.data;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph, params) => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { messageId } = parsed.data;
 
-  const candidates = await readCandidates(graph, messageId);
-  if (!candidates.ok) return candidates;
+    const candidates = await readCandidates(graph, messageId);
+    if (!candidates.ok) return candidates;
 
-  // Sequential on purpose: the newest sent message almost always carries the
-  // signature, so this is one body read in the common case. Fanning out over ten
-  // would cost ten reads every time to save latency the caller rarely needs.
-  for (const id of candidates.value) {
-    const fetched = await graph.get(`/me/messages/${id}?$select=body,sentDateTime,hasAttachments`);
-    if (!fetched.ok) return fetched;
-    const message = messageSchema.safeParse(fetched.value);
-    if (!message.success || message.data.body === undefined) continue;
-    const block = extractSignatureBlock(message.data.body.content);
-    if (block === undefined) continue;
-    const inlined = referencesCidImage(block) ? await inlineSignatureImages(graph, id, block) : { html: block, count: 0 };
-    return ok(buildEnvelope(id, block, message.data.sentDateTime, inlined));
-  }
-  return err(noSignatureFound(messageId, candidates.value.length));
-};
+    // Sequential on purpose: the newest sent message almost always carries the
+    // signature, so this is one body read in the common case. Fanning out over ten
+    // would cost ten reads every time to save latency the caller rarely needs.
+    for (const id of candidates.value) {
+      const fetched = await graph.get(`/me/messages/${id}?$select=body,sentDateTime,hasAttachments`);
+      if (!fetched.ok) return fetched;
+      const message = messageSchema.safeParse(fetched.value);
+      if (!message.success || message.data.body === undefined) continue;
+      const block = extractSignatureBlock(message.data.body.content);
+      if (block === undefined) continue;
+      const inlined = referencesCidImage(block) ? await inlineSignatureImages(graph, id, block) : { html: block, count: 0 };
+      return ok(buildEnvelope(id, block, message.data.sentDateTime, inlined));
+    }
+    return err(noSignatureFound(messageId, candidates.value.length));
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -142,4 +145,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Mail.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
