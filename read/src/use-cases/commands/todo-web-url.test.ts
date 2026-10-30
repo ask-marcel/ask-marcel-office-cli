@@ -3,7 +3,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 // The shape the To Do web app opens a task with, confirmed by hand 2026-09-27:
 // the id exactly as Graph gives it, its `=` padding left raw.
