@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
+import type { MediaPart } from '../use-cases/ports/converters.ts';
 
 /**
  * Pulls the image parts out of an OOXML package (.docx / .xlsx /
@@ -21,8 +22,6 @@ import type { GraphError } from './graph-client.ts';
  * high-fidelity original beside a png fallback). Legacy vector (emf/wmf) and
  * audio/video are still excluded — neither a model can use.
  */
-type MediaPart = { readonly path: string; readonly bytes: Uint8Array };
-
 const IMAGE_MEDIA = /^(word|xl|ppt)\/media\/[^/]+\.(png|jpe?g|gif|bmp|tiff?|webp|svg)$/i;
 
 const extractOoxmlMedia = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<MediaPart>, GraphError>> => {

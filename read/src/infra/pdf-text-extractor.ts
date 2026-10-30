@@ -1,6 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
+import type { PdfText } from '../use-cases/ports/converters.ts';
 
 /**
  * Extract a PDF's text layer via unpdf (a pure-JS pdfjs build — no native deps,
@@ -41,8 +42,6 @@ const pdfErrorMessage = (e: unknown): string => {
   }
   return `pdf text extraction failed: ${detail}`;
 };
-
-type PdfText = { readonly text: string; readonly pageCount: number };
 
 const extractPdfText = async (bytes: Uint8Array): Promise<Result<PdfText, GraphError>> => {
   try {

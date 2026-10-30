@@ -1,6 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
+import type { MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg } from '../use-cases/ports/converters.ts';
 
 /**
  * Parse an Outlook `.msg` file — the OLE Compound File (CFBF) container Outlook
@@ -19,20 +20,6 @@ import type { GraphError } from './graph-client.ts';
  * non-OLE / corrupt container, and a single unreadable attachment must not sink the
  * whole parse, so attachment reads are individually guarded.
  */
-
-type MsgRecipientKind = 'to' | 'cc' | 'bcc' | 'unknown';
-type MsgRecipient = { readonly kind: MsgRecipientKind; readonly name?: string; readonly email?: string };
-type MsgAttachment = { readonly fileName?: string; readonly content?: Uint8Array };
-type ParsedMsg = {
-  readonly subject?: string;
-  readonly senderName?: string;
-  readonly senderEmail?: string;
-  readonly date?: string;
-  readonly body?: string;
-  readonly bodyHtml?: string;
-  readonly recipients: readonly MsgRecipient[];
-  readonly attachments: readonly MsgAttachment[];
-};
 
 // Structural view of the bits of msgreader's `FieldsData` we consume.
 type RawRecipient = { readonly recipType?: string; readonly name?: string; readonly smtpAddress?: string; readonly email?: string };
