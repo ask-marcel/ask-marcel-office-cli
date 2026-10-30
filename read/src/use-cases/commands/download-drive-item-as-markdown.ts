@@ -10,6 +10,8 @@ import { officeToMarkdown } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 import { SHEET_OPTION } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -25,35 +27,37 @@ const schema = z.object({
     .optional(),
 });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
-  const inlineImages = parsed.data.inlineImages === 'true';
-  const keepQuoted = parsed.data.keepQuoted === 'true';
-  const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
-  const tenant = brandOptionalTenantId(parsed.data.tenantId);
-  if (!tenant.ok) return tenant;
-  const tenantId = tenant.value;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId } = parsed.data;
+    const includeMetadata = parsed.data.includeMetadata === 'true';
+    const inlineImages = parsed.data.inlineImages === 'true';
+    const keepQuoted = parsed.data.keepQuoted === 'true';
+    const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
+    const tenant = brandOptionalTenantId(parsed.data.tenantId);
+    if (!tenant.ok) return tenant;
+    const tenantId = tenant.value;
 
-  const metaPath = `/drives/${driveId}/items/${itemId}`;
-  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
-  if (!meta.ok) return meta;
-  const { name = '', lastModifiedDateTime: modifiedAt } = meta.value as { name?: string; lastModifiedDateTime?: string };
+    const metaPath = `/drives/${driveId}/items/${itemId}`;
+    const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
+    if (!meta.ok) return meta;
+    const { name = '', lastModifiedDateTime: modifiedAt } = meta.value as { name?: string; lastModifiedDateTime?: string };
 
-  // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
-  // byte fetch through the whole conversion pipeline with nothing else to change.
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, {
-    includeMetadata,
-    inlineImages,
-    maxCells,
-    keepQuoted,
-    tenantId,
-    sheet: parsed.data.sheet,
-    modifiedAt,
-  });
-};
+    // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
+    // byte fetch through the whole conversion pipeline with nothing else to change.
+    return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, {
+      includeMetadata,
+      inlineImages,
+      maxCells,
+      keepQuoted,
+      tenantId,
+      sheet: parsed.data.sheet,
+      modifiedAt,
+    });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -105,4 +109,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

@@ -3,11 +3,16 @@ import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { execute as convertZip } from './convert-drive-item-zip-to-markdown.ts';
-import { execute as asMarkdown } from './download-drive-item-as-markdown.ts';
+import { createExecute as createConvertZip } from './convert-drive-item-zip-to-markdown.ts';
+import { createExecute as createAsMarkdown } from './download-drive-item-as-markdown.ts';
 import { execute as asPdf } from './download-drive-item-as-pdf.ts';
 import { execute as downloadContent } from './download-drive-item-content.ts';
-import { execute as extractImages } from './extract-drive-item-images.ts';
+import { createExecute as createExtractImages } from './extract-drive-item-images.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const convertZip = createConvertZip(CONVERTERS);
+const asMarkdown = createAsMarkdown(CONVERTERS);
+const extractImages = createExtractImages(CONVERTERS);
 
 const PARTNER = tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
 const ARGS = { driveId: 'b!x', itemId: '01ABC', tenantId: PARTNER };

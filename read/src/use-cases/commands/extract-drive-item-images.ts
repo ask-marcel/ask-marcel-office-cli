@@ -9,39 +9,43 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), pages: pagesField.optional(), ...tenantIdShape });
 
 const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-drive-item-content` and process locally.';
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
-  const tenant = brandOptionalTenantId(parsed.data.tenantId);
-  if (!tenant.ok) return tenant;
-  const tenantId = tenant.value;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId } = parsed.data;
+    const tenant = brandOptionalTenantId(parsed.data.tenantId);
+    if (!tenant.ok) return tenant;
+    const tenantId = tenant.value;
 
-  // Route the metadata read too, not just the bytes below: for a partner-tenant
-  // file this is the FIRST call, so leaving it on the home token fails before the
-  // extraction is ever attempted.
-  const metaPath = `/drives/${driveId}/items/${itemId}`;
-  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
-  if (!meta.ok) return meta;
-  const item = meta.value as { name?: string; folder?: unknown };
-  // A folder has no document to extract from — point at list-folder-files (mirrors download-drive-item-as-pdf).
-  if (item.folder !== undefined && item.folder !== null) {
-    return err({
-      type: 'api_error',
-      status: 400,
-      message: `item '${item.name ?? ''}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a document from inside it.`,
-    });
-  }
+    // Route the metadata read too, not just the bytes below: for a partner-tenant
+    // file this is the FIRST call, so leaving it on the home token fails before the
+    // extraction is ever attempted.
+    const metaPath = `/drives/${driveId}/items/${itemId}`;
+    const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
+    if (!meta.ok) return meta;
+    const item = meta.value as { name?: string; folder?: unknown };
+    // A folder has no document to extract from — point at list-folder-files (mirrors download-drive-item-as-pdf).
+    if (item.folder !== undefined && item.folder !== null) {
+      return err({
+        type: 'api_error',
+        status: 400,
+        message: `item '${item.name ?? ''}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a document from inside it.`,
+      });
+    }
 
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
-  if (!bytes.ok) return bytes;
-  return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT, parsed.data.pages);
-};
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
+    if (!bytes.ok) return bytes;
+    return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT, parsed.data.pages);
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -74,4 +78,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
