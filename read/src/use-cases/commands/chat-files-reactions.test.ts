@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const CHAT = '19:abc@thread.v2';
 const ROBIN = '11111111-2222-3333-4444-555555555555';
