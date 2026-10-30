@@ -1,4 +1,5 @@
 import type { AccessToken } from '../domain/access-token.ts';
+import type { GraphError } from '../domain/graph-error.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
@@ -13,12 +14,6 @@ import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor 
  * build that imports only the read graph carries no write code (package split,
  * D9; scripts/check-read-bundle.ts checks it).
  */
-
-type GraphError =
-  | { type: 'api_error'; status: number; message: string; code?: string; retryAfterSeconds?: number }
-  | { type: 'auth_failed'; message: string; code?: string }
-  | { type: 'network_error'; message: string; code?: string }
-  | { type: 'validation_error'; message: string; code?: string };
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 

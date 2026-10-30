@@ -1,6 +1,6 @@
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
+import type { GraphError } from './graph-error.ts';
+import type { Result } from './result.ts';
+import { err } from './result.ts';
 
 /*
  * The POST check of the read graph (package split, D9): a read command may

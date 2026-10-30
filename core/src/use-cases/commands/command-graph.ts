@@ -1,7 +1,7 @@
 import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
 import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './command-types.ts';
-import { postIfReadOnly } from './read-only-post.ts';
+import { postIfReadOnly } from '../../domain/read-only-post.ts';
 
 /*
  * Each command runs on the graph its effect allows (package split, D9). The
