@@ -11,6 +11,8 @@ import { extractEml } from '../../infra/eml-parser-adapter.ts';
 import { readEmbeddedItem } from './embedded-item.ts';
 import { extractImagesFromBytes, imagesOfFiles, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1), pages: pagesField.optional() });
 
@@ -108,12 +110,14 @@ const extractAttachmentImages = async (graph: ReadGraph, attachmentPath: string,
   }
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-  return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { messageId, attachmentId } = parsed.data;
+    return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -135,5 +139,5 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Mail.Read'],
 };
 
-export { execute, extractAttachmentImages, meta, schema };
+export { createExecute, extractAttachmentImages, meta, schema };
 export type { ImageExtractionHints };

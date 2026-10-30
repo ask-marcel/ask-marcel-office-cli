@@ -9,6 +9,8 @@ import { formatOnenoteMetadata } from './onenote-metadata.ts';
 import type { OnenotePage } from './onenote-metadata.ts';
 import { embedOnenoteResources } from './onenote-resource-embedder.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   onenotePageId: z.string().min(1),
@@ -20,25 +22,27 @@ const schema = z.object({
 // title/timestamps — one GET, only when `--include-metadata true`.
 const PAGE_METADATA_QUERY = '$select=title,createdDateTime,lastModifiedDateTime&$expand=parentSection($select=displayName),parentNotebook($select=displayName)';
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { onenotePageId } = parsed.data;
-  // Default `true`: embed the page's `…/onenote/resources/{id}/$value` images as
-  // data URIs so the markdown is self-contained. `--inline-images false` keeps
-  // the raw Graph resource URLs.
-  const embedImages = parsed.data.inlineImages !== 'false';
-  const includeMetadata = parsed.data.includeMetadata === 'true';
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { onenotePageId } = parsed.data;
+    // Default `true`: embed the page's `…/onenote/resources/{id}/$value` images as
+    // data URIs so the markdown is self-contained. `--inline-images false` keeps
+    // the raw Graph resource URLs.
+    const embedImages = parsed.data.inlineImages !== 'false';
+    const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const md = await convertToMarkdown(graph, `/me/onenote/pages/${onenotePageId}/content`, embedImages ? { htmlTransform: (html) => embedOnenoteResources(graph, html) } : {});
-  if (!md.ok) return md;
-  if (!includeMetadata) return ok(md.value);
+    const md = await convertToMarkdown(graph, `/me/onenote/pages/${onenotePageId}/content`, embedImages ? { htmlTransform: (html) => embedOnenoteResources(graph, html) } : {});
+    if (!md.ok) return md;
+    if (!includeMetadata) return ok(md.value);
 
-  const page = await graph.get(`/me/onenote/pages/${onenotePageId}?${PAGE_METADATA_QUERY}`);
-  if (!page.ok) return page;
-  const text = `${md.value.text}\n\n${formatOnenoteMetadata(page.value as OnenotePage)}`;
-  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
-};
+    const page = await graph.get(`/me/onenote/pages/${onenotePageId}?${PAGE_METADATA_QUERY}`);
+    if (!page.ok) return page;
+    const text = `${md.value.text}\n\n${formatOnenoteMetadata(page.value as OnenotePage)}`;
+    return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -79,4 +83,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Notes.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
