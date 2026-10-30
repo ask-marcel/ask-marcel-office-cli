@@ -1,4 +1,4 @@
-import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { writeCommandOf } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
 import type { Command, WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';

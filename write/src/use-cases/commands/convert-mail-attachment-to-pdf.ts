@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
-import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { base64ToBytes, inlineBasicBinary, tagPdfPassthrough } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
