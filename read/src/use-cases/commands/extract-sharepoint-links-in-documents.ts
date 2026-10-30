@@ -11,6 +11,8 @@ import { extractExternalRels } from './ooxml-metadata.ts';
 import { extractSharepointUrls, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import type { ResolvedLink } from './sharepoint-link-extractor.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
  * The document-side sibling of `extract-sharepoint-links-in-mail`: pulls a
@@ -36,42 +38,44 @@ type DocumentLinkSummary = {
   readonly skippedCount: number;
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<DocumentLinkSummary, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<DocumentLinkSummary, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId } = parsed.data;
 
-  // 1. Pull the raw document bytes.
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
-  if (!bytes.ok) return bytes;
+    // 1. Pull the raw document bytes.
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
+    if (!bytes.ok) return bytes;
 
-  // 2. Open as a zip package. A non-zip input (pdf, image, anything that isn't a
-  //    ZIP) can't carry extractable hyperlinks → friendly 400.
-  const zip = await openOoxmlZip(bytes.value);
-  if (!zip.ok) {
-    return err({
-      type: 'api_error',
-      status: 400,
-      message:
-        'not a zip-based Office document — only OOXML (.docx/.xlsx/.pptx and their macro-enabled / template variants) and OpenDocument (.odt/.ods/.odp) carry extractable hyperlinks. pdf, images, and plain binaries have none.',
-    });
-  }
+    // 2. Open as a zip package. A non-zip input (pdf, image, anything that isn't a
+    //    ZIP) can't carry extractable hyperlinks → friendly 400.
+    const zip = await openOoxmlZip(bytes.value);
+    if (!zip.ok) {
+      return err({
+        type: 'api_error',
+        status: 400,
+        message:
+          'not a zip-based Office document — only OOXML (.docx/.xlsx/.pptx and their macro-enabled / template variants) and OpenDocument (.odt/.ods/.odp) carry extractable hyperlinks. pdf, images, and plain binaries have none.',
+      });
+    }
 
-  // 3. Collect candidate URLs. OOXML keeps external hyperlinks in the package's
-  //    relationship parts (`_rels/*.rels`, TargetMode="External"); OpenDocument
-  //    keeps them inline in content.xml / styles.xml as `xlink:href` attributes
-  //    (the SharePoint regex pulls them straight out of the raw XML). Then keep
-  //    the SharePoint ones and resolve each.
-  const isOdf = (zip.value.read('mimetype') ?? '').startsWith('application/vnd.oasis.opendocument');
-  const haystack = isOdf
-    ? ['content.xml', 'styles.xml'].map((part) => zip.value.read(part) ?? '').join('\n')
-    : extractExternalRels(zip.value)
-        .map((rel) => rel.target)
-        .join('\n');
-  const { links, truncated, skippedCount } = await resolveSharepointUrls(graph, extractSharepointUrls(haystack));
+    // 3. Collect candidate URLs. OOXML keeps external hyperlinks in the package's
+    //    relationship parts (`_rels/*.rels`, TargetMode="External"); OpenDocument
+    //    keeps them inline in content.xml / styles.xml as `xlink:href` attributes
+    //    (the SharePoint regex pulls them straight out of the raw XML). Then keep
+    //    the SharePoint ones and resolve each.
+    const isOdf = (zip.value.read('mimetype') ?? '').startsWith('application/vnd.oasis.opendocument');
+    const haystack = isOdf
+      ? ['content.xml', 'styles.xml'].map((part) => zip.value.read(part) ?? '').join('\n')
+      : extractExternalRels(zip.value)
+          .map((rel) => rel.target)
+          .join('\n');
+    const { links, truncated, skippedCount } = await resolveSharepointUrls(graph, extractSharepointUrls(haystack));
 
-  return ok({ driveId, itemId, links, truncated, skippedCount });
-};
+    return ok({ driveId, itemId, links, truncated, skippedCount });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -101,5 +105,5 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
 export type { DocumentLinkSummary };
