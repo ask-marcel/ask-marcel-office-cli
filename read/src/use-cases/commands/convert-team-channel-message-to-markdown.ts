@@ -10,6 +10,8 @@ import { markdownEnvelope, relativeGraphPath } from './channel-message-page.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   teamId: z.string().min(1),
@@ -43,19 +45,21 @@ const readReplies = async (graph: ReadGraph, messagePath: string): Promise<Repli
   return { replies, notes: [] };
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { teamId, channelId, messageId } = parsed.data;
-  const messagePath = `/teams/${teamId}/channels/${channelId}/messages/${messageId}`;
-  const fetched = rewriteChannelScopedError(await graph.get(messagePath), channelScopeOf(params));
-  if (!fetched.ok) return fetched;
-  const root = fetched.value as ChannelMessage;
-  const { replies, notes } = await readReplies(graph, messagePath);
-  const inline = parsed.data.inlineImages === 'true';
-  const images = inline ? await fetchHostedImages(graph, hostedImageSources([{ ...root, replies }])) : new Map<string, string>();
-  return ok(markdownEnvelope(renderThread(root, replies, images, inline), notes));
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { teamId, channelId, messageId } = parsed.data;
+    const messagePath = `/teams/${teamId}/channels/${channelId}/messages/${messageId}`;
+    const fetched = rewriteChannelScopedError(await graph.get(messagePath), channelScopeOf(params));
+    if (!fetched.ok) return fetched;
+    const root = fetched.value as ChannelMessage;
+    const { replies, notes } = await readReplies(graph, messagePath);
+    const inline = parsed.data.inlineImages === 'true';
+    const images = inline ? await fetchHostedImages(graph, hostedImageSources([{ ...root, replies }])) : new Map<string, string>();
+    return ok(markdownEnvelope(renderThread(root, replies, images, inline), notes));
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -90,4 +94,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['ChannelMessage.Read.All'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

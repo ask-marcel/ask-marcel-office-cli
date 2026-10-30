@@ -11,6 +11,8 @@ import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-sche
 import { rendersThroughGraph } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { MAX_CELLS_OPTION, maxCellsField, SHEET_OPTION } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -32,30 +34,32 @@ const liveNote = (id: string, before: string | undefined): string =>
     ? `Version ${id} is the only one saved: there is no earlier version to compare with the live file.`
     : `Nothing was saved after ${before}: version ${id} is the live file.`;
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, before, maxCells, sheet } = parsed.data;
-  const file = await readDriveFile(graph, driveId, itemId);
-  if (!file.ok) return file;
-  const { name } = file.value;
-  if (rendersThroughGraph(name)) return refuseVersionRender(name, "Use `download-drive-item-version --format original` for an old version's raw bytes");
-  const version =
-    parsed.data.versionId === undefined && before === undefined
-      ? await pickPreviousVersion(graph, driveId, itemId)
-      : await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
-  if (!version.ok) return version;
-  const { id, current } = version.value;
-  // The chosen version is still the live file: nothing moved, nothing to download.
-  if (current) return ok({ contentType: 'text/x-diff', size: 0, text: '', added: 0, removed: 0, versionId: id, note: liveNote(id, before) });
-  const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
-  const old = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/versions/${id}/content`, { ...opts, elevated: true });
-  if (!old.ok) return old;
-  const live = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
-  if (!live.ok) return live;
-  const diff = diffEnvelope(`a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, WORDING);
-  return ok({ ...diff, versionId: id });
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId, before, maxCells, sheet } = parsed.data;
+    const file = await readDriveFile(graph, driveId, itemId);
+    if (!file.ok) return file;
+    const { name } = file.value;
+    if (rendersThroughGraph(name)) return refuseVersionRender(name, "Use `download-drive-item-version --format original` for an old version's raw bytes");
+    const version =
+      parsed.data.versionId === undefined && before === undefined
+        ? await pickPreviousVersion(graph, driveId, itemId)
+        : await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
+    if (!version.ok) return version;
+    const { id, current } = version.value;
+    // The chosen version is still the live file: nothing moved, nothing to download.
+    if (current) return ok({ contentType: 'text/x-diff', size: 0, text: '', added: 0, removed: 0, versionId: id, note: liveNote(id, before) });
+    const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
+    const old = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/versions/${id}/content`, { ...opts, elevated: true });
+    if (!old.ok) return old;
+    const live = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
+    if (!live.ok) return live;
+    const diff = diffEnvelope(`a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, WORDING);
+    return ok({ ...diff, versionId: id });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -105,4 +109,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

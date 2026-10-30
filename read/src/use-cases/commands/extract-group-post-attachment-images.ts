@@ -7,6 +7,8 @@ import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands
 import { extractAttachmentImages } from './extract-mail-attachment-images.ts';
 import type { ImageExtractionHints } from './extract-mail-attachment-images.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // Both hints name a command that can address a POST. The mail wording would
 // send the caller to `get-mail-attachment --message-id`, which cannot.
@@ -22,12 +24,14 @@ const schema = z.object({
   attachmentId: z.string().min(1),
 });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { groupId, threadId, postId, attachmentId } = parsed.data;
-  return extractAttachmentImages(graph, `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`, POST_HINTS);
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { groupId, threadId, postId, attachmentId } = parsed.data;
+    return extractAttachmentImages(graph, `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`, POST_HINTS);
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -51,4 +55,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Group.Read.All'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

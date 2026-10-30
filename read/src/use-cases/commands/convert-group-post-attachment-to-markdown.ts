@@ -9,6 +9,8 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // Every hint names a command that can actually address a POST. Borrowing the
 // mail wording would name commands that cannot. The unconvertible cases route
@@ -36,17 +38,19 @@ const schema = z.object({
   keepQuoted: keepQuotedSchemaField,
 });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { groupId, threadId, postId, attachmentId } = parsed.data;
-  return convertAttachmentToMarkdown(
-    graph,
-    `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`,
-    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells },
-    POST_HINTS
-  );
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { groupId, threadId, postId, attachmentId } = parsed.data;
+    return convertAttachmentToMarkdown(
+      graph,
+      `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`,
+      { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells },
+      POST_HINTS
+    );
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -99,4 +103,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Group.Read.All'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

@@ -9,37 +9,41 @@ import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
-  const tenant = brandOptionalTenantId(parsed.data.tenantId);
-  if (!tenant.ok) return tenant;
-  const tenantId = tenant.value;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId } = parsed.data;
+    const tenant = brandOptionalTenantId(parsed.data.tenantId);
+    if (!tenant.ok) return tenant;
+    const tenantId = tenant.value;
 
-  // The name decides the reader, and a folder has no comments to read.
-  const metaPath = `/drives/${driveId}/items/${itemId}`;
-  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
-  if (!meta.ok) return meta;
-  const item = meta.value as { name?: string; folder?: unknown };
-  const name = item.name ?? '';
-  if (item.folder !== undefined && item.folder !== null) {
-    return err({
-      type: 'api_error',
-      status: 400,
-      message: `item '${name}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a document from inside it.`,
-    });
-  }
+    // The name decides the reader, and a folder has no comments to read.
+    const metaPath = `/drives/${driveId}/items/${itemId}`;
+    const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
+    if (!meta.ok) return meta;
+    const item = meta.value as { name?: string; folder?: unknown };
+    const name = item.name ?? '';
+    if (item.folder !== undefined && item.folder !== null) {
+      return err({
+        type: 'api_error',
+        status: 400,
+        message: `item '${name}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a document from inside it.`,
+      });
+    }
 
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
-  if (!bytes.ok) return bytes;
-  const comments = await commentsFromBytes(bytes.value, name);
-  if (!comments.ok) return comments;
-  return ok({ name, ...comments.value });
-};
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
+    if (!bytes.ok) return bytes;
+    const comments = await commentsFromBytes(bytes.value, name);
+    if (!comments.ok) return comments;
+    return ok({ name, ...comments.value });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -65,4 +69,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

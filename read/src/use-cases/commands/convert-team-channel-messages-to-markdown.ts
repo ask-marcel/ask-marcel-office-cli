@@ -12,6 +12,7 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { topOnlyShape } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
+import type { Converters } from '../ports/converters.ts';
 
 const DEFAULT_MAX_PAGES = 10;
 const MAX_PAGES_PATTERN = /^(?:[1-9]|[1-4]\d|50)$/;
@@ -74,25 +75,26 @@ const transcriptNotes = (
   return notes;
 };
 
-const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, params) => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { teamId, channelId, since } = parsed.data;
-  const top = parsed.data.top ?? String(CHANNEL_MESSAGES_TOP_CAP);
-  const maxPages = parsed.data.maxPages === undefined ? DEFAULT_MAX_PAGES : Number(parsed.data.maxPages);
-  const channelPath = `/teams/${teamId}/channels/${channelId}`;
-  const channelName = await channelNameOf(graph, channelPath);
-  const first =
-    since === undefined
-      ? `${channelPath}/messages?$top=${top}&$expand=replies`
-      : `${channelPath}/messages/delta?$filter=lastModifiedDateTime%20gt%20${since}&$top=${top}&$expand=replies`;
-  const walked = rewriteChannelScopedError(await walkSince(graph, first, since === undefined ? 1 : maxPages), channelScopeOf(params));
-  if (!walked.ok) return walked;
-  const inline = parsed.data.inlineImages === 'true';
-  const images = inline ? await fetchHostedImages(graph, hostedImageSources(walked.value.messages)) : new Map<string, string>();
-  const rendered = renderTranscript(walked.value.messages, { channelName, images, inline });
-  return ok(markdownEnvelope(rendered.text, transcriptNotes(rendered, walked.value, since, maxPages)));
-});
+const createExecute = (_converters: Converters): ReadCommand['execute'] =>
+  createTopCappedExecute(async (graph, params) => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { teamId, channelId, since } = parsed.data;
+    const top = parsed.data.top ?? String(CHANNEL_MESSAGES_TOP_CAP);
+    const maxPages = parsed.data.maxPages === undefined ? DEFAULT_MAX_PAGES : Number(parsed.data.maxPages);
+    const channelPath = `/teams/${teamId}/channels/${channelId}`;
+    const channelName = await channelNameOf(graph, channelPath);
+    const first =
+      since === undefined
+        ? `${channelPath}/messages?$top=${top}&$expand=replies`
+        : `${channelPath}/messages/delta?$filter=lastModifiedDateTime%20gt%20${since}&$top=${top}&$expand=replies`;
+    const walked = rewriteChannelScopedError(await walkSince(graph, first, since === undefined ? 1 : maxPages), channelScopeOf(params));
+    if (!walked.ok) return walked;
+    const inline = parsed.data.inlineImages === 'true';
+    const images = inline ? await fetchHostedImages(graph, hostedImageSources(walked.value.messages)) : new Map<string, string>();
+    const rendered = renderTranscript(walked.value.messages, { channelName, images, inline });
+    return ok(markdownEnvelope(rendered.text, transcriptNotes(rendered, walked.value, since, maxPages)));
+  });
 
 const meta: ReadCommandMeta = {
   summary:
@@ -139,4 +141,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['ChannelMessage.Read.All'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
