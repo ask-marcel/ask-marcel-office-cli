@@ -145,6 +145,35 @@ const tryBanFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArray<F
   { name: `${cwd}: a use-case never catches`, path, source: TRY_CATCH, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
 ];
 
+// Rule 37 (ADR 0004): the layer zones of eslint.base.js. A use-case of each
+// folder never imports infra, by a relative path or by a core export path, and
+// takes its types from a port. Read alone keeps its converter adapters on an
+// allowlist. Core holds a file in every layer, so it proves the other zones.
+const USE_CASE_INFRA = "import type { ReadGraph } from '../../infra/read-graph.ts';\nexport type F = ReadGraph;\n";
+const USE_CASE_CORE_INFRA = "import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';\nexport type F = ReadGraph;\n";
+const USE_CASE_PORT = "import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';\nexport type F = ReadGraph;\n";
+const USE_CASE_ADAPTER = "import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';\nexport const f = (): unknown => htmlToMarkdown;\n";
+const LAYER_PORT = "import type { Logger } from '../use-cases/ports/logger.ts';\nexport type F = Logger;\n";
+const LAYER_USE_CASE = "import { execute } from '../use-cases/commands/login.ts';\nexport const f = (): unknown => execute;\n";
+const LAYER_COMPOSITION = "import { main } from '../composition/main.ts';\nexport const f = (): unknown => main;\n";
+
+const layerZoneFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArray<Fixture> => [
+  { name: `${cwd}: a use-case never imports infra`, path, source: USE_CASE_INFRA, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
+  { name: `${cwd}: a use-case never imports core's infra`, path, source: USE_CASE_CORE_INFRA, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
+  { name: `control: ${cwd}: a use-case takes a type from a port`, path, source: USE_CASE_PORT, rule: 'no-restricted-imports', fires: false, strict: false, cwd },
+  { name: `${cwd}: a use-case imports a converter adapter only in read`, path, source: USE_CASE_ADAPTER, rule: 'no-restricted-imports', fires: cwd !== 'read', strict: false, cwd },
+];
+
+const CORE_LAYER_FIXTURES: ReadonlyArray<Fixture> = [
+  { name: 'core: domain never imports a port', path: 'src/domain/access-token.ts', source: LAYER_PORT, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'core' },
+  { name: 'core: the presenter never imports a port', path: 'src/presenter/error-hints.ts', source: LAYER_PORT, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'core' },
+  { name: 'core: infra never imports a use-case', path: 'src/infra/auth-paths.ts', source: LAYER_USE_CASE, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'core' },
+  { name: 'core: infra never imports the composition root', path: 'src/infra/auth-paths.ts', source: LAYER_COMPOSITION, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'core' },
+  { name: 'control: core: infra implements a port', path: 'src/infra/auth-paths.ts', source: LAYER_PORT, rule: 'no-restricted-imports', fires: false, strict: false, cwd: 'core' },
+  { name: 'auth: infra never imports a use-case', path: 'src/infra/auth-browser.ts', source: LAYER_USE_CASE, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'auth' },
+  { name: 'read: infra never imports a use-case', path: 'src/infra/eml-parser-adapter.ts', source: LAYER_USE_CASE, rule: 'no-restricted-imports', fires: true, strict: false, cwd: 'read' },
+];
+
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'the MCP gateway never writes stdout', path: 'src/composition/mcp-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
@@ -200,6 +229,8 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'control: core: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false, cwd: 'core' },
   ...WORKSPACE_FILES.flatMap((file, i) => baseBanFixtures(file, WORKSPACE_TESTS[i] ?? file)),
   ...USE_CASE_FILES.flatMap(tryBanFixtures),
+  ...USE_CASE_FILES.flatMap(layerZoneFixtures),
+  ...CORE_LAYER_FIXTURES,
   { name: 'control: read: an infra adapter may catch', path: 'src/infra/mammoth-adapter.ts', source: TRY_CATCH, rule: 'no-restricted-syntax', fires: false, strict: false, cwd: 'read' },
   // Core's own no-restricted-syntax blocks replace the base's options, so they
   // repeat the call-assertion ban: one file of each block.

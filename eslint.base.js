@@ -62,8 +62,40 @@ const TEST_HELPERS_BAN = {
   message: 'A test fake is dev-only: production code never imports test-helpers/. Take the real port, and pass the fake from the test.',
 };
 
-/** @type {(tsconfigRootDir: string) => import('eslint').Linter.Config[]} */
-export const baseConfig = (tsconfigRootDir) => [
+// Rule 37 (ADR 0004): dependencies point inward. Each layer lists the layers it
+// may never import, as a relative path or as a core export path
+// (`@ask-marcel/office-core/<layer>/`). Domain sees nothing else; use-cases see
+// domain and their ports; infra sees domain and the ports it implements; the
+// presenter sees domain; composition sees everything. Tests are outside the
+// zones. ESLint replaces the options of `no-restricted-imports` when two blocks
+// match a file, so each zone repeats the mock ban and the test-helpers ban.
+const layerBan = (regex, message) => ({ regex, message: `${message} (hard rule 37, ADR 0004).` });
+
+// The converter adapters a read use-case still imports (ADR 0004, decision 5):
+// debt that a later port removes. The list may only get shorter.
+const adapterLookahead = (adapters) => (adapters.length === 0 ? '' : `(?!(${adapters.join('|')})\\.ts$)`);
+
+const layerZones = (useCaseAdapters) => [
+  { layer: 'domain', bans: [layerBan('(^|/)(use-cases|infra|presenter|composition)/', 'Domain imports nothing else in src/')] },
+  {
+    layer: 'use-cases',
+    bans: [
+      layerBan(`(^|/)infra/${adapterLookahead(useCaseAdapters)}`, 'A use-case sees domain and its ports, never infra: take the type from a port'),
+      layerBan('(^|/)(presenter|composition)/', 'A use-case never imports the presenter or the composition root'),
+    ],
+  },
+  {
+    layer: 'infra',
+    bans: [
+      layerBan('(^|/)use-cases/(?!ports/)', 'Infra sees domain and the ports it implements, never a use-case'),
+      layerBan('(^|/)(presenter|composition)/', 'Infra never imports the presenter or the composition root'),
+    ],
+  },
+  { layer: 'presenter', bans: [layerBan('(^|/)(use-cases|infra|composition)/', 'The presenter sees domain only')] },
+];
+
+/** @type {(tsconfigRootDir: string, options?: { useCaseAdapters?: ReadonlyArray<string> }) => import('eslint').Linter.Config[]} */
+export const baseConfig = (tsconfigRootDir, { useCaseAdapters = [] } = {}) => [
   pluginJs.configs.recommended,
   ...tsPlugin.configs.recommended,
   securityPlugin.configs.recommended,
@@ -131,6 +163,13 @@ export const baseConfig = (tsconfigRootDir) => [
       'no-restricted-imports': ['error', { paths: [MOCK_BAN], patterns: [TEST_HELPERS_BAN] }],
     },
   },
+  ...layerZones(useCaseAdapters).map(({ layer, bans }) => ({
+    files: [`src/${layer}/**/*.ts`],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [MOCK_BAN], patterns: [TEST_HELPERS_BAN, ...bans] }],
+    },
+  })),
   {
     // The same rule with the try ban added (rule 17), for the same reason.
     files: ['src/use-cases/**/*.ts'],
