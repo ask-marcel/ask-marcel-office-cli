@@ -3,7 +3,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const SELECT = '$select=id,displayName,mail,userPrincipalName,userType&$top=999';
 const grant = (role: string, name: string): Record<string, unknown> => ({ roles: [role], grantedToV2: { siteGroup: { displayName: name, id: '3', loginName: name } } });

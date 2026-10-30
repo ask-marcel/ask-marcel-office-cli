@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const command = commands['list-team-channel-messages-delta'];
 if (!command) throw new Error('list-team-channel-messages-delta is not registered');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { execute } from './list-mail-folder-messages-delta.ts';
 
 type Call = { readonly path: string; readonly headers: Record<string, string> | undefined };

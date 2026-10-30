@@ -4,7 +4,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildCommentedXlsx } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const command = commands['list-document-comments'];
 const ARGS = { driveId: 'b!x', itemId: '01ABC' };
