@@ -3,7 +3,7 @@ import { includesPage, parsePageRange } from '@ask-marcel/office-core/domain/pag
 import type { PageRange } from '@ask-marcel/office-core/domain/page-range.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
 import type { MediaPart } from '../../infra/ooxml-media-extractor.ts';
 import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';

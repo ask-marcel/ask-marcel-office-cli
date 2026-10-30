@@ -1,4 +1,4 @@
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { readCommandOf } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
 import type { Command, ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
