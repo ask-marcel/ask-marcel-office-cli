@@ -26,9 +26,10 @@ On main 3eb2167 about 195 production imports break the rule:
    import domain. `read-only-post.ts` is pure apart from `GraphError`, so it moves to domain too.
    This removes the infra -> use-cases import.
 2. `ReadGraph` and `WriteGraph` move to `core/src/use-cases/ports/graph.ts`. `FetchFn` stays in
-   infra, because outside infra only tests use it. `AuthManager` and `AuthError` move to
-   `auth/src/use-cases/ports/auth.ts`. Infra imports these types from the ports and implements
-   them.
+   infra, because outside infra only tests use it. In auth, `login` and `logout` take an
+   `AuthSession` port (`auth/src/use-cases/ports/auth-session.ts`): the five methods they call,
+   with `AuthError` and `CachedTierInfo`. The full `AuthManager` stays in infra and fits the port.
+   Infra imports these types from the ports and implements them.
 3. Each old module re-exports what moved out of it: infra re-exports the moved types,
    `use-cases/commands/bin-names.ts` re-exports the fill functions, and `command-directory.ts`
    re-exports `PACKAGE_ROLES`. Tests are not in the zones, so no existing test changes (rule 24).
