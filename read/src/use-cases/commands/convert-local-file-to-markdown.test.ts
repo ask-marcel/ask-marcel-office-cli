@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { buildGbkNameZip, buildPdfNoImages, buildSampleDocx, buildSampleMsg, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
-import { executeLocal, execute } from './convert-local-file-to-markdown.ts';
+import { createExecuteLocal, execute } from './convert-local-file-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const executeLocal = createExecuteLocal(CONVERTERS);
 
 type Envelope = { contentType?: string; size?: number; text?: string };
 type ZipResult = {

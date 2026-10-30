@@ -2,8 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { executeLocal } from './convert-local-file-to-markdown.ts';
+import { createExecuteLocal } from './convert-local-file-to-markdown.ts';
 import { commands } from '../../composition/read-commands.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const executeLocal = createExecuteLocal(CONVERTERS);
 
 type Envelope = { readonly contentType?: string; readonly size?: number; readonly text?: string };
 
