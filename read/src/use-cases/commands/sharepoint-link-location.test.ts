@@ -3,7 +3,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 
 const DENIED: GraphError = { type: 'api_error', status: 403, message: 'accessDenied: Access denied', code: 'accessDenied' };

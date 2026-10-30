@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 /*
  * The whole point of the 2026-07-24 unification: a parameter a command does not
