@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { htmlToMarkdown, stripHtmlToText } from '../../infra/turndown-adapter.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown, stripInlineImages } from './docx-to-markdown.ts';
