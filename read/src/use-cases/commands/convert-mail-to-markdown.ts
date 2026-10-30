@@ -10,6 +10,8 @@ import type { InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 import { findPlainTextQuoteBoundary, findQuoteBoundary } from '@ask-marcel/office-core/use-cases/commands/quote-boundary.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // `--inline-images true` opts INTO the per-image bytes-fetch + base64
 // embedding. The default is text-first: an LLM that just wants the body of
@@ -342,22 +344,24 @@ const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, o
 
 const MAIL_ATTACHMENT_HINT = '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._';
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  return renderMessageAsMarkdown(graph, `/me/messages/${parsed.data.messageId}`, {
-    // Embedding is opt-in (`--inline-images true`): the default skips the
-    // per-image bytes fetch entirely and renders placeholders instead, which
-    // is what an LLM consumer wants from a text command.
-    inlineImages: parsed.data.inlineImages === 'true',
-    // Quoted reply chains / forwarded-message blocks are stripped by default
-    // (they duplicate content already in earlier messages and blow the context
-    // budget). Pass `--keep-quoted true` to preserve the full body.
-    keepQuoted: parsed.data.keepQuoted === 'true',
-    attachmentHint: MAIL_ATTACHMENT_HINT,
-    renderHeaders,
-  });
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    return renderMessageAsMarkdown(graph, `/me/messages/${parsed.data.messageId}`, {
+      // Embedding is opt-in (`--inline-images true`): the default skips the
+      // per-image bytes fetch entirely and renders placeholders instead, which
+      // is what an LLM consumer wants from a text command.
+      inlineImages: parsed.data.inlineImages === 'true',
+      // Quoted reply chains / forwarded-message blocks are stripped by default
+      // (they duplicate content already in earlier messages and blow the context
+      // budget). Pass `--keep-quoted true` to preserve the full body.
+      keepQuoted: parsed.data.keepQuoted === 'true',
+      attachmentHint: MAIL_ATTACHMENT_HINT,
+      renderHeaders,
+    });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -403,7 +407,7 @@ const meta: ReadCommandMeta = {
 export {
   ATTACHMENT_METADATA_SELECT,
   attachmentsListSchema,
-  execute,
+  createExecute,
   fetchInlineImageBytes,
   formatAddress,
   formatBytes,

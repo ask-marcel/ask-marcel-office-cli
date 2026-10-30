@@ -2,7 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { execute } from './convert-mail-to-markdown.ts';
+import { createExecute } from './convert-mail-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const execute = createExecute(CONVERTERS);
 
 // The command's own tests live in commands.test.ts; this file covers the
 // behaviours mutation testing showed were unpinned — chiefly the ways a single

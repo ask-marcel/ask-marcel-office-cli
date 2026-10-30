@@ -15,6 +15,8 @@ import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),
@@ -154,17 +156,19 @@ const convertAttachmentToMarkdown = async (graph: ReadGraph, attachmentPath: str
   return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints, attachmentPath);
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-  return convertAttachmentToMarkdown(
-    graph,
-    `/me/messages/${messageId}/attachments/${attachmentId}`,
-    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet, maxCells: parsed.data.maxCells },
-    MAIL_HINTS
-  );
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { messageId, attachmentId } = parsed.data;
+    return convertAttachmentToMarkdown(
+      graph,
+      `/me/messages/${messageId}/attachments/${attachmentId}`,
+      { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet, maxCells: parsed.data.maxCells },
+      MAIL_HINTS
+    );
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -196,5 +200,5 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Mail.Read'],
 };
 
-export { convertAttachmentToMarkdown, convertFetchedAttachment, execute, MAIL_HINTS, meta, schema };
+export { convertAttachmentToMarkdown, convertFetchedAttachment, createExecute, MAIL_HINTS, meta, schema };
 export type { ConvertOptions };

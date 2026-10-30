@@ -13,7 +13,10 @@ import {
   buildSampleDocx,
   buildSampleXlsx,
 } from '../../test-helpers/office-fixtures.ts';
-import { execute } from './convert-mail-attachment-to-markdown.ts';
+import { createExecute } from './convert-mail-attachment-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const execute = createExecute(CONVERTERS);
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
