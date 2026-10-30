@@ -9,6 +9,8 @@ import type { Render, RenderOptions } from './drive-item-diff.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { MAX_CELLS_OPTION, maxCellsField, SHEET_OPTION } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -29,16 +31,18 @@ const renderFile = async (graph: ReadGraph, driveId: string, itemId: string, opt
 
 const WORDING = { same: 'The two files render to the same markdown.', readWhole: 'read each file with download-drive-item-as-markdown' };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, otherDriveId, otherItemId, maxCells, sheet } = parsed.data;
-  const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
-  const [from, to] = await Promise.all([renderFile(graph, driveId, itemId, opts), renderFile(graph, otherDriveId, otherItemId, opts)]);
-  if (!from.ok) return from;
-  if (!to.ok) return to;
-  return ok(diffEnvelope(`a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, WORDING));
-};
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId, otherDriveId, otherItemId, maxCells, sheet } = parsed.data;
+    const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
+    const [from, to] = await Promise.all([renderFile(graph, driveId, itemId, opts), renderFile(graph, otherDriveId, otherItemId, opts)]);
+    if (!from.ok) return from;
+    if (!to.ok) return to;
+    return ok(diffEnvelope(`a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, WORDING));
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -76,4 +80,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
