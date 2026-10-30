@@ -2,7 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { execute } from './get-mail-signature.ts';
+import { createExecute } from './get-mail-signature.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const execute = createExecute(CONVERTERS);
 
 const SCAN_PATH = '/me/mailFolders/sentitems/messages?$top=10&$orderby=sentDateTime%20desc&$select=id,sentDateTime';
 const SIGNATURE = '<div id="Signature"><div>Robin Chen</div><div>Fabrikam</div></div>';

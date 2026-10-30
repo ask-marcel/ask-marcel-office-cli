@@ -12,6 +12,8 @@ import { normalizeVersionId } from './version-id.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // v1.4.0 surface-consolidation: the three historical-version downloads
 // (`-content`, `-as-pdf`, `-as-markdown`) shared the exact same schema +
@@ -161,23 +163,25 @@ const withNote = (value: Record<string, unknown>, note: string): Record<string, 
   return { ...value, note: typeof existing === 'string' ? `${existing} ${note}` : note };
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, before } = parsed.data;
-  const resolved = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
-  if (!resolved.ok) return resolved;
-  const picked = resolved.value;
-  const format = parsed.data.format ?? 'original';
-  const includeMetadata = parsed.data.includeMetadata === 'true';
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId, before } = parsed.data;
+    const resolved = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
+    if (!resolved.ok) return resolved;
+    const picked = resolved.value;
+    const format = parsed.data.format ?? 'original';
+    const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const contentPath = contentPathOf(driveId, itemId, picked);
-  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath, format, includeMetadata, maxCells: parsed.data.maxCells });
-  if (!fetched.ok || before === undefined) return fetched;
-  // Say which version `--before` chose: the caller never saw the listing.
-  const chosen = { ...(fetched.value as Record<string, unknown>), versionId: picked.id };
-  return ok(picked.current ? withNote({ ...chosen, current: true }, `Nothing was saved after ${before}: this is the live file.`) : chosen);
-};
+    const contentPath = contentPathOf(driveId, itemId, picked);
+    const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath, format, includeMetadata, maxCells: parsed.data.maxCells });
+    if (!fetched.ok || before === undefined) return fetched;
+    // Say which version `--before` chose: the caller never saw the listing.
+    const chosen = { ...(fetched.value as Record<string, unknown>), versionId: picked.id };
+    return ok(picked.current ? withNote({ ...chosen, current: true }, `Nothing was saved after ${before}: this is the live file.`) : chosen);
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -234,4 +238,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, pickPreviousVersion, refuseVersionRender, resolveVersion, schema };
+export { createExecute, meta, pickPreviousVersion, refuseVersionRender, resolveVersion, schema };

@@ -10,6 +10,8 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),
@@ -68,33 +70,35 @@ const nameByContentType = (a: Record<string, unknown>): Record<string, unknown> 
   return { ...a, name: `attachment.${ext}` };
 };
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
-  const keepQuoted = parsed.data.keepQuoted === 'true';
-  const { sheet, maxCells } = parsed.data;
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { messageId, attachmentId } = parsed.data;
+    const includeMetadata = parsed.data.includeMetadata === 'true';
+    const keepQuoted = parsed.data.keepQuoted === 'true';
+    const { sheet, maxCells } = parsed.data;
 
-  // Single fetch, then auto-route by content-type: a zip is unpacked + converted
-  // entry-by-entry; everything else (docx/xlsx/pptx/odf/csv/pdf/.msg/.eml/legacy/text,
-  // referenceAttachment, embedded item) goes through the markdown dispatch — so a
-  // caller that just wants to "read this attachment" never has to pick the command.
-  const attachmentPath = `/me/messages/${messageId}/attachments/${attachmentId}`;
-  const fetched = await graph.get(attachmentPath);
-  if (!fetched.ok) return fetched;
-  const a = fetched.value as Record<string, unknown>;
+    // Single fetch, then auto-route by content-type: a zip is unpacked + converted
+    // entry-by-entry; everything else (docx/xlsx/pptx/odf/csv/pdf/.msg/.eml/legacy/text,
+    // referenceAttachment, embedded item) goes through the markdown dispatch — so a
+    // caller that just wants to "read this attachment" never has to pick the command.
+    const attachmentPath = `/me/messages/${messageId}/attachments/${attachmentId}`;
+    const fetched = await graph.get(attachmentPath);
+    if (!fetched.ok) return fetched;
+    const a = fetched.value as Record<string, unknown>;
 
-  if (isZipAttachment(a)) {
-    if (sheet !== undefined) return refuseSheet('this attachment is a zip archive');
-    const contentBytes = a['contentBytes'];
-    if (typeof contentBytes !== 'string') {
-      return err({ type: 'api_error', status: 400, message: 'zip fileAttachment has no contentBytes to unpack (the attachment may be empty).' });
+    if (isZipAttachment(a)) {
+      if (sheet !== undefined) return refuseSheet('this attachment is a zip archive');
+      const contentBytes = a['contentBytes'];
+      if (typeof contentBytes !== 'string') {
+        return err({ type: 'api_error', status: 400, message: 'zip fileAttachment has no contentBytes to unpack (the attachment may be empty).' });
+      }
+      return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted, maxCells });
     }
-    return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted, maxCells });
-  }
-  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted, sheet, maxCells }, MAIL_HINTS, attachmentPath);
-};
+    return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted, sheet, maxCells }, MAIL_HINTS, attachmentPath);
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -126,4 +130,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Mail.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };

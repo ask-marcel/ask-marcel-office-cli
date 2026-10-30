@@ -201,6 +201,7 @@ import * as getExcelUsedRange from './get-excel-used-range.ts';
 import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const cmdMap: Record<string, { execute: ReadCommand['execute'] }> = {
   'list-drives': listDrives,
@@ -210,7 +211,7 @@ const cmdMap: Record<string, { execute: ReadCommand['execute'] }> = {
   'get-drive-item': getDriveItem,
   'list-drive-item-permissions': listDriveItemPermissions,
   'list-drive-item-versions': listDriveItemVersions,
-  'download-drive-item-version': downloadDriveItemVersion,
+  'download-drive-item-version': { execute: downloadDriveItemVersion.createExecute(CONVERTERS) },
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
   'extract-drive-item-images': extractDriveItemImages,
