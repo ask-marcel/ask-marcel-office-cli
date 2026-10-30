@@ -86,6 +86,11 @@ const CLASS_DECLARATION = 'export class Box {\n  readonly n = 1;\n}\n';
 const INLINE_TYPE_IMPORT = "import { ok, type Result } from './result.ts';\nexport const f = (): Result<number, string> => ok(1);\n";
 const CURRIED_ARROW = 'export const add = (a: number) => (b: number): number => a + b;\n';
 const CREATE_FACTORY = 'export const createAdder = (a: number) => (b: number): number => a + b;\n';
+// Rule 35: eleven paths (ten ifs) is one over the limit, and nine ifs is at it.
+const pathsFn = (ifs: number): string =>
+  `export const f = (n: number): number => {\n${Array.from({ length: ifs }, (_, i) => `  if (n === ${i}) return ${i};\n`).join('')}  return -1;\n};\n`;
+const ELEVEN_PATHS = pathsFn(10);
+const TEN_PATHS = pathsFn(9);
 const TRY_CATCH = "export const f = (raw: string): unknown => {\n  try {\n    return JSON.parse(raw);\n  } catch {\n    return undefined;\n  }\n};\n";
 const CALL_ASSERTION_IN_SOURCE = "export const f = (e: { toHaveBeenCalled: () => void }): void => {\n  e.toHaveBeenCalled();\n};\n";
 
@@ -123,6 +128,8 @@ const baseBanFixtures = ([cwd, path]: readonly [string, string], [, testPath]: r
   { name: `${cwd}: an inline type specifier is rejected`, path, source: INLINE_TYPE_IMPORT, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
   { name: `${cwd}: a curried arrow is rejected`, path, source: CURRIED_ARROW, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
   { name: `control: ${cwd}: a createX factory may return a function`, path, source: CREATE_FACTORY, rule: 'no-restricted-syntax', fires: false, strict: false, cwd },
+  { name: `${cwd}: a function with eleven paths is rejected`, path, source: ELEVEN_PATHS, rule: 'complexity', fires: true, strict: false, cwd },
+  { name: `control: ${cwd}: a function with ten paths is kept`, path, source: TEN_PATHS, rule: 'complexity', fires: false, strict: false, cwd },
 ];
 
 // Rule 17: a try in a use-case, one file of each folder. Core's own blocks
