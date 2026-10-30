@@ -24,7 +24,7 @@ import {
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
-import { commands as cmdRegistry } from './index.ts';
+import { commands as cmdRegistry } from '../../composition/read-commands.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as listAccessibleDrives from './list-accessible-drives.ts';
