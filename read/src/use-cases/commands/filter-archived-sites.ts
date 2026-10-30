@@ -1,7 +1,7 @@
 import { errorIndicatesArchived, isArchivedSite } from '../../domain/utilities/archive-status.ts';
 import { isNonNavigableSiteUrl } from '../../domain/utilities/site-url-classifier.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 
 /**
  * Drop sites the signed-in user cannot actually open from a list of Microsoft
