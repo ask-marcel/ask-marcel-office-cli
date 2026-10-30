@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from '@ask-marcel/office-core/use-cases/commands/office-extensions.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
