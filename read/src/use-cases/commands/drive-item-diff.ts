@@ -1,7 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { lineDiff, MAX_EDITS } from '../../infra/line-diff-adapter.ts';
 import type { FetchOptions } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
