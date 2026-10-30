@@ -8,6 +8,7 @@ import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fing
 import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
+import type { AuthError, CachedTierInfo } from '../use-cases/ports/auth-session.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
@@ -81,7 +82,6 @@ type CachedToken = {
    */
   guest_tokens?: Partial<Record<string, { access_token: string; expires_on: number }>>;
 };
-type AuthError = { type: 'auth_failed'; message: string; code?: string } | { type: 'auth_cancelled' };
 /**
  * Outcome of the elevated-token capture leg of the most recent
  * browser-acquired session. Read by `login.execute` to surface a
@@ -91,10 +91,6 @@ type AuthError = { type: 'auth_failed'; message: string; code?: string } | { typ
  * downloads) will work without invoking them.
  */
 type ElevatedOutcome = { captured: true } | { captured: false; reason: ElevatedFailureReason | 'unknown_error' };
-// Decode-only preflight info for one token tier: availability, remaining runway,
-// and the scopes granted to that token (decoded from its `scp` claim; empty when
-// the token or the claim is absent).
-type CachedTierInfo = { readonly available: boolean; readonly expiresInSeconds: number | undefined; readonly scopes: ReadonlyArray<string> };
 
 type AuthManager = {
   getAccessToken: (options?: { force?: boolean }) => Promise<Result<AccessToken, AuthError>>;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import type { AuthManager } from '../../infra/auth.ts';
+import type { AuthError, AuthSession } from '../ports/auth-session.ts';
 
 const schema = z.object({}).strict();
 
@@ -35,7 +35,7 @@ const schema = z.object({}).strict();
  * `freshElevatedToken`. Verified live 2026-08-30: silent capture in 17s with no
  * prompt, and the same call failing against a profile a forced login had wiped.
  */
-const execute = async (auth: AuthManager, options?: { force?: boolean }): Promise<Result<string, import('../../infra/auth.ts').AuthError>> => {
+const execute = async (auth: AuthSession, options?: { force?: boolean }): Promise<Result<string, AuthError>> => {
   const authenticated = await auth.getAccessToken(options);
   // Already forced: the dance just ran. If elevated is still missing (a
   // federated tenant whose capture failed), escalating again would open a
