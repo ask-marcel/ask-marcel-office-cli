@@ -5,7 +5,8 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 import type { ReadGraph, ReadOnlyPostPath } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import type { Command, CommandMeta, ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { commands, registerCommands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
+import { registerCommands } from './index.ts';
 
 /*
  * The read guarantee of the read package (package split, D9): the registry

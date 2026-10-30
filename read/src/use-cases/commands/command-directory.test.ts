@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { COMMAND_DIRECTORY, commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 // The directory is static so core can read it without the registry; this suite
