@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildSampleEml } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 
 const textOf = async (opts: { readonly keepQuoted?: boolean }): Promise<string> => {
