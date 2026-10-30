@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 type Answer = { readonly contentType: string; readonly size: number; readonly text: string; readonly note?: string };
 

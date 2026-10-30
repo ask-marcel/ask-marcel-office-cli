@@ -3,7 +3,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const CHAT = '19:abc@thread.v2';
 const SHOT = 'https://as-api.asm.skype.com/v1/objects/0-weu-d1-aaa/views/imgo';
