@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatAddress, nonEmpty, renderMessageAsMarkdown } from './convert-mail-to-markdown.ts';
 import type { MailLikeResource } from './convert-mail-to-markdown.ts';
