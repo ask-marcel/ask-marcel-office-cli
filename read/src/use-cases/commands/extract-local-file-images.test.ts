@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { buildMalformedDocx, buildMediaSamples, buildPdfNoImages, buildPdfWithImage } from '../../test-helpers/office-fixtures.ts';
-import { execute, executeLocal } from './extract-local-file-images.ts';
+import { execute, createExecuteLocal } from './extract-local-file-images.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
+
+const executeLocal = createExecuteLocal(CONVERTERS);
 
 type MediaEnvelope = { count: number; media: ReadonlyArray<{ path: string; contentType: string; sizeBytes: number; base64: string }> };
 

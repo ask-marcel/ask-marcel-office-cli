@@ -13,6 +13,8 @@ import type { ConversionHints } from './markdown-dispatch.ts';
 import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
  * Convert a file ON DISK to markdown through the same `bytesToMarkdown`
@@ -55,30 +57,32 @@ const LOCAL_HINTS: ConversionHints = {
   generic: (ext) => `${ext} is not a convertible Office/text format. For formats Graph can render (rtf, …), upload the file to OneDrive and use \`download-drive-item-as-pdf\`.`,
 };
 
-const executeLocal = async (fs: FileSystem, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { path } = parsed.data;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
-  const inlineImages = parsed.data.inlineImages === 'true';
-  const keepQuoted = parsed.data.keepQuoted === 'true';
-  const includeImages = parsed.data.includeImages === 'true';
-  const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
+const createExecuteLocal =
+  (_converters: Converters): NonNullable<ReadCommand['executeLocal']> =>
+  async (fs: FileSystem, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { path } = parsed.data;
+    const includeMetadata = parsed.data.includeMetadata === 'true';
+    const inlineImages = parsed.data.inlineImages === 'true';
+    const keepQuoted = parsed.data.keepQuoted === 'true';
+    const includeImages = parsed.data.includeImages === 'true';
+    const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
 
-  const bytes = await fs.readBytes(path);
-  if (!bytes.ok) {
-    if (bytes.error.type === 'not_found') return err({ type: 'api_error', status: 404, message: `local file not found: ${path}` });
-    return err({ type: 'api_error', status: 500, message: `failed to read ${path}: ${bytes.error.message}` });
-  }
+    const bytes = await fs.readBytes(path);
+    if (!bytes.ok) {
+      if (bytes.error.type === 'not_found') return err({ type: 'api_error', status: 404, message: `local file not found: ${path}` });
+      return err({ type: 'api_error', status: 500, message: `failed to read ${path}: ${bytes.error.message}` });
+    }
 
-  const name = basename(path);
-  const { sheet } = parsed.data;
-  if (extensionOf(name) === 'zip') {
-    if (sheet !== undefined) return refuseSheet('this file is a zip archive');
-    return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted, maxCells });
-  }
-  return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
-};
+    const name = basename(path);
+    const { sheet } = parsed.data;
+    if (extensionOf(name) === 'zip') {
+      if (sheet !== undefined) return refuseSheet('this file is a zip archive');
+      return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted, maxCells });
+    }
+    return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
+  };
 
 const execute = async (_graph: ReadGraph, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
   err({
@@ -142,4 +146,4 @@ const meta: ReadCommandMeta = {
   effect: 'read',
 };
 
-export { execute, executeLocal, meta, schema };
+export { execute, createExecuteLocal, meta, schema };
