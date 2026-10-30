@@ -1,35 +1,10 @@
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
+import type { WriteGraph } from '../use-cases/ports/graph.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
-
-/*
- * The graph a write command gets (package split, D9): the basic tier only,
- * which is all the write commands sign with. It reads as they need (JSON,
- * bytes, the CDN follow) and adds post, patch, put and delete. Read code never
- * imports this module (eslint.config.js), so a read-only build carries none of
- * it (scripts/check-read-bundle.ts).
- */
-
-type WriteGraph = {
-  get: (path: string, extraHeaders?: Record<string, string>) => Promise<Result<unknown, GraphError>>;
-  getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
-  fetchUrl: (url: string) => Promise<Result<unknown, GraphError>>;
-  post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
-  patch: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
-  /**
-   * Upload bytes to a drive item. `basePath` is the bare driveItem
-   * path (e.g. `/me/drive/root:/.ask-marcel-temp/abc.rtf`) — `put()`
-   * appends `:/content` for the simple ≤4 MiB sync path or
-   * `:/createUploadSession` for the chunked-session path internally
-   * based on `body.byteLength`. No upper file-size limit beyond the
-   * user's OneDrive quota.
-   */
-  put: (basePath: string, body: Uint8Array, contentType?: string) => Promise<Result<unknown, GraphError>>;
-  delete: (path: string) => Promise<Result<unknown, GraphError>>;
-};
 
 const SIMPLE_PUT_THRESHOLD = 4 * 1024 * 1024; // 4 MiB
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320 KiB; 5 MiB is 16 × 320 KiB
