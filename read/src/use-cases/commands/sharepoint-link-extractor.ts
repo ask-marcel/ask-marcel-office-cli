@@ -1,5 +1,5 @@
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 
 /**
