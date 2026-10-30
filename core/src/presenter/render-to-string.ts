@@ -12,8 +12,8 @@
  * write directly, trailing newline included — `output.test.ts` captures
  * stdout and pins that contract.
  */
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
-import { fillNamesOrKeep } from '../use-cases/commands/bin-names.ts';
+import type { NameSource } from '../domain/bin-names.ts';
+import { fillNamesOrKeep } from '../domain/bin-names.ts';
 import type { ErrorSource } from './error-hints.ts';
 import { findErrorHint } from './error-hints.ts';
 import { canonicalizeGraphCursor } from './graph-cursor.ts';

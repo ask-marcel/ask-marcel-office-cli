@@ -9,14 +9,16 @@
  * `composition/mcp-shell.ts` serves the MCP stdio protocol, where stdout carries
  * JSON-RPC frames and a stray write corrupts the stream.
  */
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
-import type { Logger } from '../use-cases/ports/logger.ts';
+import type { NameSource } from '../domain/bin-names.ts';
 import type { ErrorSource } from './error-hints.ts';
 import type { OutputFormat, RenderContext } from './render-to-string.ts';
 import { renderErrorToString, renderToString } from './render-to-string.ts';
 
 // `names`: the package whose bins fill the CLI's own text (see render-to-string.ts).
-const render = (data: unknown, logger: Logger, format: OutputFormat, context?: RenderContext, names?: NameSource): void => {
+// The one logger method the presenter calls; a Logger port fits it (ADR 0004: presenter sees domain only).
+type RenderLog = { readonly info: (event: string, meta?: Readonly<Record<string, unknown>>) => void };
+
+const render = (data: unknown, logger: RenderLog, format: OutputFormat, context?: RenderContext, names?: NameSource): void => {
   logger.info('output_rendered', {});
   process.stdout.write(renderToString(data, format, context, names));
 };
