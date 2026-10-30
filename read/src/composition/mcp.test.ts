@@ -5,7 +5,7 @@ import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 import { buildMcpServer } from './mcp.ts';
 import type { BuildMcpServerDeps } from './mcp.ts';
 

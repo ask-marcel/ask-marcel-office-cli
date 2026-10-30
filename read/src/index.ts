@@ -27,6 +27,6 @@ export type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-
 /** A read command: its meta and its run on the read graph. */
 export type Command = CoreCommand<ReadGraph>;
 
-export { commands } from './use-cases/commands/index.ts';
+export { commands } from './composition/read-commands.ts';
 export { createEnvThenHelperTokenSource } from './composition/read-token-source.ts';
 export { createReadClient } from './composition/read-client.ts';
