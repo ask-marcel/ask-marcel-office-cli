@@ -1,5 +1,5 @@
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
-import { fillNamesOrKeep } from '../use-cases/commands/bin-names.ts';
+import type { NameSource } from '../domain/bin-names.ts';
+import { fillNamesOrKeep } from '../domain/bin-names.ts';
 import { canonicalizeGraphCursor } from './graph-cursor.ts';
 
 type Cursors = {

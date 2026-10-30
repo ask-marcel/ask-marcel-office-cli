@@ -9,9 +9,10 @@
  * in it: no package sends a caller elsewhere for them.
  */
 
-/** The three published packages of the split. */
-export const PACKAGE_ROLES = ['auth', 'read', 'write'] as const;
-export type PackageRole = (typeof PACKAGE_ROLES)[number];
+import type { PackageRole } from '../../domain/package-role.ts';
+
+export { PACKAGE_ROLES } from '../../domain/package-role.ts';
+export type { PackageRole } from '../../domain/package-role.ts';
 
 /** The npm name of each package of the split (plan decision D8). */
 export const PACKAGE_NAMES: Readonly<Record<PackageRole, string>> = {
