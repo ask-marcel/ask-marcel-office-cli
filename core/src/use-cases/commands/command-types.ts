@@ -1,8 +1,7 @@
 import type { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { GraphError } from '../../domain/graph-error.ts';
+import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
 
 type CommandSchema = z.ZodType;

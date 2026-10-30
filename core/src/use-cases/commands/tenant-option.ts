@@ -3,8 +3,8 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import { tenantId } from '../../domain/tenant-id.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { GraphError } from '../../domain/graph-error.ts';
+import type { ReadGraph } from '../ports/graph.ts';
 import type { CommandOptionMeta } from './command-types.ts';
 
 /**

@@ -2,8 +2,8 @@ import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { GraphError } from '../../domain/graph-error.ts';
+import type { ReadGraph } from '../ports/graph.ts';
 
 /**
  * Helpers that consolidate the "Graph hands you a 302, follow the CDN

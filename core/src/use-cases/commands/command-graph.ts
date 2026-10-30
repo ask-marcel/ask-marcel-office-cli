@@ -1,5 +1,4 @@
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './command-types.ts';
 import { postIfReadOnly } from '../../domain/read-only-post.ts';
 
