@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const messageFor = async (params: Record<string, string>): Promise<string> => {
   const command = commands['get-mail-message'];
