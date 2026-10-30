@@ -4,7 +4,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildSampleDocx, buildTrackedChangesDocx } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 type Diff = { readonly contentType: string; readonly size: number; readonly text: string; readonly added?: number; readonly removed?: number; readonly note?: string };
 

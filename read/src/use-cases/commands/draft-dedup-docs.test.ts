@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 // Guards the drafts-dedup caveat: a future edit must not silently drop the
 // warning that a conversationId $filter on the Drafts folder is not a reliable

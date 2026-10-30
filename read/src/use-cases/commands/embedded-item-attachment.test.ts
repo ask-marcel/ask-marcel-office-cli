@@ -4,7 +4,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildSampleEml } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const PATH = '/me/messages/m1/attachments/a1';
 const EXPANDED = `${PATH}?$expand=microsoft.graph.itemattachment/item`;

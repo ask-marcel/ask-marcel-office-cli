@@ -3,7 +3,7 @@ import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/
 import type { Command } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({

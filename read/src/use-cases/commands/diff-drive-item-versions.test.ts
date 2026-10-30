@@ -4,7 +4,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildSampleDocx, buildTrackedChangesDocx } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const VERSIONS = '/drives/d1/items/i1/versions?$select=id,lastModifiedDateTime';
 const saved = (id: string, day: number): { id: string; lastModifiedDateTime: string } => ({ id, lastModifiedDateTime: `2026-09-${day}T09:00:00Z` });
