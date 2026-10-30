@@ -1,7 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { attrOf, findAll, parseXml, textOf } from './ooxml-xml-walker.ts';

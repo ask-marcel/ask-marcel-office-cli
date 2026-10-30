@@ -1,8 +1,8 @@
 import { parseJson } from '@ask-marcel/office-core/domain/json.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok, unwrapOr } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
