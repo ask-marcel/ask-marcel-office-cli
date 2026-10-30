@@ -11,6 +11,8 @@ import { convertZipArchive } from './zip-archive-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -33,19 +35,21 @@ const schema = z.object({
   ...tenantIdShape,
 });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
-  const tenant = brandOptionalTenantId(parsed.data.tenantId);
-  if (!tenant.ok) return tenant;
-  const tenantId = tenant.value;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { driveId, itemId } = parsed.data;
+    const tenant = brandOptionalTenantId(parsed.data.tenantId);
+    if (!tenant.ok) return tenant;
+    const tenantId = tenant.value;
+    const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
-  if (!bytes.ok) return bytes;
-  return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
-};
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
+    if (!bytes.ok) return bytes;
+    return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -81,4 +85,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Files.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
