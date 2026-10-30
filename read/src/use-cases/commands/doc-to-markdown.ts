@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractDocText } from '../../infra/legacy-doc-extractor.ts';
 
 type DocTextEnvelope = { readonly contentType: 'text/plain'; readonly size: number; readonly text: string };
