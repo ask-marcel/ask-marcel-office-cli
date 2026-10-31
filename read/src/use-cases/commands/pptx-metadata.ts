@@ -1,7 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
+import type { Converters, OoxmlZip } from '../ports/converters.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
@@ -44,8 +43,8 @@ const extractSlideTags = (zip: OoxmlZip): ReadonlyArray<SlideTag> => {
   return out;
 };
 
-const extractPptxMetadata = async (bytes: Uint8Array): Promise<Result<PptxMetadata, GraphError>> => {
-  const zipR = await openOoxmlZip(bytes);
+const extractPptxMetadata = async (converters: Converters, bytes: Uint8Array): Promise<Result<PptxMetadata, GraphError>> => {
+  const zipR = await converters.openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   const zip = zipR.value;
   const commentAuthors = extractCommentAuthors(zip);

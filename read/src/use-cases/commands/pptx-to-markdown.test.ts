@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { buildEmptyPptx, buildMalformedPptx, buildRichPptx } from '../../test-helpers/office-fixtures.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('pptxToMarkdown', () => {
   it('renders each slide as a `## Slide N` section — body text then speaker notes inline, hidden slides flagged, sections blank-line separated', async () => {
-    const result = await pptxToMarkdown(await buildRichPptx());
+    const result = await pptxToMarkdown(CONVERTERS, await buildRichPptx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/markdown');
@@ -27,7 +28,7 @@ describe('pptxToMarkdown', () => {
   });
 
   it('appends the `## PPTX metadata` side-channel block when includeMetadata is true (body still present)', async () => {
-    const result = await pptxToMarkdown(await buildRichPptx(), { includeMetadata: true });
+    const result = await pptxToMarkdown(CONVERTERS, await buildRichPptx(), { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text).toContain('## Slide 1'); // slide body still rendered
@@ -35,14 +36,14 @@ describe('pptxToMarkdown', () => {
   });
 
   it('renders a slide with no text or notes as a bare `## Slide N` header (no empty body / notes lines)', async () => {
-    const result = await pptxToMarkdown(await buildEmptyPptx());
+    const result = await pptxToMarkdown(CONVERTERS, await buildEmptyPptx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text).toBe('## Slide 1'); // text/notes branches both skipped — no trailing blank lines
   });
 
   it('propagates the zip-parse error for a malformed deck', async () => {
-    const result = await pptxToMarkdown(buildMalformedPptx());
+    const result = await pptxToMarkdown(CONVERTERS, buildMalformedPptx());
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');

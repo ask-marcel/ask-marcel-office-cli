@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const rels = (body: string): string => `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${body}</Relationships>`;
@@ -27,7 +28,8 @@ const workbookWith = async (parts: Readonly<Record<string, string>>): Promise<Ui
   return zip.generateAsync({ type: 'uint8array' });
 };
 
-const metadataOf = async (parts: Readonly<Record<string, string>>): Promise<Awaited<ReturnType<typeof extractXlsxMetadata>>> => extractXlsxMetadata(await workbookWith(parts));
+const metadataOf = async (parts: Readonly<Record<string, string>>): Promise<Awaited<ReturnType<typeof extractXlsxMetadata>>> =>
+  extractXlsxMetadata(CONVERTERS, await workbookWith(parts));
 
 describe('which sheet a workbook comment belongs to', () => {
   it('follows only comments relationships, so another relationship aimed at a comments part does not move it', async () => {

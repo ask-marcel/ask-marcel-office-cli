@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { buildMalformedPptx, buildMinimalPptx, buildRichPptx } from '../../test-helpers/office-fixtures.ts';
 import { formatPptxMetadata } from './pptx-metadata-to-markdown.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('extractPptxMetadata', () => {
   it('collects p:tag entries ONLY from ppt/tags/tag{N}.xml parts — the ^/$ anchored path filter excludes look-alike paths and p:tags elsewhere in the package', async () => {
@@ -15,7 +16,7 @@ describe('extractPptxMetadata', () => {
     zip.file('notppt/tags/tag1.xml', tagPart('NOCARET', 'x')); // matches only if the leading ^ is dropped
     zip.file('ppt/tags/tag1.xmlbak', tagPart('NODOLLAR', 'x')); // matches only if the trailing $ is dropped
     zip.file('ppt/foo/decoy.xml', tagPart('FILTERED', 'x')); // a p:tag outside the tags folder — only the no-filter mutant reads it
-    const result = await extractPptxMetadata(await zip.generateAsync({ type: 'uint8array' }));
+    const result = await extractPptxMetadata(CONVERTERS, await zip.generateAsync({ type: 'uint8array' }));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.slideTags).toEqual([
@@ -25,7 +26,7 @@ describe('extractPptxMetadata', () => {
   });
 
   it('surfaces the authored-but-invisible content a slide PDF never shows — custom props, slide tag, legacy + modern comments, hidden slide, speaker notes, external hyperlink', async () => {
-    const result = await extractPptxMetadata(await buildRichPptx());
+    const result = await extractPptxMetadata(CONVERTERS, await buildRichPptx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
@@ -61,7 +62,7 @@ describe('extractPptxMetadata', () => {
   });
 
   it('returns empty arrays for every list section on a barebones deck (one untitled slide, no tags/comments/notes/custom)', async () => {
-    const result = await extractPptxMetadata(await buildMinimalPptx());
+    const result = await extractPptxMetadata(CONVERTERS, await buildMinimalPptx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.custom).toEqual([]);
@@ -76,7 +77,7 @@ describe('extractPptxMetadata', () => {
   });
 
   it('returns an api_error Result when the pptx zip is malformed', async () => {
-    const result = await extractPptxMetadata(buildMalformedPptx());
+    const result = await extractPptxMetadata(CONVERTERS, buildMalformedPptx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('ooxml zip parse failed');
@@ -86,7 +87,7 @@ describe('extractPptxMetadata', () => {
 
 describe('formatPptxMetadata', () => {
   it('renders a populated `## PPTX metadata` block with every section heading and the authored content', async () => {
-    const extracted = await extractPptxMetadata(await buildRichPptx());
+    const extracted = await extractPptxMetadata(CONVERTERS, await buildRichPptx());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     const md = formatPptxMetadata(extracted.value);
@@ -104,7 +105,7 @@ describe('formatPptxMetadata', () => {
   });
 
   it('emits `_(none)_` placeholders for empty sections on a barebones deck', async () => {
-    const extracted = await extractPptxMetadata(await buildMinimalPptx());
+    const extracted = await extractPptxMetadata(CONVERTERS, await buildMinimalPptx());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     const md = formatPptxMetadata(extracted.value);

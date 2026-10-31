@@ -4,24 +4,25 @@ import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-clie
 import { buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { commands } from '../../composition/read-commands.ts';
 import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const workbook = buildSampleXlsx();
 
 describe('rendering one sheet of a workbook', () => {
   it('keeps only the named sheet, case-insensitively, and every sheet without the flag', async () => {
-    const one = await xlsxToMarkdown(workbook, { sheet: 'sheet2' });
+    const one = await xlsxToMarkdown(CONVERTERS, workbook, { sheet: 'sheet2' });
     if (!one.ok) throw new Error('expected ok');
     expect(one.value.text).toContain('## Sheet2');
     expect(one.value.text).not.toContain('## Sheet1');
-    const all = await xlsxToMarkdown(workbook);
+    const all = await xlsxToMarkdown(CONVERTERS, workbook);
     if (!all.ok) throw new Error('expected ok');
     expect(all.value.text).toContain('## Sheet1');
     expect(all.value.text).toContain('## Sheet2');
   });
 
   it('names the sheets that exist when the requested one does not', async () => {
-    const missing = await xlsxToMarkdown(workbook, { sheet: 'Totals' });
+    const missing = await xlsxToMarkdown(CONVERTERS, workbook, { sheet: 'Totals' });
     expect(missing.ok).toBe(false);
     if (missing.ok) return;
     expect(missing.error.type).toBe('validation_error');
