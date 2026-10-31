@@ -1,10 +1,9 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { mammothToHtml } from '../../infra/mammoth-adapter.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 type MarkdownEnvelope = { readonly contentType: 'text/markdown'; readonly size: number; readonly text: string };
 type DocxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly inlineImages?: boolean };
@@ -67,14 +66,14 @@ const promoteFirstRowToThead = (html: string): string => {
   return out;
 };
 
-const docxToMarkdown = async (bytes: Uint8Array, opts: DocxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
-  const html = await mammothToHtml(bytes);
+const docxToMarkdown = async (converters: Converters, bytes: Uint8Array, opts: DocxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+  const html = await converters.mammothToHtml(bytes);
   if (!html.ok) return html;
-  const md = htmlToMarkdown(promoteFirstRowToThead(html.value));
+  const md = converters.htmlToMarkdown(promoteFirstRowToThead(html.value));
   if (!md.ok) return md;
   let text = opts.inlineImages === true ? md.value : stripInlineImages(md.value);
   if (opts.includeMetadata === true) {
-    const meta = await extractDocxMetadata(bytes);
+    const meta = await extractDocxMetadata(converters, bytes);
     if (!meta.ok) return meta;
     text = `${text}\n\n${formatDocxMetadata(meta.value)}`;
   }

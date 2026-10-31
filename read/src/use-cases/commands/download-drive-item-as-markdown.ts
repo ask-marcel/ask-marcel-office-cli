@@ -28,7 +28,7 @@ const schema = z.object({
 });
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -48,7 +48,7 @@ const createExecute =
 
     // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
     // byte fetch through the whole conversion pipeline with nothing else to change.
-    return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, {
+    return officeToMarkdown(converters, graph, `/drives/${driveId}/items/${itemId}/content`, name, {
       includeMetadata,
       inlineImages,
       maxCells,

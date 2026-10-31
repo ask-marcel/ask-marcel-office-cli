@@ -12,6 +12,7 @@ import {
 } from '../../test-helpers/office-fixtures.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 /**
  * Hand-rolled DOCX zip carrying the XML shapes the `docx` package can't
@@ -133,7 +134,7 @@ const buildTableRevisionDocx = async (): Promise<Uint8Array> => {
 describe('extractDocxMetadata', () => {
   it('returns every section populated for a rich docx — core/custom props, comment, tracked ins/del, hidden text, external rel, MERGEFIELD, bookmark', async () => {
     const bytes = await buildRichDocx();
-    const result = await extractDocxMetadata(bytes);
+    const result = await extractDocxMetadata(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
@@ -162,7 +163,7 @@ describe('extractDocxMetadata', () => {
   });
 
   it('captures header/footer body prose and text-box (w:txbxContent) text that mammoth drops', async () => {
-    const result = await extractDocxMetadata(await buildDocxWithHeaderFooterTextbox());
+    const result = await extractDocxMetadata(CONVERTERS, await buildDocxWithHeaderFooterTextbox());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
@@ -176,7 +177,7 @@ describe('extractDocxMetadata', () => {
   });
 
   it('pins every side-channel field and its empty/whitespace filtering: comment attrs, tracked id/author/date, hidden-text, bookmark name filter, trimmed/empty fields, text boxes, two-digit + decoy header parts', async () => {
-    const result = await extractDocxMetadata(await buildSideChannelDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildSideChannelDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
@@ -214,7 +215,7 @@ describe('extractDocxMetadata', () => {
 
   it('returns empty arrays for every list section on a barebones docx with no side-channel content (no people, no comments, no tracked changes, no hidden text, no bookmarks)', async () => {
     const bytes = await buildSampleDocx();
-    const result = await extractDocxMetadata(bytes);
+    const result = await extractDocxMetadata(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.people).toEqual([]);
@@ -228,7 +229,7 @@ describe('extractDocxMetadata', () => {
   });
 
   it('returns an api_error Result when the docx zip is malformed (the openOoxmlZip try/catch in the infra adapter translates the JSZip throw to a Result.err)', async () => {
-    const result = await extractDocxMetadata(buildMalformedDocx());
+    const result = await extractDocxMetadata(CONVERTERS, buildMalformedDocx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('ooxml zip parse failed');
@@ -237,7 +238,7 @@ describe('extractDocxMetadata', () => {
 
   it('extracts the people registry, w:fldSimple field instructions, and flattens multi-w:t runs from a docx carrying XML shapes the `docx` package cannot synthesise', async () => {
     const bytes = await buildCraftedDocx();
-    const result = await extractDocxMetadata(bytes);
+    const result = await extractDocxMetadata(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.people).toEqual([{ author: 'Alice Smith', providerId: 'AD', userId: 'alice@contoso.com' }]);
@@ -265,7 +266,7 @@ describe('extractDocxMetadata', () => {
 
 describe('VBA macro detection (shared across docx / xlsx / pptx)', () => {
   it('flags the vbaProject.bin part of a macro-enabled document and renders a `### Macros (VBA)` warning', async () => {
-    const result = await extractDocxMetadata(await buildMacroDocm());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMacroDocm());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.macros).toEqual(['word/vbaProject.bin']);
@@ -276,7 +277,7 @@ describe('VBA macro detection (shared across docx / xlsx / pptx)', () => {
   });
 
   it('reports no macros (and renders `_(none)_`) for a document with no vbaProject.bin', async () => {
-    const result = await extractDocxMetadata(await buildSampleDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildSampleDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.macros).toEqual([]);
@@ -289,7 +290,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   // insertion. Reported as two loose halves, a single edit reads as an unrelated
   // cut plus an unrelated addition, and nothing says the two are the same edit.
   it('pairs a deletion immediately followed by an insertion into one replacement, and takes both halves out of the loose lists', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements).toContainEqual({
@@ -305,7 +306,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('pairs the insertion-then-deletion order too, which is what Word writes when the cursor sat before the selection', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements).toContainEqual({
@@ -319,7 +320,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('refuses to pair across untouched prose: a cut here and an addition later in the paragraph are two edits, not one replacement', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements.some((r) => r.before === 'far-del' || r.after === 'far-ins')).toBe(false);
@@ -328,7 +329,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('refuses to pair two authors, since one person deleting and another inserting is not one person replacing a span', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements.some((r) => r.before === 'hers-del')).toBe(false);
@@ -337,7 +338,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('still pairs across a bookmark marker, which carries no visible text and so does not separate the two halves', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements).toContainEqual({
@@ -351,7 +352,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('pairs across the other glyph-free markers too, not only the bookmark pair', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements.some((r) => r.before === 'proofed-del' && r.after === 'proofed-ins')).toBe(true);
@@ -359,7 +360,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('refuses to pair two deletions in a row, since a replacement needs one half of each kind', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements.some((r) => r.before === 'first-cut' || r.after === 'second-cut')).toBe(false);
@@ -368,7 +369,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('treats a textless insertion as breaking the run rather than as a replacement half', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.replacements.some((r) => r.before === 'split-del')).toBe(false);
@@ -377,7 +378,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
   });
 
   it('leaves an insertion with nothing beside it in the insertions list', async () => {
-    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.insertions.some((i) => i.text === 'lonely-ins')).toBe(true);
@@ -386,7 +387,7 @@ describe('extractDocxMetadata — replacement pairing', () => {
 });
 describe('extractDocxMetadata — moves and format changes', () => {
   it('joins a move by its range name rather than its text, so two moves of the same sentence stay two moves', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const joined = result.value.moves.filter((m) => m.halves === 'both');
@@ -397,7 +398,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('still reports a move whose destination never arrived, marked as the half it is', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.moves).toContainEqual({
@@ -410,7 +411,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('names the properties that changed when one formatting tag replaces another', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const styled = result.value.formatChanges.find((f) => f.text === 'styled words');
@@ -427,7 +428,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   // The case a tag-name comparison misses: w:color is on both sides and only
   // the value moved, so the paragraph reads as unchanged unless attributes count.
   it('catches a property whose tag is unchanged and whose value moved', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const recoloured = result.value.formatChanges.find((f) => f.text === 'recoloured words');
@@ -438,7 +439,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   // Two attributes per side is what makes the comparison order them at all. It
   // is also the shape a real font change takes, where ascii and hAnsi move together.
   it('compares a property carrying several attributes as one value, so a font swap is one changed property', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const refonted = result.value.formatChanges.find((f) => f.text === 'refonted words');
@@ -446,7 +447,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('reports a table whose width a reviewer changed under revision marking, scoped to the table', async () => {
-    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTableRevisionDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const table = result.value.formatChanges.find((f) => f.scope === 'table');
@@ -456,7 +457,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('reports a row whose height a reviewer changed under revision marking, scoped to the row', async () => {
-    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTableRevisionDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const row = result.value.formatChanges.find((f) => f.scope === 'row');
@@ -468,7 +469,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   // Comparing arrays by identity, or signing only the first entry, reports a
   // paragraph whose second tab stop moved as unchanged.
   it('compares a property holding repeated children, so moving one tab stop is a change', async () => {
-    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTableRevisionDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const retabbed = result.value.formatChanges.find((f) => f.text === 'retabbed line');
@@ -477,7 +478,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('reports a cell whose shading a reviewer changed under revision marking, scoped to the cell', async () => {
-    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildTableRevisionDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const cell = result.value.formatChanges.find((f) => f.scope === 'cell');
@@ -487,7 +488,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('reports a paragraph-property change against the paragraph text, scoped apart from run formatting', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const realigned = result.value.formatChanges.find((f) => f.text === 'realigned paragraph');
@@ -496,7 +497,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('reports an arrival whose origin has left the document, the mirror of a departure with no destination', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.moves).toContainEqual({
@@ -512,7 +513,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   // brackets, or one sitting after its range closed, belongs to no move, and
   // reporting it as one would invent an edit nobody made.
   it('ignores a moved half that no range brackets, and one that follows a closed range', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.moves.some((m) => m.text === 'unbracketed')).toBe(false);
@@ -520,14 +521,14 @@ describe('extractDocxMetadata — moves and format changes', () => {
   });
 
   it('skips a bracketed move that carries no text, since a move of nothing is not a move', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.moves.some((m) => m.name === 'move-empty')).toBe(false);
   });
 
   it('invents no revision for a run that was simply formatted and never edited', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.formatChanges.some((f) => f.text === 'plain bold text')).toBe(false);
@@ -536,7 +537,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
   // Guard on the pairing rule next door: a moveTo carries w:t like an insertion
   // does, so a del/ins pairing that keyed on "opposite kind" would swallow it.
   it('keeps moves out of the insertion, deletion and replacement lists entirely', async () => {
-    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    const result = await extractDocxMetadata(CONVERTERS, await buildMoveAndFormatDocx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.insertions).toEqual([]);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
 import { buildCommentedXlsx, buildMalformedDocx, buildMalformedPptx, buildMalformedXlsx, buildRichDocx, buildRichPptx } from '../../test-helpers/office-fixtures.ts';
 import { cellRef, commentsFromBytes, mentionsIn, slideAnchor } from './document-comments.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('who a comment @-mentions', () => {
   it('finds the known names written after an @, whatever their case, once each', () => {
@@ -24,7 +25,7 @@ describe('where a workbook comment sits', () => {
 
 describe('the comments of an Office file as one list', () => {
   it('reads a workbook: notes and threaded comments with their sheet, the legacy copies of threaded comments dropped', async () => {
-    const r = await commentsFromBytes(await buildCommentedXlsx(), 'plan.xlsx');
+    const r = await commentsFromBytes(CONVERTERS, await buildCommentedXlsx(), 'plan.xlsx');
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value).toEqual({
       format: 'xlsx',
@@ -38,7 +39,7 @@ describe('the comments of an Office file as one list', () => {
   });
 
   it('reads a document: each comment with the text it is anchored to', async () => {
-    const r = await commentsFromBytes(await buildRichDocx(), 'report.docm');
+    const r = await commentsFromBytes(CONVERTERS, await buildRichDocx(), 'report.docm');
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value).toEqual({
       format: 'docx',
@@ -48,7 +49,7 @@ describe('the comments of an Office file as one list', () => {
   });
 
   it('reads a deck: legacy and modern comments, with the slide when the deck names it', async () => {
-    const r = await commentsFromBytes(await buildRichPptx(), 'board.pptx');
+    const r = await commentsFromBytes(CONVERTERS, await buildRichPptx(), 'board.pptx');
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value).toEqual({
       format: 'pptx',
@@ -66,13 +67,13 @@ describe('the comments of an Office file as one list', () => {
       [buildMalformedXlsx(), 'a.xlsx'],
       [buildMalformedPptx(), 'a.pptx'],
     ] as const) {
-      const r = await commentsFromBytes(bytes, name);
+      const r = await commentsFromBytes(CONVERTERS, bytes, name);
       expect(r.ok).toBe(false);
     }
   });
 
   it('refuses a file that is not a Word, Excel or PowerPoint file, naming what it reads', async () => {
-    const txt = await commentsFromBytes(new Uint8Array([1]), 'notes.txt');
+    const txt = await commentsFromBytes(CONVERTERS, new Uint8Array([1]), 'notes.txt');
     expect(txt.ok).toBe(false);
     if (!txt.ok) {
       expect(txt.error).toMatchObject({ type: 'api_error', status: 415, code: 'unsupported_format' });
@@ -80,7 +81,7 @@ describe('the comments of an Office file as one list', () => {
         'list-document-comments reads Word, Excel and PowerPoint files (docx, xlsx, pptx and their macro-enabled and template variants); this file is a .txt.'
       );
     }
-    const bare = await commentsFromBytes(new Uint8Array([1]), 'README');
+    const bare = await commentsFromBytes(CONVERTERS, new Uint8Array([1]), 'README');
     if (!bare.ok) expect(bare.error.message).toEndWith('this file has no extension.');
   });
 });
@@ -94,7 +95,7 @@ describe('mentions of people who did not comment', () => {
     );
     const commentsXml = (await zip.file('word/comments.xml')?.async('string')) ?? '';
     zip.file('word/comments.xml', commentsXml.replace('Please double-check this figure.', '@Robin Chen please double-check this figure.'));
-    const r = await commentsFromBytes(await zip.generateAsync({ type: 'uint8array' }), 'report.docx');
+    const r = await commentsFromBytes(CONVERTERS, await zip.generateAsync({ type: 'uint8array' }), 'report.docx');
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value.comments.map((c) => [c.author, c.mentions])).toEqual([['Jordan Avery', ['Robin Chen']]]);
   });

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { buildMalformedDocx, buildRichDocx, buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
 import { docxToMarkdown, promoteFirstRowToThead, stripInlineImages } from './docx-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('docxToMarkdown', () => {
   it('converts a docx into a markdown envelope with heading, bold/italic, table, and an [image] placeholder (base64 stripped by default)', async () => {
     const bytes = await buildSampleDocx();
-    const result = await docxToMarkdown(bytes);
+    const result = await docxToMarkdown(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.contentType).toBe('text/markdown');
@@ -20,13 +21,13 @@ describe('docxToMarkdown', () => {
   });
 
   it('keeps base64 data: URIs when inlineImages is true (opt-in self-contained output)', async () => {
-    const result = await docxToMarkdown(await buildSampleDocx(), { inlineImages: true });
+    const result = await docxToMarkdown(CONVERTERS, await buildSampleDocx(), { inlineImages: true });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.text).toContain('data:image/png;base64,');
   });
 
   it('propagates the api_error from the mammoth adapter when the input is not a valid docx', async () => {
-    const result = await docxToMarkdown(buildMalformedDocx());
+    const result = await docxToMarkdown(CONVERTERS, buildMalformedDocx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('docx conversion failed');
@@ -35,7 +36,7 @@ describe('docxToMarkdown', () => {
 
   it('defaults to NOT appending the metadata block when the includeMetadata flag is omitted (backward-compat — existing callers must see the same envelope)', async () => {
     const bytes = await buildRichDocx();
-    const result = await docxToMarkdown(bytes);
+    const result = await docxToMarkdown(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.text).not.toContain('## DOCX metadata');
@@ -45,7 +46,7 @@ describe('docxToMarkdown', () => {
 
   it('defaults to NOT appending the metadata block when the includeMetadata flag is explicitly false', async () => {
     const bytes = await buildRichDocx();
-    const result = await docxToMarkdown(bytes, { includeMetadata: false });
+    const result = await docxToMarkdown(CONVERTERS, bytes, { includeMetadata: false });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.text).not.toContain('## DOCX metadata');
   });
@@ -54,7 +55,7 @@ describe('docxToMarkdown', () => {
 describe('docxToMarkdown — with --include-metadata true', () => {
   it('appends a populated metadata block surfacing every side-channel surface mammoth drops (core/app/custom props, comment, tracked ins/del, hidden text, external link, MERGEFIELD, bookmark)', async () => {
     const bytes = await buildRichDocx();
-    const result = await docxToMarkdown(bytes, { includeMetadata: true });
+    const result = await docxToMarkdown(CONVERTERS, bytes, { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const text = result.value.text;
@@ -107,7 +108,7 @@ describe('docxToMarkdown — with --include-metadata true', () => {
 
   it('emits `_(none)_` placeholders for every empty section so the output is grep-stable even on a barebones docx', async () => {
     const bytes = await buildSampleDocx();
-    const result = await docxToMarkdown(bytes, { includeMetadata: true });
+    const result = await docxToMarkdown(CONVERTERS, bytes, { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const text = result.value.text;
@@ -122,7 +123,7 @@ describe('docxToMarkdown — with --include-metadata true', () => {
   });
 
   it('propagates the zip-parse error when --include-metadata true is requested on a malformed docx (the same Result.err path the body conversion takes)', async () => {
-    const result = await docxToMarkdown(buildMalformedDocx(), { includeMetadata: true });
+    const result = await docxToMarkdown(CONVERTERS, buildMalformedDocx(), { includeMetadata: true });
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       // mammoth fails first on a corrupted zip — that error wins over the metadata-extractor zip error
