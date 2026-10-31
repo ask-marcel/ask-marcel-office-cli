@@ -1,7 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { extractPdfText } from '../../infra/pdf-text-extractor.ts';
+import type { Converters } from '../ports/converters.ts';
 
 type PdfTextEnvelope = { readonly contentType: 'text/plain'; readonly size: number; readonly text: string; readonly pageCount: number };
 
@@ -14,8 +14,8 @@ type PdfTextEnvelope = { readonly contentType: 'text/plain'; readonly size: numb
  * `size` is the byte length of the produced text (what `--output-path` writes),
  * consistent with the other converters — NOT the source PDF's byte count.
  */
-const pdfToMarkdown = async (bytes: Uint8Array, noTextHint: string): Promise<Result<PdfTextEnvelope, GraphError>> => {
-  const extracted = await extractPdfText(bytes);
+const pdfToMarkdown = async (converters: Converters, bytes: Uint8Array, noTextHint: string): Promise<Result<PdfTextEnvelope, GraphError>> => {
+  const extracted = await converters.extractPdfText(bytes);
   if (!extracted.ok) return extracted;
   const text = extracted.value.text.trim();
   if (text === '') return err({ type: 'api_error', status: 415, message: noTextHint });

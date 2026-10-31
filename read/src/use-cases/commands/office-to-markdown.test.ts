@@ -13,6 +13,7 @@ import {
   buildSampleXlsx,
 } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeReadGraph(overrides);
 
@@ -37,7 +38,7 @@ describe('officeToMarkdown — extension dispatch', () => {
         return ok({ contentType: 'text/plain', size: 5, text: 'hello' });
       },
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.txt');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'notes.txt');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({ contentType: 'text/plain', size: 5, text: 'hello' });
@@ -52,7 +53,7 @@ describe('officeToMarkdown — extension dispatch', () => {
         return ok({ contentType: 'text/plain', size: 13, text: 'hello via CDN' });
       },
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.txt');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'notes.txt');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({ contentType: 'text/plain', size: 13, text: 'hello via CDN' });
@@ -64,7 +65,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.docx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.docx');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -78,7 +79,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.xlsx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.xlsx');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -96,14 +97,14 @@ describe('officeToMarkdown — extension dispatch', () => {
         return ok({ contentType: 'text/html', size: 13, text: '<p>loop x</p>' });
       },
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'planning.loop');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'planning.loop');
     expect(result.ok).toBe(true);
     expect(calledPath).toBe('/drives/d1/items/i1/content?format=html');
   });
 
   it('extracts pptx slide text (titles, body, speaker notes inline) by default — no --include-metadata required', async () => {
     const graph = bytesGraph(await buildRichPptx());
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.pptx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'deck.pptx');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const env = result.value as { contentType: string; text: string };
@@ -118,19 +119,19 @@ describe('officeToMarkdown — extension dispatch', () => {
   it('aliases the macro-enabled / template families onto their base parser (.docm → docx, .xlsm → xlsx, .pptm → pptx metadata)', async () => {
     const docxBytes = await buildSampleDocx();
     const docmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) }) });
-    const docm = await officeToMarkdown(docmGraph, '/drives/d1/items/i1/content', 'report.docm');
+    const docm = await officeToMarkdown(CONVERTERS, docmGraph, '/drives/d1/items/i1/content', 'report.docm');
     expect(docm.ok).toBe(true);
     if (docm.ok) expect((docm.value as { text: string }).text).toContain('# Sample Heading');
 
     const xlsxBytes = buildSampleXlsx();
     const xlsmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }) });
-    const xlsm = await officeToMarkdown(xlsmGraph, '/drives/d1/items/i1/content', 'data.xlsm');
+    const xlsm = await officeToMarkdown(CONVERTERS, xlsmGraph, '/drives/d1/items/i1/content', 'data.xlsm');
     expect(xlsm.ok).toBe(true);
     if (xlsm.ok) expect((xlsm.value as { text: string }).text).toContain('## Sheet1');
 
     const pptxBytes = await buildRichPptx();
     const pptmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: pptxBytes.byteLength, base64: toBase64(pptxBytes) }) });
-    const pptm = await officeToMarkdown(pptmGraph, '/drives/d1/items/i1/content', 'deck.pptm', { includeMetadata: true });
+    const pptm = await officeToMarkdown(CONVERTERS, pptmGraph, '/drives/d1/items/i1/content', 'deck.pptm', { includeMetadata: true });
     expect(pptm.ok).toBe(true);
     if (pptm.ok) expect((pptm.value as { text: string }).text).toContain('## PPTX metadata');
   });
@@ -140,7 +141,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: pptxBytes.byteLength, base64: toBase64(pptxBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.pptx', { includeMetadata: true });
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'deck.pptx', { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -156,7 +157,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: odtBytes.byteLength, base64: toBase64(odtBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'plan.odt', { includeMetadata: true });
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'plan.odt', { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -172,7 +173,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: odtBytes.byteLength, base64: toBase64(odtBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'plan.odt');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'plan.odt');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -184,7 +185,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('errs with the generic 38-input-set hint for a non-pdf extension Graph accepts on the pdf path (rtf, etc.)', async () => {
     const graph = bytesGraph(BINARY_BYTES);
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.rtf');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'notes.rtf');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -195,7 +196,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('extracts a born-digital PDF’s text layer as a text/plain envelope', async () => {
     const graph = bytesGraph(buildPdfWithText(), 'application/pdf');
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.pdf');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { contentType: string; text: string };
@@ -205,7 +206,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('errs 415 with a vision-model hint for a scanned / image-only PDF (no text layer)', async () => {
     const graph = bytesGraph(buildPdfNoImages(), 'application/pdf');
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'scan.pdf');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'scan.pdf');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -216,7 +217,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('propagates a getBinary api_error from the pdf path', async () => {
     const graph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 404, message: 'pdf not found' } }) });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.pdf');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -225,7 +226,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('converts a legacy .xls (BIFF / OLE) through the sheetjs pipeline to a markdown table', async () => {
     const graph = bytesGraph(buildLegacyXls());
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'budget.xls');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'budget.xls');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const env = result.value as { contentType: string; text: string };
@@ -236,7 +237,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('extracts a legacy .doc (OLE binary) body as a text/plain envelope', async () => {
     const graph = bytesGraph(await buildSampleDoc());
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'memo.doc');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'memo.doc');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const env = result.value as { contentType: string; text: string };
@@ -246,18 +247,18 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('propagates a getBinary api_error from the legacy .xls and .doc paths', async () => {
     const xlsGraph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'xls forbidden' } }) });
-    const xls = await officeToMarkdown(xlsGraph, '/drives/d1/items/i1/content', 'old.xls');
+    const xls = await officeToMarkdown(CONVERTERS, xlsGraph, '/drives/d1/items/i1/content', 'old.xls');
     expect(xls.ok).toBe(false);
     expect(!xls.ok && xls.error.type === 'api_error' ? xls.error.message : '').toContain('xls forbidden');
     const docGraph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'doc forbidden' } }) });
-    const doc = await officeToMarkdown(docGraph, '/drives/d1/items/i1/content', 'old.doc');
+    const doc = await officeToMarkdown(CONVERTERS, docGraph, '/drives/d1/items/i1/content', 'old.doc');
     expect(doc.ok).toBe(false);
     expect(!doc.ok && doc.error.type === 'api_error' ? doc.error.message : '').toContain('doc forbidden');
   });
 
   it('errs 415 for a legacy .ppt pointing at the convert-to-PDF-first workflow', async () => {
     const graph = bytesGraph(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE bytes are fetched, then the ppt branch errs
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.ppt');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'deck.ppt');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -268,7 +269,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('a known-binary extension (zip, mp4, …) is fetched and content-sniffed, then errs 415 with the generic *-as-pdf hint — no dedicated short-circuit list', async () => {
     const graph = bytesGraph(BINARY_BYTES);
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'sources.zip');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'sources.zip');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -279,7 +280,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('errs 415 with the image hint for a raster image (png), pointing at extract-drive-item-images / a vision model', async () => {
     const graph = bytesGraph(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'photo.png');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'photo.png');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -291,7 +292,7 @@ describe('officeToMarkdown — extension dispatch', () => {
   it('an .svg (which is XML text) content-sniffs to text/plain rather than being rejected as binary', async () => {
     const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><text>org chart label</text></svg>');
     const graph = bytesGraph(svg);
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'diagram.svg');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'diagram.svg');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const env = result.value as { contentType: string; text: string };
@@ -302,20 +303,20 @@ describe('officeToMarkdown — extension dispatch', () => {
   it('threads includeMetadata into the docx and xlsx converters (appends the metadata block when true)', async () => {
     const docxBytes = await buildSampleDocx();
     const docxGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) }) });
-    const docx = await officeToMarkdown(docxGraph, '/drives/d1/items/i1/content', 'report.docx', { includeMetadata: true });
+    const docx = await officeToMarkdown(CONVERTERS, docxGraph, '/drives/d1/items/i1/content', 'report.docx', { includeMetadata: true });
     expect(docx.ok).toBe(true);
     if (docx.ok) expect((docx.value as { text: string }).text).toContain('## DOCX metadata');
 
     const xlsxBytes = buildSampleXlsx();
     const xlsxGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }) });
-    const xlsx = await officeToMarkdown(xlsxGraph, '/drives/d1/items/i1/content', 'data.xlsx', { includeMetadata: true });
+    const xlsx = await officeToMarkdown(CONVERTERS, xlsxGraph, '/drives/d1/items/i1/content', 'data.xlsx', { includeMetadata: true });
     expect(xlsx.ok).toBe(true);
     if (xlsx.ok) expect((xlsx.value as { text: string }).text).toContain('## Workbook metadata');
   });
 
   it('errs with `<no-extension>` placeholder when the filename has no dot', async () => {
     const graph = bytesGraph(BINARY_BYTES);
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'README');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'README');
     // Unconditional assertions (no `type === 'api_error'` guard, which would let an
     // ObjectLiteral / StringLiteral mutant on the error envelope skip the check — see LESSONS.md).
     expect(result.ok).toBe(false);
@@ -327,7 +328,7 @@ describe('officeToMarkdown — extension dispatch', () => {
 
   it('errs with `<no-extension>` placeholder when the filename ends with a dot but no extension', async () => {
     const graph = bytesGraph(BINARY_BYTES);
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'oddfile.');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'oddfile.');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -339,7 +340,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const textBytes = new TextEncoder().encode('server {\n  listen 80;\n}\n');
     const graph = bytesGraph(textBytes);
     for (const name of ['nginx.conf', 'README', 'notes.txt', 'data.weirdext']) {
-      const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', name);
+      const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', name);
       expect(result.ok).toBe(true);
       if (!result.ok) continue;
       const v = result.value as { contentType: string; text: string };
@@ -352,7 +353,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 404, message: 'not found' } }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.docx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.docx');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(404);
@@ -363,7 +364,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 401, message: 'unauthorized' } }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.xlsx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.xlsx');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(401);
@@ -374,7 +375,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ surprise: true }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.docx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.docx');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('unexpected envelope');
@@ -390,7 +391,7 @@ describe('officeToMarkdown — extension dispatch', () => {
         return ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) });
       },
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.docx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.docx');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -405,7 +406,7 @@ describe('officeToMarkdown — extension dispatch', () => {
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/data.xlsx' }),
       fetchUrl: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.xlsx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.xlsx');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { text: string };
@@ -418,7 +419,7 @@ describe('officeToMarkdown — extension dispatch', () => {
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/x' }),
       fetchUrl: async () => ({ ok: false, error: { type: 'network_error' as const, message: 'socket reset' } }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.docx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'report.docx');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
       expect(result.error.message).toBe('socket reset');
@@ -431,7 +432,7 @@ describe('officeToMarkdown — extension dispatch', () => {
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/data.csv' }),
       fetchUrl: async () => ok({ contentType: 'text/csv', size: csv.length, text: csv }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.csv');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.csv');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
@@ -447,7 +448,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/csv', size: csvBytes.byteLength, base64: toBase64(csvBytes) }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.csv');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.csv');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const env = result.value as { text: string };
@@ -460,7 +461,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const csv = 'a,b,c\nd,e,f\ng,h,i';
     const csvBytes = new TextEncoder().encode(csv);
     const graph = noopGraph({ getBinary: async () => ok({ contentType: 'text/csv', size: csvBytes.byteLength, base64: toBase64(csvBytes) }) });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.csv', { maxCells: 4 });
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.csv', { maxCells: 4 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const env = result.value as { text: string };
@@ -472,7 +473,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'forbidden' } }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.csv');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.csv');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(403);
@@ -484,7 +485,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/plain', size: 4, text: 'PK' }),
     });
-    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.xlsx');
+    const result = await officeToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content', 'data.xlsx');
     // sheetjs will reject; we only need to verify the text-decoder branch was exercised.
     expect(result.ok).toBe(false);
   });

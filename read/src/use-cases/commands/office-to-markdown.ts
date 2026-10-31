@@ -9,6 +9,7 @@ import type { ConversionHints } from './markdown-dispatch.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * `*-as-markdown` dispatcher for a OneDrive / SharePoint drive item. Loop/Fluid/
@@ -68,13 +69,19 @@ const withLoopNote = (result: Result<unknown, GraphError>, modifiedAt: string | 
   return result;
 };
 
-const officeToMarkdown = async (graph: ReadGraph, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
+const officeToMarkdown = async (
+  converters: Converters,
+  graph: ReadGraph,
+  contentPath: string,
+  filename: string,
+  opts: OfficeToMarkdownOptions = {}
+): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && HTML_FORMAT_INPUTS.has(ext)) return refuseSheet(`this file is a .${ext}`);
-  if (HTML_FORMAT_INPUTS.has(ext)) return withLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`), opts.modifiedAt);
+  if (HTML_FORMAT_INPUTS.has(ext)) return withLoopNote(await convertToMarkdown(converters, graph, `${contentPath}?format=html`), opts.modifiedAt);
   const bytes = await fetchRawBytes(graph, contentPath, opts);
   if (!bytes.ok) return bytes;
-  return bytesToMarkdown(bytes.value, filename, opts, DRIVE_HINTS);
+  return bytesToMarkdown(converters, bytes.value, filename, opts, DRIVE_HINTS);
 };
 
 /** Loop, Fluid and Whiteboard files are rendered by Graph (`?format=html`), not by a local converter. */

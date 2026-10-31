@@ -4,6 +4,7 @@ import { buildMalformedDocx, buildMinimalOdt, buildRichOdt } from '../../test-he
 import { formatOdfMetadata } from './odf-metadata-to-markdown.ts';
 import { extractOdfMetadata } from './odf-metadata.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 // A meta.xml exercising the extractor's skip/filter branches: office:meta
 // carries an attribute (the @_ skip) and inter-element whitespace (the #text
@@ -37,7 +38,7 @@ const buildEmptyFieldsOdt = async (): Promise<Uint8Array> => {
 
 describe('extractOdfMetadata', () => {
   it('excludes empty-text properties from the flat record, never folds user-defined into it, and drops an empty-name user-defined field', async () => {
-    const result = await extractOdfMetadata(await buildEmptyFieldsOdt());
+    const result = await extractOdfMetadata(CONVERTERS, await buildEmptyFieldsOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.properties).toEqual({ title: 'T' });
@@ -46,7 +47,7 @@ describe('extractOdfMetadata', () => {
   });
 
   it('extracts Dublin Core + ODF meta properties, the keyword list, and user-defined custom fields', async () => {
-    const result = await extractOdfMetadata(await buildRichOdt());
+    const result = await extractOdfMetadata(CONVERTERS, await buildRichOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.properties).toEqual({
@@ -66,7 +67,7 @@ describe('extractOdfMetadata', () => {
   });
 
   it('returns empty sections for a package with no meta.xml', async () => {
-    const result = await extractOdfMetadata(await buildMinimalOdt());
+    const result = await extractOdfMetadata(CONVERTERS, await buildMinimalOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.properties).toEqual({});
@@ -75,7 +76,7 @@ describe('extractOdfMetadata', () => {
   });
 
   it('returns an api_error Result when the package is not a valid zip', async () => {
-    const result = await extractOdfMetadata(buildMalformedDocx());
+    const result = await extractOdfMetadata(CONVERTERS, buildMalformedDocx());
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -83,7 +84,7 @@ describe('extractOdfMetadata', () => {
   });
 
   it('skips office:meta attributes and whitespace, drops blank keywords and name-less user-defined fields, and keeps keyword/user-defined tags out of the property record', async () => {
-    const result = await extractOdfMetadata(await buildEdgeCaseOdt());
+    const result = await extractOdfMetadata(CONVERTERS, await buildEdgeCaseOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.properties).toEqual({ title: 'T', generator: 'plain' });
@@ -94,7 +95,7 @@ describe('extractOdfMetadata', () => {
 
 describe('formatOdfMetadata', () => {
   it('renders the full `## OpenDocument metadata` block with every section, exact rows, and ordered keywords', async () => {
-    const extracted = await extractOdfMetadata(await buildRichOdt());
+    const extracted = await extractOdfMetadata(CONVERTERS, await buildRichOdt());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     expect(formatOdfMetadata(extracted.value)).toBe(
@@ -107,7 +108,7 @@ describe('formatOdfMetadata', () => {
   });
 
   it('emits `_(none)_` for every section on a barebones package', async () => {
-    const extracted = await extractOdfMetadata(await buildMinimalOdt());
+    const extracted = await extractOdfMetadata(CONVERTERS, await buildMinimalOdt());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     expect(formatOdfMetadata(extracted.value)).toBe(
@@ -118,7 +119,7 @@ describe('formatOdfMetadata', () => {
 
 describe('odfToMarkdown', () => {
   it('converts the body to a text/markdown envelope and omits the metadata block by default', async () => {
-    const result = await odfToMarkdown(await buildRichOdt());
+    const result = await odfToMarkdown(CONVERTERS, await buildRichOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/markdown');
@@ -129,7 +130,7 @@ describe('odfToMarkdown', () => {
   });
 
   it('appends the `## OpenDocument metadata` block after the body when includeMetadata is true', async () => {
-    const result = await odfToMarkdown(await buildRichOdt(), { includeMetadata: true });
+    const result = await odfToMarkdown(CONVERTERS, await buildRichOdt(), { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text).toContain('# Heading One');
@@ -140,14 +141,14 @@ describe('odfToMarkdown', () => {
   });
 
   it('returns the metadata block alone when the body is empty (no content.xml) and includeMetadata is true', async () => {
-    const result = await odfToMarkdown(await buildMinimalOdt(), { includeMetadata: true });
+    const result = await odfToMarkdown(CONVERTERS, await buildMinimalOdt(), { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text.startsWith('## OpenDocument metadata')).toBe(true);
   });
 
   it('propagates the zip-parse error for a malformed package', async () => {
-    const result = await odfToMarkdown(buildMalformedDocx());
+    const result = await odfToMarkdown(CONVERTERS, buildMalformedDocx());
     expect(result.ok).toBe(false);
   });
 });

@@ -1,8 +1,8 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { attrOf, findAll, findAllTexts, parseXml, textOf } from './ooxml-xml-walker.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Pulls the side-channel content out of an OpenDocument package (.odt / .ods /
@@ -50,8 +50,8 @@ const extractUserDefined = (meta: unknown): ReadonlyArray<UserDefined> =>
     .map((p) => ({ name: attrOf(p, 'meta:name'), value: textOf(p) }))
     .filter((p) => p.name !== '');
 
-const extractOdfMetadata = async (bytes: Uint8Array): Promise<Result<OdfMetadata, GraphError>> => {
-  const zipR = await openOoxmlZip(bytes);
+const extractOdfMetadata = async (converters: Converters, bytes: Uint8Array): Promise<Result<OdfMetadata, GraphError>> => {
+  const zipR = await converters.openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   const meta = parseXml(zipR.value.read('meta.xml'));
   return ok({

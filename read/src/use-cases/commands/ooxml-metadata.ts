@@ -1,4 +1,4 @@
-import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
+import type { OoxmlZip } from '../ports/converters.ts';
 import { attrOf, collectText, findAll, parseXml, textOf } from './ooxml-xml-walker.ts';
 
 /**

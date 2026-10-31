@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
+import type { OoxmlZip } from '../ports/converters.ts';
 import { attrOf, collectTextLocal, findAll, findAllLocal, parseXml } from './ooxml-xml-walker.ts';
 import type { XmlObject } from './ooxml-xml-walker.ts';
 
