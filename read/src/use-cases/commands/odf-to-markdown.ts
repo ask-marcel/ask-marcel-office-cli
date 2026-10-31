@@ -5,6 +5,7 @@ import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { odfContentToMarkdown } from './odf-content-to-markdown.ts';
 import { formatOdfMetadata } from './odf-metadata-to-markdown.ts';
 import { extractOdfMetadata } from './odf-metadata.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Converts an OpenDocument (.odt / .ods / .odp) body to markdown by walking
@@ -17,12 +18,12 @@ import { extractOdfMetadata } from './odf-metadata.ts';
 
 type OdfToMarkdownOptions = { readonly includeMetadata?: boolean };
 
-const odfToMarkdown = async (bytes: Uint8Array, opts: OdfToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
-  const body = await odfContentToMarkdown(bytes);
+const odfToMarkdown = async (converters: Converters, bytes: Uint8Array, opts: OdfToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+  const body = await odfContentToMarkdown(converters, bytes);
   if (!body.ok) return body;
   let text = body.value;
   if (opts.includeMetadata === true) {
-    const meta = await extractOdfMetadata(bytes);
+    const meta = await extractOdfMetadata(converters, bytes);
     if (!meta.ok) return meta;
     const block = formatOdfMetadata(meta.value);
     text = text === '' ? block : `${text}\n\n${block}`;

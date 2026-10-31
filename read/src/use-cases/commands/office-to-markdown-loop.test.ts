@@ -2,12 +2,13 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const htmlGraph = (html: string): ReturnType<typeof fakeGraphClient> => fakeGraphClient({ getBinary: async () => ok({ contentType: 'text/html', size: html.length, text: html }) });
 
 describe('a Loop page whose HTML conversion is empty', () => {
   it('says so in a note instead of answering an empty body as if the page were empty', async () => {
-    const result = await officeToMarkdown(htmlGraph(''), '/drives/d/items/i/content', 'notes.loop');
+    const result = await officeToMarkdown(CONVERTERS, htmlGraph(''), '/drives/d/items/i/content', 'notes.loop');
     if (!result.ok) throw new Error('expected ok');
     const envelope = result.value as { text: string; note?: string };
     expect(envelope.text).toBe('');
@@ -16,7 +17,7 @@ describe('a Loop page whose HTML conversion is empty', () => {
   });
 
   it('adds nothing when the page renders', async () => {
-    const result = await officeToMarkdown(htmlGraph('<h1>Agenda</h1><p>Budget</p>'), '/drives/d/items/i/content', 'notes.loop');
+    const result = await officeToMarkdown(CONVERTERS, htmlGraph('<h1>Agenda</h1><p>Budget</p>'), '/drives/d/items/i/content', 'notes.loop');
     if (!result.ok) throw new Error('expected ok');
     const envelope = result.value as { text: string; note?: string };
     expect(envelope.text).toContain('Agenda');
