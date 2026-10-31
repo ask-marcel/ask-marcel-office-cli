@@ -142,19 +142,19 @@ type FetchRequest = {
   readonly maxCells?: number;
 };
 
-const fetchMarkdown = async (graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+const fetchMarkdown = async (converters: Converters, graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
   const { driveId, itemId, contentPath, includeMetadata, maxCells } = r;
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
   if (rendersThroughGraph(name)) return refuseVersionRender(name);
-  return officeToMarkdown(graph, contentPath, name, { elevated: true, includeMetadata, maxCells });
+  return officeToMarkdown(converters, graph, contentPath, name, { elevated: true, includeMetadata, maxCells });
 };
 
-const fetchByFormat = (graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+const fetchByFormat = (converters: Converters, graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
   if (r.format === 'original') return fetchOriginal(graph, r.contentPath);
   if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.contentPath, r.versionId);
-  return fetchMarkdown(graph, r);
+  return fetchMarkdown(converters, graph, r);
 };
 
 // A PDF passthrough already carries a note; the live-file sentence joins it.
@@ -164,7 +164,7 @@ const withNote = (value: Record<string, unknown>, note: string): Record<string, 
 };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -176,7 +176,7 @@ const createExecute =
     const includeMetadata = parsed.data.includeMetadata === 'true';
 
     const contentPath = contentPathOf(driveId, itemId, picked);
-    const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath, format, includeMetadata, maxCells: parsed.data.maxCells });
+    const fetched = await fetchByFormat(converters, graph, { driveId, itemId, versionId: picked.id, contentPath, format, includeMetadata, maxCells: parsed.data.maxCells });
     if (!fetched.ok || before === undefined) return fetched;
     // Say which version `--before` chose: the caller never saw the listing.
     const chosen = { ...(fetched.value as Record<string, unknown>), versionId: picked.id };

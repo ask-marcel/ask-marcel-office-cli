@@ -6,6 +6,7 @@ import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from '@ask-marcel/office-core/u
 import { extractPptxMetadata } from './pptx-metadata.ts';
 import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * The comments of a Word, Excel or PowerPoint file as one list, whatever the
@@ -24,7 +25,7 @@ type DocumentComment = { readonly author: string; readonly date?: string; readon
 type UnmentionedComment = Omit<DocumentComment, 'mentions'>;
 type CommentFormat = 'docx' | 'xlsx' | 'pptx';
 type DocumentComments = { readonly format: CommentFormat; readonly count: number; readonly comments: ReadonlyArray<DocumentComment> };
-type CommentReader = (bytes: Uint8Array) => Promise<Result<ReadonlyArray<DocumentComment>, GraphError>>;
+type CommentReader = (converters: Converters, bytes: Uint8Array) => Promise<Result<ReadonlyArray<DocumentComment>, GraphError>>;
 
 const THREADED_COPY = '[Threaded comment]';
 
@@ -50,8 +51,8 @@ const withMentions = (comments: ReadonlyArray<UnmentionedComment>, people: Reado
   return comments.map((c) => ({ ...c, mentions: mentionsIn(c.text, names) }));
 };
 
-const docxComments: CommentReader = async (bytes) => {
-  const m = await extractDocxMetadata(bytes);
+const docxComments: CommentReader = async (converters, bytes) => {
+  const m = await extractDocxMetadata(converters, bytes);
   if (!m.ok) return m;
   const comments = m.value.comments.map((c) => ({ author: c.author, date: c.date, anchor: c.anchor, text: c.text }));
   return ok(
@@ -62,8 +63,8 @@ const docxComments: CommentReader = async (bytes) => {
   );
 };
 
-const xlsxComments: CommentReader = async (bytes) => {
-  const m = await extractXlsxMetadata(bytes);
+const xlsxComments: CommentReader = async (converters, bytes) => {
+  const m = await extractXlsxMetadata(converters, bytes);
   if (!m.ok) return m;
   const notes = m.value.comments.filter((c) => !c.text.startsWith(THREADED_COPY)).map((c) => ({ author: c.author, anchor: cellRef(c.sheet, c.cell), text: c.text }));
   const threaded = m.value.threadedComments.map((c) => ({ author: c.author, date: c.date, anchor: cellRef(c.sheet, c.cell), text: c.text }));
@@ -75,8 +76,8 @@ const xlsxComments: CommentReader = async (bytes) => {
   );
 };
 
-const pptxComments: CommentReader = async (bytes) => {
-  const m = await extractPptxMetadata(bytes);
+const pptxComments: CommentReader = async (converters, bytes) => {
+  const m = await extractPptxMetadata(converters, bytes);
   if (!m.ok) return m;
   const comments = m.value.comments.map((c) => ({ author: c.author, date: c.date, anchor: slideAnchor(c.slide), text: c.text }));
   return ok(
@@ -93,7 +94,7 @@ const READERS: ReadonlyArray<readonly [ReadonlySet<string>, CommentFormat, Comme
   [PPTX_FAMILY, 'pptx', pptxComments],
 ];
 
-const commentsFromBytes = async (bytes: Uint8Array, filename: string): Promise<Result<DocumentComments, GraphError>> => {
+const commentsFromBytes = async (converters: Converters, bytes: Uint8Array, filename: string): Promise<Result<DocumentComments, GraphError>> => {
   const ext = extensionOf(filename);
   const reader = READERS.find(([family]) => family.has(ext));
   if (reader === undefined) {
@@ -106,7 +107,7 @@ const commentsFromBytes = async (bytes: Uint8Array, filename: string): Promise<R
     });
   }
   const [, format, read] = reader;
-  const comments = await read(bytes);
+  const comments = await read(converters, bytes);
   if (!comments.ok) return comments;
   return ok({ format, count: comments.value.length, comments: comments.value });
 };

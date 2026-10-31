@@ -2,10 +2,11 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
-import { lineDiff, MAX_EDITS } from '../../infra/line-diff-adapter.ts';
+import { MAX_EDITS } from '../../domain/line-diff-limit.ts';
 import type { FetchOptions } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { OMITTED_TABLE_MARKER } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * The shared half of the two diff commands: each side is converted to markdown
@@ -38,10 +39,10 @@ const readDriveFile = async (graph: ReadGraph, driveId: string, itemId: string):
 };
 
 /** One side as markdown; a folder is refused, and a file with no text form (an image) fails in the conversion. */
-const renderSide = async (graph: ReadGraph, file: DriveFile, contentPath: string, opts: RenderOptions): Promise<Result<Render, GraphError>> => {
+const renderSide = async (converters: Converters, graph: ReadGraph, file: DriveFile, contentPath: string, opts: RenderOptions): Promise<Result<Render, GraphError>> => {
   if (file.folder) return err({ type: 'validation_error', message: `${file.name} is a folder, not a file: pick a file inside it with list-folder-files.` });
   // Every markdown answer carries `text`: converted markdown or a plain-text passthrough.
-  return map(await officeToMarkdown(graph, contentPath, file.name, opts), (envelope) => {
+  return map(await officeToMarkdown(converters, graph, contentPath, file.name, opts), (envelope) => {
     const { text, note } = envelope as { readonly text: string; readonly note?: unknown };
     return typeof note === 'string' ? { text, note } : { text };
   });
@@ -76,11 +77,11 @@ const joinNotes = (notes: ReadonlyArray<string | undefined>): { readonly note?: 
   return present.length === 0 ? {} : { note: present.join(' ') };
 };
 
-const diffEnvelope = (fromLabel: string, from: Render, toLabel: string, to: Render, wording: DiffWording): DiffEnvelope => {
+const diffEnvelope = (converters: Converters, fromLabel: string, from: Render, toLabel: string, to: Render, wording: DiffWording): DiffEnvelope => {
   const capped = [...new Set([...cappedTables(from.text), ...cappedTables(to.text)])];
   const cappedNote = capped.length === 0 ? undefined : notComparedNote(capped);
   const sideNotes = [labelled(fromLabel, from), labelled(toLabel, to)];
-  const diff = lineDiff(fromLabel, from.text, toLabel, to.text);
+  const diff = converters.lineDiff(fromLabel, from.text, toLabel, to.text);
   if (diff === undefined) return { contentType: 'text/x-diff', size: 0, text: '', ...joinNotes([tooDifferent(wording.readWhole), cappedNote, ...sideNotes]) };
   // An empty patch means "unchanged" only when every table was compared.
   const same = diff.patch === '' && cappedNote === undefined ? wording.same : undefined;

@@ -1,7 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
+import type { Converters, OoxmlZip } from '../ports/converters.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
@@ -356,8 +355,8 @@ const extractFormatChanges = (root: unknown): ReadonlyArray<FormatChange> => [
   ...changesIn(root, 'w:tc', 'w:tcPr', 'w:tcPrChange', 'cell'),
 ];
 
-const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetadata, GraphError>> => {
-  const zipR = await openOoxmlZip(bytes);
+const extractDocxMetadata = async (converters: Converters, bytes: Uint8Array): Promise<Result<DocxMetadata, GraphError>> => {
+  const zipR = await converters.openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   const zip = zipR.value;
   const documentXml = zip.read('word/document.xml');
