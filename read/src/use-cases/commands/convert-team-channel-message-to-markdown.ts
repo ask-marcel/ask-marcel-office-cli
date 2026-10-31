@@ -46,7 +46,7 @@ const readReplies = async (graph: ReadGraph, messagePath: string): Promise<Repli
 };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -58,7 +58,7 @@ const createExecute =
     const { replies, notes } = await readReplies(graph, messagePath);
     const inline = parsed.data.inlineImages === 'true';
     const images = inline ? await fetchHostedImages(graph, hostedImageSources([{ ...root, replies }])) : new Map<string, string>();
-    return ok(markdownEnvelope(renderThread(root, replies, images, inline), notes));
+    return ok(markdownEnvelope(renderThread(converters, root, replies, images, inline), notes));
   };
 
 const meta: ReadCommandMeta = {

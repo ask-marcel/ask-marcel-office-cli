@@ -58,7 +58,7 @@ const LOCAL_HINTS: ConversionHints = {
 };
 
 const createExecuteLocal =
-  (_converters: Converters): NonNullable<ReadCommand['executeLocal']> =>
+  (converters: Converters): NonNullable<ReadCommand['executeLocal']> =>
   async (fs: FileSystem, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -79,9 +79,9 @@ const createExecuteLocal =
     const { sheet } = parsed.data;
     if (extensionOf(name) === 'zip') {
       if (sheet !== undefined) return refuseSheet('this file is a zip archive');
-      return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted, maxCells });
+      return convertZipArchive(converters, bytes.value, { includeMetadata, includeImages, keepQuoted, maxCells });
     }
-    return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
+    return bytesToMarkdown(converters, bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
   };
 
 const execute = async (_graph: ReadGraph, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>

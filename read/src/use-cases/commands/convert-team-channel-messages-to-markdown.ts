@@ -75,7 +75,7 @@ const transcriptNotes = (
   return notes;
 };
 
-const createExecute = (_converters: Converters): ReadCommand['execute'] =>
+const createExecute = (converters: Converters): ReadCommand['execute'] =>
   createTopCappedExecute(async (graph, params) => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -92,7 +92,7 @@ const createExecute = (_converters: Converters): ReadCommand['execute'] =>
     if (!walked.ok) return walked;
     const inline = parsed.data.inlineImages === 'true';
     const images = inline ? await fetchHostedImages(graph, hostedImageSources(walked.value.messages)) : new Map<string, string>();
-    const rendered = renderTranscript(walked.value.messages, { channelName, images, inline });
+    const rendered = renderTranscript(converters, walked.value.messages, { channelName, images, inline });
     return ok(markdownEnvelope(rendered.text, transcriptNotes(rendered, walked.value, since, maxPages)));
   });
 

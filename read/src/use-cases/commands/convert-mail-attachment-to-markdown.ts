@@ -44,10 +44,19 @@ const MAIL_HINTS: ConversionHints = {
 
 // fileAttachment carries the bytes inline (base64) — decode and run them through the
 // shared dispatch (docx/xlsx/pptx/odf/csv/pdf/legacy + content-sniff), same as drive.
-const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> =>
-  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, hints);
+const convertFileAttachment = (
+  converters: Converters,
+  attachment: { name?: string; contentBytes?: string },
+  opts: ConvertOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError>> => bytesToMarkdown(converters, base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, hints);
 
-const convertReferenceAttachment = async (graph: ReadGraph, attachment: { sourceUrl?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
+const convertReferenceAttachment = async (
+  converters: Converters,
+  graph: ReadGraph,
+  attachment: { sourceUrl?: string },
+  opts: ConvertOptions
+): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
     return err({
@@ -71,10 +80,10 @@ const convertReferenceAttachment = async (graph: ReadGraph, attachment: { source
         'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.',
     });
   }
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, opts);
+  return officeToMarkdown(converters, graph, `/drives/${driveId}/items/${itemId}/content`, name, opts);
 };
 
-const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): Result<unknown, GraphError> => {
+const convertItemAttachment = (converters: Converters, attachment: { item?: Record<string, unknown> }): Result<unknown, GraphError> => {
   const item = attachment.item;
   if (!item || typeof item !== 'object') {
     return err({ type: 'api_error', status: 400, message: 'itemAttachment missing inner item' });
@@ -93,9 +102,9 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 
   switch (innerType) {
     case '#microsoft.graph.message':
-      return ok(renderToEnvelope(embeddedMessageToMarkdown(item as EmbeddedMessage)));
+      return ok(renderToEnvelope(embeddedMessageToMarkdown(converters, item as EmbeddedMessage)));
     case '#microsoft.graph.event':
-      return ok(renderToEnvelope(embeddedEventToMarkdown(item as EmbeddedEvent)));
+      return ok(renderToEnvelope(embeddedEventToMarkdown(converters, item as EmbeddedEvent)));
     case '#microsoft.graph.contact':
       return ok(renderToEnvelope(embeddedContactToMarkdown(item as EmbeddedContact)));
     default:
@@ -114,12 +123,18 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // that carries the mail's own attachments (a 15 MB legal opinion inside a
 // forwarded mail, 2026-09-23); an embedded event or contact renders from the
 // expanded item. An attachment that already carries `item` renders from it.
-const readItemAttachment = async (graph: ReadGraph, a: Record<string, unknown>, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
-  if (a['item'] !== undefined) return convertItemAttachment(a);
+const readItemAttachment = async (
+  converters: Converters,
+  graph: ReadGraph,
+  a: Record<string, unknown>,
+  attachmentPath: string,
+  opts: ConvertOptions
+): Promise<Result<unknown, GraphError>> => {
+  if (a['item'] !== undefined) return convertItemAttachment(converters, a);
   const embedded = await readEmbeddedItem(graph, attachmentPath);
   if (!embedded.ok) return embedded;
-  if (embedded.value.kind === 'other') return convertItemAttachment(embedded.value.attachment);
-  return bytesToMarkdown(embedded.value.source, 'attached-message.eml', opts, NESTED_HINTS);
+  if (embedded.value.kind === 'other') return convertItemAttachment(converters, embedded.value.attachment);
+  return bytesToMarkdown(converters, embedded.value.source, 'attached-message.eml', opts, NESTED_HINTS);
 };
 
 // Route an ALREADY-FETCHED attachment object to markdown by its polymorphic
@@ -127,6 +142,7 @@ const readItemAttachment = async (graph: ReadGraph, a: Record<string, unknown>, 
 // can peek the type for zip-routing without a second Graph round-trip; the
 // path is what an embedded item is read through.
 const convertFetchedAttachment = (
+  converters: Converters,
   graph: ReadGraph,
   a: Record<string, unknown>,
   opts: ConvertOptions,
@@ -140,29 +156,36 @@ const convertFetchedAttachment = (
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(a, opts, hints);
+      return convertFileAttachment(converters, a, opts, hints);
     case '#microsoft.graph.referenceAttachment':
-      return convertReferenceAttachment(graph, a, opts);
+      return convertReferenceAttachment(converters, graph, a, opts);
     case '#microsoft.graph.itemAttachment':
-      return opts.sheet === undefined ? readItemAttachment(graph, a, attachmentPath, opts) : refuseSheet('this attachment is an embedded Outlook item');
+      return opts.sheet === undefined ? readItemAttachment(converters, graph, a, attachmentPath, opts) : refuseSheet('this attachment is an embedded Outlook item');
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
 };
 
-const convertAttachmentToMarkdown = async (graph: ReadGraph, attachmentPath: string, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
+const convertAttachmentToMarkdown = async (
+  converters: Converters,
+  graph: ReadGraph,
+  attachmentPath: string,
+  opts: ConvertOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
-  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints, attachmentPath);
+  return convertFetchedAttachment(converters, graph, fetched.value as Record<string, unknown>, opts, hints, attachmentPath);
 };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { messageId, attachmentId } = parsed.data;
     return convertAttachmentToMarkdown(
+      converters,
       graph,
       `/me/messages/${messageId}/attachments/${attachmentId}`,
       { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet, maxCells: parsed.data.maxCells },

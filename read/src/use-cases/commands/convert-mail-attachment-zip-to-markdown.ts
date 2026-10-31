@@ -31,7 +31,7 @@ const schema = z.object({
 });
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -54,7 +54,7 @@ const createExecute =
     if (typeof contentBytes !== 'string') {
       return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
     }
-    return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
+    return convertZipArchive(converters, base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
   };
 
 const meta: ReadCommandMeta = {

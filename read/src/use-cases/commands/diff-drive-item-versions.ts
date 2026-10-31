@@ -35,7 +35,7 @@ const liveNote = (id: string, before: string | undefined): string =>
     : `Nothing was saved after ${before}: version ${id} is the live file.`;
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -53,11 +53,11 @@ const createExecute =
     // The chosen version is still the live file: nothing moved, nothing to download.
     if (current) return ok({ contentType: 'text/x-diff', size: 0, text: '', added: 0, removed: 0, versionId: id, note: liveNote(id, before) });
     const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
-    const old = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/versions/${id}/content`, { ...opts, elevated: true });
+    const old = await renderSide(converters, graph, file.value, `/drives/${driveId}/items/${itemId}/versions/${id}/content`, { ...opts, elevated: true });
     if (!old.ok) return old;
-    const live = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
+    const live = await renderSide(converters, graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
     if (!live.ok) return live;
-    const diff = diffEnvelope(`a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, WORDING);
+    const diff = diffEnvelope(converters, `a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, WORDING);
     return ok({ ...diff, versionId: id });
   };
 
