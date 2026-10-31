@@ -22,26 +22,32 @@ const schema = z.object({
   sheet: z.string().min(1).optional(),
 });
 
-const renderFile = async (graph: ReadGraph, driveId: string, itemId: string, opts: RenderOptions): Promise<Result<{ name: string; render: Render }, GraphError>> => {
+const renderFile = async (
+  converters: Converters,
+  graph: ReadGraph,
+  driveId: string,
+  itemId: string,
+  opts: RenderOptions
+): Promise<Result<{ name: string; render: Render }, GraphError>> => {
   const file = await readDriveFile(graph, driveId, itemId);
   if (!file.ok) return file;
-  const render = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
+  const render = await renderSide(converters, graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
   return render.ok ? ok({ name: file.value.name, render: render.value }) : render;
 };
 
 const WORDING = { same: 'The two files render to the same markdown.', readWhole: 'read each file with download-drive-item-as-markdown' };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { driveId, itemId, otherDriveId, otherItemId, maxCells, sheet } = parsed.data;
     const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
-    const [from, to] = await Promise.all([renderFile(graph, driveId, itemId, opts), renderFile(graph, otherDriveId, otherItemId, opts)]);
+    const [from, to] = await Promise.all([renderFile(converters, graph, driveId, itemId, opts), renderFile(converters, graph, otherDriveId, otherItemId, opts)]);
     if (!from.ok) return from;
     if (!to.ok) return to;
-    return ok(diffEnvelope(`a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, WORDING));
+    return ok(diffEnvelope(converters, `a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, WORDING));
   };
 
 const meta: ReadCommandMeta = {

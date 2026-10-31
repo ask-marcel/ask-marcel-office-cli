@@ -4,7 +4,6 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, replaceUnresolvedCidImages } from './inline-image-embedder.ts';
 import type { InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
@@ -267,13 +266,13 @@ type RenderedBody = { readonly bodyMd: string; readonly quotedStripped: boolean;
 // short body look like it had GROWN. Locating the boundary a second time is a
 // regex scan over a string already in memory, cheaper than widening the
 // strippers' return type for this one caller.
-const renderBody = (isHtml: boolean, inlined: string, keepQuoted: boolean): Result<RenderedBody, GraphError> => {
+const renderBody = (converters: Converters, isHtml: boolean, inlined: string, keepQuoted: boolean): Result<RenderedBody, GraphError> => {
   if (isHtml) {
     // Strip quoted reply chains before turndown (the Outlook / Gmail markers
     // are still HTML at this point). v1 covers HTML bodies only — plain-text
     // reply detection is a separate heuristic.
     const stripped = keepQuoted ? { html: inlined, stripped: false } : stripQuotedReplies(inlined);
-    const converted = htmlToMarkdown(stripped.html);
+    const converted = converters.htmlToMarkdown(stripped.html);
     if (!converted.ok) return converted;
     return ok({ bodyMd: converted.value, quotedStripped: stripped.stripped, quotedBoundary: findQuoteBoundary(inlined) });
   }
@@ -308,7 +307,7 @@ const envelopeNote = (attachmentsListNote: string | undefined, strippedPercent: 
 // (`/me/messages/{id}`, `/groups/{g}/threads/{t}/posts/{p}`) and its attachments
 // always live one segment below it, so the only things that differ between the
 // two are the header line-up and the fetch hint, which arrive as options.
-const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, options: MarkdownRenderOptions): Promise<Result<unknown, GraphError>> => {
+const renderMessageAsMarkdown = async (converters: Converters, graph: ReadGraph, resourcePath: string, options: MarkdownRenderOptions): Promise<Result<unknown, GraphError>> => {
   const { inlineImages: embedInlineImagesEnabled, keepQuoted } = options;
 
   const fetched = await graph.get(resourcePath);
@@ -326,7 +325,7 @@ const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, o
   // cid with no matching attachment) becomes a readable placeholder so the
   // markdown never carries a broken cid: link.
   const inlined = replaceUnresolvedCidImages(embedded, labelsByContentId(attachments));
-  const body = renderBody(m.body?.contentType === 'html', inlined, keepQuoted);
+  const body = renderBody(converters, m.body?.contentType === 'html', inlined, keepQuoted);
   if (!body.ok) return body;
   const { bodyMd, quotedStripped, quotedBoundary } = body.value;
   const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled, options.attachmentHint);
@@ -345,11 +344,11 @@ const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, o
 const MAIL_ATTACHMENT_HINT = '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._';
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    return renderMessageAsMarkdown(graph, `/me/messages/${parsed.data.messageId}`, {
+    return renderMessageAsMarkdown(converters, graph, `/me/messages/${parsed.data.messageId}`, {
       // Embedding is opt-in (`--inline-images true`): the default skips the
       // per-image bytes fetch entirely and renders placeholders instead, which
       // is what an LLM consumer wants from a text command.
