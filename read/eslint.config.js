@@ -1,21 +1,6 @@
 import { baseConfig } from '../eslint.base.js';
 import { READ_ONLY_IMPORT_BANS, STDOUT_BAN } from '../eslint.ownership.js';
 
-const READ_USE_CASE_ADAPTERS = [
-  'eml-parser-adapter',
-  'legacy-doc-extractor',
-  'line-diff-adapter',
-  'mammoth-adapter',
-  'msg-reader-adapter',
-  'ooxml-media-extractor',
-  'ooxml-zip-adapter',
-  'pdf-image-extractor',
-  'pdf-text-extractor',
-  'sheetjs-adapter',
-  'turndown-adapter',
-  'zip-reader',
-];
-
 /*
  * Read's own path-scoped rules (package split, phase 6), which the root held
  * for these files before the move. The reasons of the bans live beside their
@@ -26,8 +11,7 @@ const READ_USE_CASE_ADAPTERS = [
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-  // The converter adapters that read use-cases still import (ADR 0004, decision 5).
-  ...baseConfig(import.meta.dirname, { useCaseAdapters: READ_USE_CASE_ADAPTERS }),
+  ...baseConfig(import.meta.dirname),
   {
     // stdout is the MCP frame channel, and read code never holds the write
     // graph (D9), its type included: both banned in every read file. The CLI
