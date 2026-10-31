@@ -1,8 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { openZipEntries } from '../../infra/zip-reader.ts';
-import type { ZipEntry } from '../../infra/zip-reader.ts';
+import type { Converters, ZipEntry } from '../ports/converters.ts';
 import { extractImagesFromBytes } from './image-extraction.ts';
 import type { MediaEnvelope } from './media-files.ts';
 import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
@@ -36,8 +35,8 @@ type ZipArchiveResult = { readonly count: number; readonly truncated?: true; rea
 // Embedded images of one entry, best-effort: an entry type that carries none
 // (or isn't a supported document) simply yields []. The fetchHint is empty —
 // these images travel back inline; there is no per-entry sibling command.
-const entryImages = async (entry: ZipEntry): Promise<MediaEnvelope['media']> => {
-  const r = await extractImagesFromBytes(entry.bytes, entry.path, '');
+const entryImages = async (converters: Converters, entry: ZipEntry): Promise<MediaEnvelope['media']> => {
+  const r = await extractImagesFromBytes(converters, entry.bytes, entry.path, '');
   return r.ok ? r.value.media : [];
 };
 
@@ -46,21 +45,27 @@ const entryImages = async (entry: ZipEntry): Promise<MediaEnvelope['media']> => 
 // `--keep-quoted` too), and `f(bytes, true, false, true)` is unreadable.
 type ZipArchiveOptions = { readonly includeMetadata: boolean; readonly includeImages?: boolean; readonly keepQuoted?: boolean; readonly maxCells?: number };
 
-const convertEntry = async (entry: ZipEntry, opts: ZipArchiveOptions): Promise<FileResult> => {
-  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata: opts.includeMetadata, keepQuoted: opts.keepQuoted, maxCells: opts.maxCells }, NESTED_HINTS);
+const convertEntry = async (converters: Converters, entry: ZipEntry, opts: ZipArchiveOptions): Promise<FileResult> => {
+  const r = await bytesToMarkdown(
+    converters,
+    entry.bytes,
+    entry.path,
+    { includeMetadata: opts.includeMetadata, keepQuoted: opts.keepQuoted, maxCells: opts.maxCells },
+    NESTED_HINTS
+  );
   if (!r.ok) return { path: entry.path, note: r.error.message };
   const env = r.value as { contentType: string; size: number; text: string };
   const base = { path: entry.path, contentType: env.contentType, size: env.size, text: env.text };
   if (opts.includeImages !== true) return base;
-  const images = await entryImages(entry);
+  const images = await entryImages(converters, entry);
   return images.length > 0 ? { ...base, images } : base;
 };
 
-const convertZipArchive = async (bytes: Uint8Array, opts: ZipArchiveOptions): Promise<Result<ZipArchiveResult, GraphError>> => {
-  const entries = await openZipEntries(bytes);
+const convertZipArchive = async (converters: Converters, bytes: Uint8Array, opts: ZipArchiveOptions): Promise<Result<ZipArchiveResult, GraphError>> => {
+  const entries = await converters.openZipEntries(bytes);
   if (!entries.ok) return entries;
   const capped = entries.value.slice(0, MAX_ENTRIES);
-  const files = await Promise.all(capped.map((entry) => convertEntry(entry, opts)));
+  const files = await Promise.all(capped.map((entry) => convertEntry(converters, entry, opts)));
   if (entries.value.length > MAX_ENTRIES) {
     return ok({ count: files.length, totalEntries: entries.value.length, truncated: true, files });
   }

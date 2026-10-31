@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { buildMalformedXlsx, buildRichXlsx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { csvToMarkdownSection, csvToMarkdownTable, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('xlsxToMarkdown', () => {
   it('converts an xlsx into one `## SheetName` section per sheet, each with a markdown table', async () => {
-    const result = await xlsxToMarkdown(buildSampleXlsx());
+    const result = await xlsxToMarkdown(CONVERTERS, buildSampleXlsx());
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.contentType).toBe('text/markdown');
@@ -18,7 +19,7 @@ describe('xlsxToMarkdown', () => {
   });
 
   it('separates the per-sheet sections with blank lines', async () => {
-    const result = await xlsxToMarkdown(buildSampleXlsx());
+    const result = await xlsxToMarkdown(CONVERTERS, buildSampleXlsx());
     if (result.ok) {
       const sheet1Index = result.value.text.indexOf('## Sheet1');
       const sheet2Index = result.value.text.indexOf('## Sheet2');
@@ -28,7 +29,7 @@ describe('xlsxToMarkdown', () => {
   });
 
   it('propagates the api_error from the sheetjs adapter when the input is not a valid xlsx', async () => {
-    const result = await xlsxToMarkdown(buildMalformedXlsx());
+    const result = await xlsxToMarkdown(CONVERTERS, buildMalformedXlsx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('xlsx parse failed');
@@ -36,7 +37,7 @@ describe('xlsxToMarkdown', () => {
   });
 
   it('appends a `## Workbook metadata` section when --include-metadata is set, surfacing authored content the value-rendered tables hide', async () => {
-    const result = await xlsxToMarkdown(await buildRichXlsx(), { includeMetadata: true });
+    const result = await xlsxToMarkdown(CONVERTERS, await buildRichXlsx(), { includeMetadata: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text).toContain('## Workbook metadata');
@@ -47,13 +48,13 @@ describe('xlsxToMarkdown', () => {
   });
 
   it('does NOT append the metadata block by default (backward-compat — existing callers see the same envelope)', async () => {
-    const result = await xlsxToMarkdown(buildSampleXlsx());
+    const result = await xlsxToMarkdown(CONVERTERS, buildSampleXlsx());
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.text).not.toContain('## Workbook metadata');
   });
 
   it('caps an oversized sheet to its header + a truncation hint instead of rendering the full table when --max-cells is exceeded', async () => {
-    const result = await xlsxToMarkdown(buildSampleXlsx(), { maxCells: 4 });
+    const result = await xlsxToMarkdown(CONVERTERS, buildSampleXlsx(), { maxCells: 4 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.text).toContain('## Sheet1');
