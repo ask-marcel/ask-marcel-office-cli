@@ -71,16 +71,12 @@ const TEST_HELPERS_BAN = {
 // match a file, so each zone repeats the mock ban and the test-helpers ban.
 const layerBan = (regex, message) => ({ regex, message: `${message} (hard rule 37, ADR 0004).` });
 
-// The converter adapters a read use-case still imports (ADR 0004, decision 5):
-// debt that a later port removes. The list may only get shorter.
-const adapterLookahead = (adapters) => (adapters.length === 0 ? '' : `(?!(${adapters.join('|')})\\.ts$)`);
-
-const layerZones = (useCaseAdapters) => [
+const LAYER_ZONES = [
   { layer: 'domain', bans: [layerBan('(^|/)(use-cases|infra|presenter|composition)/', 'Domain imports nothing else in src/')] },
   {
     layer: 'use-cases',
     bans: [
-      layerBan(`(^|/)infra/${adapterLookahead(useCaseAdapters)}`, 'A use-case sees domain and its ports, never infra: take the type from a port'),
+      layerBan('(^|/)infra/', 'A use-case sees domain and its ports, never infra: take the type from a port'),
       layerBan('(^|/)(presenter|composition)/', 'A use-case never imports the presenter or the composition root'),
     ],
   },
@@ -94,8 +90,8 @@ const layerZones = (useCaseAdapters) => [
   { layer: 'presenter', bans: [layerBan('(^|/)(use-cases|infra|composition)/', 'The presenter sees domain only')] },
 ];
 
-/** @type {(tsconfigRootDir: string, options?: { useCaseAdapters?: ReadonlyArray<string> }) => import('eslint').Linter.Config[]} */
-export const baseConfig = (tsconfigRootDir, { useCaseAdapters = [] } = {}) => [
+/** @type {(tsconfigRootDir: string) => import('eslint').Linter.Config[]} */
+export const baseConfig = (tsconfigRootDir) => [
   pluginJs.configs.recommended,
   ...tsPlugin.configs.recommended,
   securityPlugin.configs.recommended,
@@ -163,7 +159,7 @@ export const baseConfig = (tsconfigRootDir, { useCaseAdapters = [] } = {}) => [
       'no-restricted-imports': ['error', { paths: [MOCK_BAN], patterns: [TEST_HELPERS_BAN] }],
     },
   },
-  ...layerZones(useCaseAdapters).map(({ layer, bans }) => ({
+  ...LAYER_ZONES.map(({ layer, bans }) => ({
     files: [`src/${layer}/**/*.ts`],
     ignores: ['**/*.test.ts'],
     rules: {

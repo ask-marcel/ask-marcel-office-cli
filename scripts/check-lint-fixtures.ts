@@ -147,8 +147,9 @@ const tryBanFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArray<F
 
 // Rule 37 (ADR 0004): the layer zones of eslint.base.js. A use-case of each
 // folder never imports infra, by a relative path or by a core export path, and
-// takes its types from a port. Read alone keeps its converter adapters on an
-// allowlist. Core holds a file in every layer, so it proves the other zones.
+// takes its types from a port: a converter adapter too, which reaches a read
+// command through the Converters port. Core holds a file in every layer, so it
+// proves the other zones.
 const USE_CASE_INFRA = "import type { ReadGraph } from '../../infra/read-graph.ts';\nexport type F = ReadGraph;\n";
 const USE_CASE_CORE_INFRA = "import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';\nexport type F = ReadGraph;\n";
 const USE_CASE_PORT = "import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';\nexport type F = ReadGraph;\n";
@@ -161,7 +162,7 @@ const layerZoneFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArra
   { name: `${cwd}: a use-case never imports infra`, path, source: USE_CASE_INFRA, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
   { name: `${cwd}: a use-case never imports core's infra`, path, source: USE_CASE_CORE_INFRA, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
   { name: `control: ${cwd}: a use-case takes a type from a port`, path, source: USE_CASE_PORT, rule: 'no-restricted-imports', fires: false, strict: false, cwd },
-  { name: `${cwd}: a use-case imports a converter adapter only in read`, path, source: USE_CASE_ADAPTER, rule: 'no-restricted-imports', fires: cwd !== 'read', strict: false, cwd },
+  { name: `${cwd}: a use-case never imports a converter adapter`, path, source: USE_CASE_ADAPTER, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
 ];
 
 const CORE_LAYER_FIXTURES: ReadonlyArray<Fixture> = [
