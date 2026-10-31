@@ -3,10 +3,10 @@ import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/comman
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { readSheetsAsCsv } from '../../infra/sheetjs-adapter.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
+import type { Converters } from '../ports/converters.ts';
 
 type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly sheet?: string };
 
@@ -125,8 +125,8 @@ const narrowToSheet = (sheets: ReadonlyArray<NamedCsv>, wanted: string | undefin
   return err({ type: 'validation_error', message: `no sheet named "${wanted}" in this workbook; its sheets are: ${sheets.map(({ name }) => name).join(', ')}` });
 };
 
-const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
-  const sheets = await readSheetsAsCsv(bytes);
+const xlsxToMarkdown = async (converters: Converters, bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+  const sheets = await converters.readSheetsAsCsv(bytes);
   if (!sheets.ok) return sheets;
   const maxCells = opts.maxCells ?? DEFAULT_MAX_CELLS;
   const chosen = narrowToSheet(sheets.value, opts.sheet);
@@ -134,7 +134,7 @@ const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {
   const sections = chosen.value.map(({ name, csv }) => csvToMarkdownSection(name, csv, maxCells));
   let md = sections.join('\n\n');
   if (opts.includeMetadata === true) {
-    const meta = await extractXlsxMetadata(bytes);
+    const meta = await extractXlsxMetadata(converters, bytes);
     if (!meta.ok) return meta;
     md = `${md}\n\n${formatXlsxMetadata(meta.value)}`;
   }

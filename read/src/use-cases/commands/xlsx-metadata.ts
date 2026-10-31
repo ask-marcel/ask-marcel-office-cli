@@ -1,12 +1,12 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { attrOf, findAll, parseXml, textOf } from './ooxml-xml-walker.ts';
 import { extractLegacyComments, extractPeople, extractThreadedComments } from './xlsx-comments.ts';
 import type { CellComment, Person, ThreadedComment } from './xlsx-comments.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Pulls the side-channel content out of a .xlsx zip — everything a user can
@@ -50,8 +50,8 @@ const extractHiddenSheets = (workbook: unknown): ReadonlyArray<Sheet> =>
     .map((s) => ({ name: attrOf(s, 'name'), state: attrOf(s, 'state') }))
     .filter((s) => HIDDEN_STATES.has(s.state));
 
-const extractXlsxMetadata = async (bytes: Uint8Array): Promise<Result<XlsxMetadata, GraphError>> => {
-  const zipR = await openOoxmlZip(bytes);
+const extractXlsxMetadata = async (converters: Converters, bytes: Uint8Array): Promise<Result<XlsxMetadata, GraphError>> => {
+  const zipR = await converters.openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   const zip = zipR.value;
   const workbook = parseXml(zip.read('xl/workbook.xml'));

@@ -2,11 +2,12 @@ import { describe, expect, it } from 'bun:test';
 import { buildMalformedXlsx, buildRichXlsx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('extractXlsxMetadata', () => {
   it('surfaces every authored surface a value-rendered workbook hides — custom props, defined names, hidden sheets, cell comment, person-resolved threaded comment, external workbook link', async () => {
     const bytes = await buildRichXlsx();
-    const result = await extractXlsxMetadata(bytes);
+    const result = await extractXlsxMetadata(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
@@ -40,7 +41,7 @@ describe('extractXlsxMetadata', () => {
 
   it('returns empty arrays for every list section on a barebones workbook (sheetjs output has no defined names, comments, hidden sheets, or custom props)', async () => {
     const bytes = buildSampleXlsx();
-    const result = await extractXlsxMetadata(bytes);
+    const result = await extractXlsxMetadata(CONVERTERS, bytes);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.custom).toEqual([]);
@@ -53,7 +54,7 @@ describe('extractXlsxMetadata', () => {
   });
 
   it('returns an api_error Result when the workbook zip is malformed', async () => {
-    const result = await extractXlsxMetadata(buildMalformedXlsx());
+    const result = await extractXlsxMetadata(CONVERTERS, buildMalformedXlsx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('ooxml zip parse failed');
@@ -63,7 +64,7 @@ describe('extractXlsxMetadata', () => {
 
 describe('formatXlsxMetadata', () => {
   it('renders a populated `## Workbook metadata` block with every section heading and the authored content', async () => {
-    const extracted = await extractXlsxMetadata(await buildRichXlsx());
+    const extracted = await extractXlsxMetadata(CONVERTERS, await buildRichXlsx());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     const md = formatXlsxMetadata(extracted.value);
@@ -86,7 +87,7 @@ describe('formatXlsxMetadata', () => {
   });
 
   it('emits `_(none)_` placeholders for every empty section on a barebones workbook so the output stays grep-stable', async () => {
-    const extracted = await extractXlsxMetadata(buildSampleXlsx());
+    const extracted = await extractXlsxMetadata(CONVERTERS, buildSampleXlsx());
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     const md = formatXlsxMetadata(extracted.value);
