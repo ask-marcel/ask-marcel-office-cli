@@ -1,9 +1,9 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { escapeCell } from './ooxml-metadata-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Converts an OpenDocument body (`content.xml`) to markdown. ODF stores its
@@ -277,8 +277,8 @@ const renderOdfContent = (xml: string | undefined): string => {
   return renderBody(kidsOf(body, 'office:body')).join('\n\n');
 };
 
-const odfContentToMarkdown = async (bytes: Uint8Array): Promise<Result<string, GraphError>> => {
-  const zipR = await openOoxmlZip(bytes);
+const odfContentToMarkdown = async (converters: Converters, bytes: Uint8Array): Promise<Result<string, GraphError>> => {
+  const zipR = await converters.openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   return ok(renderOdfContent(zipR.value.read('content.xml')));
 };

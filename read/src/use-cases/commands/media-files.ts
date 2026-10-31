@@ -1,4 +1,4 @@
-import type { MediaPart } from '../../infra/ooxml-media-extractor.ts';
+import type { MediaPart } from '../ports/converters.ts';
 
 /**
  * Shapes the raw media parts from the extractor into the inline response

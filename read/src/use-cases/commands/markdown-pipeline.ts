@@ -2,9 +2,9 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages } from './inline-image-embedder.ts';
 import type { InlineAttachment } from './inline-image-embedder.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Orchestrate the four steps that turn a Graph `?format=html` content
@@ -67,7 +67,7 @@ type ConvertOptions = {
   readonly htmlTransform?: (html: string) => Promise<string>;
 };
 
-const convertToMarkdown = async (graph: ReadGraph, contentPath: string, options: ConvertOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+const convertToMarkdown = async (converters: Converters, graph: ReadGraph, contentPath: string, options: ConvertOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const binary = await graph.getBinary(contentPath);
   if (!binary.ok) return err(augmentSandboxError(binary.error));
   const html = await extractHtml(graph, binary.value as Record<string, unknown>);
@@ -75,7 +75,7 @@ const convertToMarkdown = async (graph: ReadGraph, contentPath: string, options:
   const transformed = options.htmlTransform ? await options.htmlTransform(html.value) : html.value;
   const inlineAttachments = options.inlineAttachments ?? [];
   const inlined = inlineAttachments.length > 0 ? embedInlineImages(transformed, inlineAttachments) : transformed;
-  const md = htmlToMarkdown(inlined);
+  const md = converters.htmlToMarkdown(inlined);
   if (!md.ok) return md;
   // size = UTF-8 byte count; `.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md.value).byteLength, text: md.value });

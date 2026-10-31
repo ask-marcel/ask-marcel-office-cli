@@ -1,9 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { extractMsg } from '../../infra/msg-reader-adapter.ts';
-import type { MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg } from '../../infra/msg-reader-adapter.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import type { Converters, MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg } from '../ports/converters.ts';
 import { replaceUnresolvedCidImages } from './inline-image-embedder.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 
@@ -64,7 +62,7 @@ const renderHeader = (msg: ParsedMsg): string =>
     .filter((s): s is string => s !== undefined)
     .join('\n');
 
-const renderBody = (msg: ParsedMsg, keepQuoted: boolean): string => {
+const renderBody = (converters: Converters, msg: ParsedMsg, keepQuoted: boolean): string => {
   if (msg.body !== undefined && msg.body.trim() !== '') {
     return (keepQuoted ? msg.body : stripQuotedPlainText(msg.body).text).trim();
   }
@@ -74,7 +72,7 @@ const renderBody = (msg: ParsedMsg, keepQuoted: boolean): string => {
     // label map still degrades every cid img to alt text / the cid's filename
     // prefix, which beats a broken ![](cid:…) link.
     const placeheld = replaceUnresolvedCidImages(stripped, new Map());
-    const converted = htmlToMarkdown(placeheld);
+    const converted = converters.htmlToMarkdown(placeheld);
     return converted.ok ? converted.value : placeheld;
   }
   return '';
@@ -97,22 +95,22 @@ const renderAttachments = async (attachments: readonly MsgAttachment[], depth: n
   return ['## Attachments', ...sections].join('\n\n');
 };
 
-const renderMsg = async (msg: ParsedMsg, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<string> => {
+const renderMsg = async (converters: Converters, msg: ParsedMsg, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<string> => {
   const sections: string[] = [];
   if (msg.subject !== undefined && msg.subject !== '') sections.push(`# ${msg.subject}`);
   const header = renderHeader(msg);
   if (header !== '') sections.push(header);
-  const body = renderBody(msg, opts.keepQuoted === true);
+  const body = renderBody(converters, msg, opts.keepQuoted === true);
   if (body !== '') sections.push(body);
   const attachments = await renderAttachments(msg.attachments, opts.depth ?? 0, recurse);
   if (attachments !== '') sections.push(attachments);
   return sections.join('\n\n');
 };
 
-const msgToMarkdown = async (bytes: Uint8Array, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<Result<unknown, GraphError>> => {
-  const parsed = await extractMsg(bytes);
+const msgToMarkdown = async (converters: Converters, bytes: Uint8Array, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<Result<unknown, GraphError>> => {
+  const parsed = await converters.extractMsg(bytes);
   if (!parsed.ok) return parsed;
-  const text = await renderMsg(parsed.value, opts, recurse);
+  const text = await renderMsg(converters, parsed.value, opts, recurse);
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

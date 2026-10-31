@@ -3,6 +3,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeReadGraph(overrides);
 
@@ -11,7 +12,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/html', size: 24, text: '<h1>Q3 Budget</h1>' }),
     });
-    const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; text: string };
@@ -28,7 +29,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
         return ok({ contentType: 'text/html', size: 13, text: '<p>follow</p>' });
       },
     });
-    const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -40,7 +41,9 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/html', size: 60, text: '<p>Logo: <img src="cid:l1" alt="logo"></p>' }),
     });
-    const result = await convertToMarkdown(graph, '/me/messages/m1?$select=body', { inlineAttachments: [{ contentId: 'l1', contentType: 'image/png', contentBytes: 'iVBORw0=' }] });
+    const result = await convertToMarkdown(CONVERTERS, graph, '/me/messages/m1?$select=body', {
+      inlineAttachments: [{ contentId: 'l1', contentType: 'image/png', contentBytes: 'iVBORw0=' }],
+    });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -53,7 +56,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/html', size: 20, text: '<p>RAW resource ref</p>' }),
     });
-    const result = await convertToMarkdown(graph, '/me/onenote/pages/p1/content', {
+    const result = await convertToMarkdown(CONVERTERS, graph, '/me/onenote/pages/p1/content', {
       htmlTransform: async (html) => html.replace('RAW resource ref', 'EMBEDDED'),
     });
     expect(result.ok).toBe(true);
@@ -68,7 +71,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 404, message: 'not found' } }),
     });
-    const result = await convertToMarkdown(graph, '/missing');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/missing');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -84,7 +87,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/x.html' }),
       fetchUrl: async () => ({ ok: false, error: { type: 'network_error' as const, message: 'socket reset' } }),
     });
-    const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
       expect(result.error.message).toBe('socket reset');
@@ -95,7 +98,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ok({ surprise: true }),
     });
-    const result = await convertToMarkdown(graph, '/some/path');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/some/path');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -110,7 +113,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/x.html' }),
       fetchUrl: async () => ok({ contentType: 'text/html', size: 5, text: '<p>x</p>' }),
     });
-    const result = await convertToMarkdown(graph, '/whatever');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/whatever');
     expect(result.ok).toBe(true);
   });
 
@@ -119,7 +122,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
       getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/x.bin' }),
       fetchUrl: async () => ok({ contentType: 'application/octet-stream', size: 4, base64: 'AAAA' }),
     });
-    const result = await convertToMarkdown(graph, '/whatever');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/whatever');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -135,7 +138,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
           message: 'Sandbox_InputFormatNotSupported: An exception occurred while executing within the Sandbox',
         }),
     });
-    const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
@@ -155,7 +158,7 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
           message: 'Sandbox_InputFormatNotSupported: An exception occurred while executing within the Sandbox',
         }),
     });
-    const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
+    const result = await convertToMarkdown(CONVERTERS, graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
