@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { buildMalformedDocx, buildMinimalOdt, buildRichOdp, buildRichOds, buildRichOdt } from '../../test-helpers/office-fixtures.ts';
 import { odfContentToMarkdown, renderOdfContent } from './odf-content-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const ODF_NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"';
 const ODF_NS_FULL =
@@ -25,7 +26,7 @@ describe('odfContentToMarkdown — text document (.odt)', () => {
   });
 
   it('renders headings (with level), inline runs (span/spaces/tab), nested lists, tables, and a display:none section in document order', async () => {
-    const result = await odfContentToMarkdown(await buildRichOdt());
+    const result = await odfContentToMarkdown(CONVERTERS, await buildRichOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value).toBe(
@@ -95,7 +96,7 @@ describe('odfContentToMarkdown — office:annotation comments rendered inline', 
 
 describe('odfContentToMarkdown — spreadsheet (.ods)', () => {
   it('renders one named-heading + markdown table per sheet, capping and trimming the 16384-wide empty-cell tail', async () => {
-    const result = await odfContentToMarkdown(await buildRichOds());
+    const result = await odfContentToMarkdown(CONVERTERS, await buildRichOds());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value).toBe(['## Budget', '| Item | Cost |\n| --- | --- |\n| Rent | 1000 |', '## Notes', '| Hello |\n| --- |'].join('\n\n'));
@@ -104,7 +105,7 @@ describe('odfContentToMarkdown — spreadsheet (.ods)', () => {
 
 describe('odfContentToMarkdown — presentation (.odp)', () => {
   it('renders one named-heading per slide followed by the slide text-box paragraphs', async () => {
-    const result = await odfContentToMarkdown(await buildRichOdp());
+    const result = await odfContentToMarkdown(CONVERTERS, await buildRichOdp());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value).toBe(['## Intro', 'Welcome slide', 'Subtitle here', '## Details', 'Detail bullet'].join('\n\n'));
@@ -113,13 +114,13 @@ describe('odfContentToMarkdown — presentation (.odp)', () => {
 
 describe('odfContentToMarkdown — edges', () => {
   it('returns an empty string for a package with no content.xml', async () => {
-    const result = await odfContentToMarkdown(await buildMinimalOdt());
+    const result = await odfContentToMarkdown(CONVERTERS, await buildMinimalOdt());
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe('');
   });
 
   it('propagates the zip-parse error for a malformed package', async () => {
-    const result = await odfContentToMarkdown(buildMalformedDocx());
+    const result = await odfContentToMarkdown(CONVERTERS, buildMalformedDocx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('ooxml zip parse failed');
   });

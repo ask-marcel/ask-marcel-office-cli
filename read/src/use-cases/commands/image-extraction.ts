@@ -4,9 +4,7 @@ import type { PageRange } from '@ask-marcel/office-core/domain/page-range.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
-import type { MediaPart } from '../../infra/ooxml-media-extractor.ts';
-import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
+import type { Converters, MediaPart } from '../ports/converters.ts';
 import { buildMediaResponse, isImagePath } from './media-files.ts';
 import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { MediaEnvelope } from './media-files.ts';
@@ -16,9 +14,9 @@ import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-pas
 const isOoxml = (ext: string): boolean => DOCX_FAMILY.has(ext) || XLSX_FAMILY.has(ext) || PPTX_FAMILY.has(ext);
 
 // Pick the media extractor by extension: PDF via unpdf, OOXML via the zip media parts, else unsupported.
-const extractorFor = (ext: string): typeof extractPdfImages | undefined => {
-  if (ext === 'pdf') return extractPdfImages;
-  if (isOoxml(ext)) return extractOoxmlMedia;
+const extractorFor = (converters: Converters, ext: string): Converters['extractPdfImages'] | undefined => {
+  if (ext === 'pdf') return converters.extractPdfImages;
+  if (isOoxml(ext)) return converters.extractOoxmlMedia;
   return undefined;
 };
 
@@ -30,13 +28,19 @@ const extractorFor = (ext: string): typeof extractPdfImages | undefined => {
  * `pages` narrows a PDF to the pages picked with `--pages`; on any other file the
  * selection is refused rather than silently ignored.
  */
-const extractImagesFromBytes = async (bytes: Uint8Array, name: string, fetchHint: string, pages?: PageRange): Promise<Result<MediaEnvelope, GraphError>> => {
+const extractImagesFromBytes = async (
+  converters: Converters,
+  bytes: Uint8Array,
+  name: string,
+  fetchHint: string,
+  pages?: PageRange
+): Promise<Result<MediaEnvelope, GraphError>> => {
   const ext = extensionOf(name);
   if (pages !== undefined && ext !== 'pdf') {
     const what = ext === '' ? 'has no extension' : `is a .${ext}`;
     return err({ type: 'validation_error', message: `--pages applies to a PDF; this file ${what}` });
   }
-  const extractor = extractorFor(ext);
+  const extractor = extractorFor(converters, ext);
   if (extractor === undefined) {
     return err({
       type: 'api_error',
@@ -79,11 +83,11 @@ type FilesMedia = MediaEnvelope & { readonly skipped: ReadonlyArray<string> };
  * other file named in `skipped`, as is a document its extractor cannot read, so
  * one broken file does not hide the others. `pages` narrows every PDF.
  */
-const imagesOfFiles = async (files: ReadonlyArray<NamedFile>, pages?: PageRange): Promise<FilesMedia> => {
+const imagesOfFiles = async (converters: Converters, files: ReadonlyArray<NamedFile>, pages?: PageRange): Promise<FilesMedia> => {
   const parts: MediaPart[] = [];
   const skipped: string[] = [];
   for (const file of files) {
-    const extractor = extractorFor(extensionOf(file.name));
+    const extractor = extractorFor(converters, extensionOf(file.name));
     if (isImagePath(file.name)) parts.push({ path: file.name, bytes: file.bytes });
     else if (extractor === undefined) skipped.push(file.name);
     else {

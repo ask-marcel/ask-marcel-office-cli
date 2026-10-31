@@ -1,7 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import { htmlToMarkdown, stripHtmlToText } from '../../infra/turndown-adapter.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown, stripInlineImages } from './docx-to-markdown.ts';
 import { emlToMarkdown } from './eml-to-markdown.ts';
@@ -12,6 +11,7 @@ import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { decodeUtf8Text, extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 // Image extensions that have no markdown text representation. NOTE: `svg` is NOT
 // here — an SVG is XML text, so it content-sniffs to text/plain like any text file.
@@ -77,10 +77,10 @@ const HTML_MARKDOWN_CAP = 1_000_000;
 
 // An embedded `data:` image becomes `[image: alt]`, as in a Word file, unless
 // `--inline-images true` asks for the base64.
-const htmlEnvelope = (bytes: Uint8Array, inlineImages: boolean | undefined): Result<unknown, GraphError> => {
+const htmlEnvelope = (converters: Converters, bytes: Uint8Array, inlineImages: boolean | undefined): Result<unknown, GraphError> => {
   const html = withoutHead(new TextDecoder().decode(bytes));
-  if (bytes.byteLength <= HTML_MARKDOWN_CAP) return map(htmlToMarkdown(html), (md) => markdownEnvelope(inlineImages === true ? md : stripInlineImages(md)));
-  const text = stripHtmlToText(html);
+  if (bytes.byteLength <= HTML_MARKDOWN_CAP) return map(converters.htmlToMarkdown(html), (md) => markdownEnvelope(inlineImages === true ? md : stripInlineImages(md)));
+  const text = converters.stripHtmlToText(html);
   return ok({
     contentType: 'text/plain',
     size: new TextEncoder().encode(text).byteLength,
@@ -100,31 +100,49 @@ const htmlEnvelope = (bytes: Uint8Array, inlineImages: boolean | undefined): Res
  * surfaces (a 415, or a zip note).
  */
 // The current document formats and PDF. Undefined for any other extension.
-const documentToMarkdown = async (ext: string, bytes: Uint8Array, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError> | undefined> => {
+const documentToMarkdown = async (
+  converters: Converters,
+  ext: string,
+  bytes: Uint8Array,
+  opts: BytesToMarkdownOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError> | undefined> => {
   if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
-  if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(bytes, opts.inlineImages);
-  if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
-  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells, sheet: opts.sheet });
-  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
-  if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
-  if (ext === 'pdf') return pdfToMarkdown(bytes, hints.pdfNoText);
+  if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(converters, bytes, opts.inlineImages);
+  if (DOCX_FAMILY.has(ext)) return docxToMarkdown(converters, bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
+  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(converters, bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells, sheet: opts.sheet });
+  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(converters, bytes, { includeMetadata: opts.includeMetadata });
+  if (ODF_FAMILY.has(ext)) return odfToMarkdown(converters, bytes, { includeMetadata: opts.includeMetadata });
+  if (ext === 'pdf') return pdfToMarkdown(converters, bytes, hints.pdfNoText);
   return undefined;
 };
 
 // The Office 97-2003 formats. Undefined for any other extension.
-const legacyToMarkdown = async (ext: string, bytes: Uint8Array, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError> | undefined> => {
-  if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells, sheet: opts.sheet }); // legacy Excel — no OOXML side-channel
-  if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
+const legacyToMarkdown = async (
+  converters: Converters,
+  ext: string,
+  bytes: Uint8Array,
+  opts: BytesToMarkdownOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError> | undefined> => {
+  if (ext === 'xls') return xlsxToMarkdown(converters, bytes, { maxCells: opts.maxCells, sheet: opts.sheet }); // legacy Excel — no OOXML side-channel
+  if (ext === 'doc') return docToMarkdown(converters, bytes); // legacy Word — text only
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, code: 'unsupported_legacy_office', message: hints.legacyPpt });
   return undefined;
 };
 
-const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
+const bytesToMarkdown = async (
+  converters: Converters,
+  bytes: Uint8Array,
+  filename: string,
+  opts: BytesToMarkdownOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
-  const document = (await documentToMarkdown(ext, bytes, opts, hints)) ?? (await legacyToMarkdown(ext, bytes, opts, hints));
+  const document = (await documentToMarkdown(converters, ext, bytes, opts, hints)) ?? (await legacyToMarkdown(converters, ext, bytes, opts, hints));
   if (document !== undefined) return document;
-  if (ext === 'msg' || ext === 'eml') return messageToMarkdown(ext, bytes, opts);
+  if (ext === 'msg' || ext === 'eml') return messageToMarkdown(converters, ext, bytes, opts);
   return otherToMarkdown(ext, bytes, hints);
 };
 
@@ -133,10 +151,12 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
 // so a message inside a message can't loop. Attachments are NESTED files —
 // container-neutral hints, not the caller's (a png inside a .msg must not
 // point at drive-item commands).
-const messageToMarkdown = async (ext: 'msg' | 'eml', bytes: Uint8Array, opts: BytesToMarkdownOptions): Promise<Result<unknown, GraphError>> => {
+const messageToMarkdown = async (converters: Converters, ext: 'msg' | 'eml', bytes: Uint8Array, opts: BytesToMarkdownOptions): Promise<Result<unknown, GraphError>> => {
   const depth = opts.depth ?? 0;
   const render = ext === 'msg' ? msgToMarkdown : emlToMarkdown;
-  return render(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
+  return render(converters, bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) =>
+    bytesToMarkdown(converters, childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS)
+  );
 };
 
 // An image is refused, text of any extension passes through, anything else is unsupported.
