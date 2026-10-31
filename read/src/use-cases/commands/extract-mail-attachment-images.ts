@@ -7,7 +7,6 @@ import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands
 import { base64ToBytes, fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import type { PageRange } from '@ask-marcel/office-core/domain/page-range.ts';
-import { extractEml } from '../../infra/eml-parser-adapter.ts';
 import { readEmbeddedItem } from './embedded-item.ts';
 import { extractImagesFromBytes, imagesOfFiles, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
@@ -36,12 +35,14 @@ const MAIL_HINTS: ImageExtractionHints = {
 };
 
 const fromFileAttachment = (
+  converters: Converters,
   attachment: { name?: string; contentBytes?: string },
   hints: ImageExtractionHints,
   pages: PageRange | undefined
-): Promise<Result<unknown, GraphError>> => extractImagesFromBytes(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', hints.fetchHint, pages);
+): Promise<Result<unknown, GraphError>> => extractImagesFromBytes(converters, base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', hints.fetchHint, pages);
 
 const fromReferenceAttachment = async (
+  converters: Converters,
   graph: ReadGraph,
   attachment: { sourceUrl?: string },
   hints: ImageExtractionHints,
@@ -68,21 +69,21 @@ const fromReferenceAttachment = async (
     });
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
-  return extractImagesFromBytes(bytes.value, item.name ?? '', hints.fetchHint, pages);
+  return extractImagesFromBytes(converters, bytes.value, item.name ?? '', hints.fetchHint, pages);
 };
 
 // A forwarded mail: its files come out of its MIME source through the .eml
 // parser, and every image they hold comes back named after its file (a scanned
 // contract inside a forwarded mail, 2026-09-23, was otherwise unreachable).
-const fromItemAttachment = async (graph: ReadGraph, attachmentPath: string, pages: PageRange | undefined): Promise<Result<unknown, GraphError>> => {
+const fromItemAttachment = async (converters: Converters, graph: ReadGraph, attachmentPath: string, pages: PageRange | undefined): Promise<Result<unknown, GraphError>> => {
   const embedded = await readEmbeddedItem(graph, attachmentPath);
   if (!embedded.ok) return embedded;
   if (embedded.value.kind === 'other')
     return err({ type: 'api_error', status: 415, message: 'This itemAttachment is an embedded event or contact, which carries no document to extract images from.' });
-  const mail = await extractEml(embedded.value.source);
+  const mail = await converters.extractEml(embedded.value.source);
   if (!mail.ok) return mail;
   const files = mail.value.attachments.map((a) => ({ name: a.fileName ?? 'unnamed', bytes: a.content ?? new Uint8Array() }));
-  const { skipped, ...media } = await imagesOfFiles(files, pages);
+  const { skipped, ...media } = await imagesOfFiles(converters, files, pages);
   return ok(skipped.length === 0 ? media : { ...media, note: `Neither images nor documents, so skipped: ${skipped.join(', ')}.` });
 };
 
@@ -91,7 +92,13 @@ const fromItemAttachment = async (graph: ReadGraph, attachmentPath: string, page
  * here, and one post of a group thread. The path and the hints are the only
  * things that differ; `pages` narrows a PDF when the caller offers `--pages`.
  */
-const extractAttachmentImages = async (graph: ReadGraph, attachmentPath: string, hints: ImageExtractionHints, pages?: PageRange): Promise<Result<unknown, GraphError>> => {
+const extractAttachmentImages = async (
+  converters: Converters,
+  graph: ReadGraph,
+  attachmentPath: string,
+  hints: ImageExtractionHints,
+  pages?: PageRange
+): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
@@ -100,23 +107,23 @@ const extractAttachmentImages = async (graph: ReadGraph, attachmentPath: string,
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return fromFileAttachment(a, hints, pages);
+      return fromFileAttachment(converters, a, hints, pages);
     case '#microsoft.graph.referenceAttachment':
-      return fromReferenceAttachment(graph, a, hints, pages);
+      return fromReferenceAttachment(converters, graph, a, hints, pages);
     case '#microsoft.graph.itemAttachment':
-      return fromItemAttachment(graph, attachmentPath, pages);
+      return fromItemAttachment(converters, graph, attachmentPath, pages);
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
 };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { messageId, attachmentId } = parsed.data;
-    return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
+    return extractAttachmentImages(converters, graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
   };
 
 const meta: ReadCommandMeta = {

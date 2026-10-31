@@ -1,9 +1,9 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import { extractEml } from '../../infra/eml-parser-adapter.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { renderMsg } from './msg-to-markdown.ts';
 import type { MsgAttachmentConverter, MsgToMarkdownOptions } from './msg-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Render a raw RFC 822 message (`.eml`) exactly as an Outlook `.msg` renders: the
@@ -12,10 +12,10 @@ import type { MsgAttachmentConverter, MsgToMarkdownOptions } from './msg-to-mark
  * attachments are the `.msg` renderer's own. `recurse` and `depth` work as in
  * `msgToMarkdown`.
  */
-const emlToMarkdown = async (bytes: Uint8Array, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<Result<unknown, GraphError>> => {
-  const parsed = await extractEml(bytes);
+const emlToMarkdown = async (converters: Converters, bytes: Uint8Array, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<Result<unknown, GraphError>> => {
+  const parsed = await converters.extractEml(bytes);
   if (!parsed.ok) return parsed;
-  const text = await renderMsg(parsed.value, opts, recurse);
+  const text = await renderMsg(converters, parsed.value, opts, recurse);
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

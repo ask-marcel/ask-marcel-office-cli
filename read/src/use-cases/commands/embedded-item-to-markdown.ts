@@ -1,4 +1,4 @@
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Render an itemAttachment's inner resource (a `microsoft.graph.message`,
@@ -26,10 +26,10 @@ const formatRecipients = (rs: ReadonlyArray<Recipient> | undefined): string | un
   return parts.length > 0 ? parts.join(', ') : undefined;
 };
 
-const renderBody = (body: Body | undefined): string => {
+const renderBody = (converters: Converters, body: Body | undefined): string => {
   if (!body?.content) return '';
   if (body.contentType !== 'html') return body.content;
-  const result = htmlToMarkdown(body.content);
+  const result = converters.htmlToMarkdown(body.content);
   return result.ok ? result.value : body.content;
 };
 
@@ -43,14 +43,14 @@ type EmbeddedMessage = {
   readonly body?: Body;
 };
 
-const embeddedMessageToMarkdown = (m: EmbeddedMessage): string => {
+const embeddedMessageToMarkdown = (converters: Converters, m: EmbeddedMessage): string => {
   const headers = [
     headerLine('Subject', m.subject),
     headerLine('From', formatAddress(m.from?.emailAddress)),
     headerLine('To', formatRecipients(m.toRecipients)),
     headerLine('Sent', m.sentDateTime),
   ].filter((s): s is string => s !== undefined);
-  const body = renderBody(m.body);
+  const body = renderBody(converters, m.body);
   return [headers.join('\n'), body].filter((s) => s !== '').join('\n\n');
 };
 
@@ -71,7 +71,7 @@ const formatEventDate = (d: EventDateTime | undefined): string | undefined => {
   return d.timeZone ? `${d.dateTime} ${d.timeZone}` : d.dateTime;
 };
 
-const embeddedEventToMarkdown = (e: EmbeddedEvent): string => {
+const embeddedEventToMarkdown = (converters: Converters, e: EmbeddedEvent): string => {
   const headers = [
     headerLine('Subject', e.subject),
     headerLine('Start', formatEventDate(e.start)),
@@ -80,7 +80,7 @@ const embeddedEventToMarkdown = (e: EmbeddedEvent): string => {
     headerLine('Organizer', formatAddress(e.organizer?.emailAddress)),
     headerLine('Attendees', formatRecipients(e.attendees)),
   ].filter((s): s is string => s !== undefined);
-  const body = renderBody(e.body);
+  const body = renderBody(converters, e.body);
   return [headers.join('\n'), body].filter((s) => s !== '').join('\n\n');
 };
 

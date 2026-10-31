@@ -3,7 +3,6 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
-import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
@@ -39,7 +38,7 @@ type DocumentLinkSummary = {
 };
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<DocumentLinkSummary, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -51,7 +50,7 @@ const createExecute =
 
     // 2. Open as a zip package. A non-zip input (pdf, image, anything that isn't a
     //    ZIP) can't carry extractable hyperlinks → friendly 400.
-    const zip = await openOoxmlZip(bytes.value);
+    const zip = await converters.openOoxmlZip(bytes.value);
     if (!zip.ok) {
       return err({
         type: 'api_error',

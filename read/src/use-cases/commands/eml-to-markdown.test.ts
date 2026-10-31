@@ -4,9 +4,10 @@ import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-clie
 import { buildSampleEml } from '../../test-helpers/office-fixtures.ts';
 import { commands } from '../../composition/read-commands.ts';
 import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const textOf = async (opts: { readonly keepQuoted?: boolean }): Promise<string> => {
-  const r = await bytesToMarkdown(buildSampleEml(), 'mail.eml', opts, NESTED_HINTS);
+  const r = await bytesToMarkdown(CONVERTERS, buildSampleEml(), 'mail.eml', opts, NESTED_HINTS);
   if (!r.ok) throw new Error(r.error.message);
   return (r.value as { text: string }).text;
 };
@@ -74,13 +75,13 @@ const nestedEml = (level: number): string => {
 
 describe('the edges of an .eml conversion', () => {
   it('answers a markdown envelope', async () => {
-    const r = await bytesToMarkdown(buildSampleEml(), 'mail.eml', {}, NESTED_HINTS);
+    const r = await bytesToMarkdown(CONVERTERS, buildSampleEml(), 'mail.eml', {}, NESTED_HINTS);
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value).toMatchObject({ contentType: 'text/markdown' });
   });
 
   it('expands attached messages three levels deep and lists the fourth without opening it', async () => {
-    const r = await bytesToMarkdown(new TextEncoder().encode(nestedEml(4)), 'mail.eml', {}, NESTED_HINTS);
+    const r = await bytesToMarkdown(CONVERTERS, new TextEncoder().encode(nestedEml(4)), 'mail.eml', {}, NESTED_HINTS);
     if (!r.ok) throw new Error(r.error.message);
     const text = (r.value as { text: string }).text;
     expect(text).toContain('# Level 1');
@@ -90,7 +91,7 @@ describe('the edges of an .eml conversion', () => {
 
   it('passes the parser refusal through for a message nested past its limit', async () => {
     const deep = Array.from({ length: 300 }, (_, i) => `Content-Type: multipart/mixed; boundary="n${i}"\r\n\r\n--n${i}\r\n`).join('');
-    const r = await bytesToMarkdown(new TextEncoder().encode(deep), 'mail.eml', {}, NESTED_HINTS);
+    const r = await bytesToMarkdown(CONVERTERS, new TextEncoder().encode(deep), 'mail.eml', {}, NESTED_HINTS);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.message).toStartWith('failed to parse .eml');
   });
