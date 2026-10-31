@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { embeddedContactToMarkdown, embeddedEventToMarkdown, embeddedMessageToMarkdown } from './embedded-item-to-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 describe('embeddedMessageToMarkdown — render an itemAttachment of type message as headers + body markdown', () => {
   it('renders the standard headers (From, To, Subject, Sent) plus the body run through htmlToMarkdown', () => {
-    const md = embeddedMessageToMarkdown({
+    const md = embeddedMessageToMarkdown(CONVERTERS, {
       subject: 'Re: Q3 plan',
       from: { emailAddress: { name: 'Alice', address: 'alice@contoso.com' } },
       toRecipients: [{ emailAddress: { name: 'Bob', address: 'bob@contoso.com' } }],
@@ -18,7 +19,7 @@ describe('embeddedMessageToMarkdown — render an itemAttachment of type message
   });
 
   it('handles multiple toRecipients and missing displayNames', () => {
-    const md = embeddedMessageToMarkdown({
+    const md = embeddedMessageToMarkdown(CONVERTERS, {
       subject: 'multi',
       toRecipients: [{ emailAddress: { address: 'a@x' } }, { emailAddress: { address: 'b@x' } }],
       body: { contentType: 'html', content: '<p>x</p>' },
@@ -27,7 +28,7 @@ describe('embeddedMessageToMarkdown — render an itemAttachment of type message
   });
 
   it('renders text-content bodies as-is when contentType is `text` instead of `html`', () => {
-    const md = embeddedMessageToMarkdown({
+    const md = embeddedMessageToMarkdown(CONVERTERS, {
       subject: 'plain',
       body: { contentType: 'text', content: 'Hello\nworld' },
     });
@@ -36,13 +37,13 @@ describe('embeddedMessageToMarkdown — render an itemAttachment of type message
   });
 
   it('still produces a header block when the message has no body', () => {
-    const md = embeddedMessageToMarkdown({ subject: 'empty', from: { emailAddress: { address: 'x@y' } } });
+    const md = embeddedMessageToMarkdown(CONVERTERS, { subject: 'empty', from: { emailAddress: { address: 'x@y' } } });
     expect(md).toContain('**Subject:** empty');
     expect(md).toContain('**From:** x@y');
   });
 
   it('omits headers whose source field is missing entirely', () => {
-    const md = embeddedMessageToMarkdown({ subject: 'only-subject' });
+    const md = embeddedMessageToMarkdown(CONVERTERS, { subject: 'only-subject' });
     expect(md).toContain('**Subject:** only-subject');
     expect(md).not.toContain('**From:**');
     expect(md).not.toContain('**To:**');
@@ -52,7 +53,7 @@ describe('embeddedMessageToMarkdown — render an itemAttachment of type message
 
 describe('embeddedEventToMarkdown — render an itemAttachment of type event', () => {
   it('renders subject, start/end, location, organizer, attendees, and body', () => {
-    const md = embeddedEventToMarkdown({
+    const md = embeddedEventToMarkdown(CONVERTERS, {
       subject: 'Quarterly Review',
       start: { dateTime: '2026-05-01T09:00:00', timeZone: 'UTC' },
       end: { dateTime: '2026-05-01T10:00:00', timeZone: 'UTC' },
@@ -71,7 +72,7 @@ describe('embeddedEventToMarkdown — render an itemAttachment of type event', (
   });
 
   it('omits the location header when the event has no location.displayName', () => {
-    const md = embeddedEventToMarkdown({
+    const md = embeddedEventToMarkdown(CONVERTERS, {
       subject: 'no-loc',
       start: { dateTime: '2026-05-01T09:00:00', timeZone: 'UTC' },
       end: { dateTime: '2026-05-01T10:00:00', timeZone: 'UTC' },
@@ -80,7 +81,7 @@ describe('embeddedEventToMarkdown — render an itemAttachment of type event', (
   });
 
   it('omits attendees when the array is empty', () => {
-    const md = embeddedEventToMarkdown({ subject: 'solo', attendees: [] });
+    const md = embeddedEventToMarkdown(CONVERTERS, { subject: 'solo', attendees: [] });
     expect(md).not.toContain('**Attendees:**');
   });
 });

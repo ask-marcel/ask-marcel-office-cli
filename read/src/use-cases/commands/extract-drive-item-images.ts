@@ -17,7 +17,7 @@ const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1),
 const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-drive-item-content` and process locally.';
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -44,7 +44,7 @@ const createExecute =
 
     const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
     if (!bytes.ok) return bytes;
-    return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT, parsed.data.pages);
+    return extractImagesFromBytes(converters, bytes.value, item.name ?? '', FETCH_HINT, parsed.data.pages);
   };
 
 const meta: ReadCommandMeta = {

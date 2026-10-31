@@ -28,7 +28,7 @@ const schema = z.object({ path: z.string().min(1) });
 const FETCH_HINT = 'The file is already on disk — read it directly with a vision-capable model, or convert its body with `convert-local-file-to-markdown`.';
 
 const createExecuteLocal =
-  (_converters: Converters): NonNullable<ReadCommand['executeLocal']> =>
+  (converters: Converters): NonNullable<ReadCommand['executeLocal']> =>
   async (fs: FileSystem, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -40,7 +40,7 @@ const createExecuteLocal =
       return err({ type: 'api_error', status: 500, message: `failed to read ${path}: ${bytes.error.message}` });
     }
 
-    return extractImagesFromBytes(bytes.value, basename(path), FETCH_HINT);
+    return extractImagesFromBytes(converters, bytes.value, basename(path), FETCH_HINT);
   };
 
 const execute = async (_graph: ReadGraph, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
