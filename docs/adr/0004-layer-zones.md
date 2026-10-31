@@ -36,10 +36,11 @@ On main 3eb2167 about 195 production imports break the rule:
 4. `PACKAGE_ROLES` moves to `core/src/domain/package-role.ts`, and the pure name fill functions
    move to `core/src/domain/bin-names.ts`, with `NameSource` as a structural type. The presenter
    types its logger as a local type with the one method it calls, so it needs no port import.
-5. The converter adapters stay as runtime imports for now. The read use-cases zone allows only the
-   named adapter files (`READ_USE_CASE_ADAPTERS` in `read/eslint.config.js`, passed to
-   `baseConfig`), so a new infra import fails lint. This list is debt: a later change injects the
-   converters through a port.
+5. The converter adapters reach the read commands through a port. Until 2026-10-31 they were
+   runtime imports on an allowlist in the read use-cases zone. Then `use-cases/ports/converters.ts`
+   declared the `Converters` bag, infra built the real one (`CONVERTERS`), the registry became
+   `createReadCommands(converters)`, and the helpers took the bag as their first parameter. The
+   allowlist is gone, and the read use-cases zone bans every infra import.
 6. The zones are one `no-restricted-imports` block per layer in `eslint.base.js`. Each block repeats
    the mock ban and the test-helpers ban, because ESLint replaces the options of a rule when two
    blocks match a file. The patterns match the relative paths and the
@@ -51,7 +52,8 @@ The work lands in four pull requests: core, then auth and write, then read, then
 
 - Inject the converter adapters now, through a `Converters` port passed to `execute`. This gives the
   full rule in one series, but it changes the `ReadCommand` contract and many existing tests.
-  Deferred, not rejected.
+  Deferred at first, then done on 2026-10-31 through factories in read (`createExecute`), so
+  core's `execute` contract did not change.
 - Let use-cases import types from infra (`allowTypeImports`). It is cheap, but use-cases still name
   infra modules, so it is weaker than rule 37. Rejected.
 - Move the converter adapters into domain. Domain would then import npm libraries. Rejected.
@@ -61,7 +63,8 @@ The work lands in four pull requests: core, then auth and write, then read, then
 ## Consequences
 
 - A use-case that imports infra, or a presenter that imports use-cases, fails lint in every folder.
-- The adapter allowlist in the read use-cases zone is visible debt. It can only get shorter.
+- The converter adapters reach a read command only through the `Converters` port, so a test can
+  pass any bag in place of the real one.
 - The old infra modules keep re-exports of the moved types for the tests.
 
 ## Reversal
