@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { ChannelMessage } from './channel-message-html.ts';
 import { renderThread, renderTranscript } from './channel-message-markdown.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const NO_IMAGES: ReadonlyMap<string, string> = new Map();
 
@@ -31,7 +32,7 @@ describe('reactions on a channel post', () => {
       createdDateTime: '2026-07-01T09:00:00Z',
       from: { user: { id: 'u2', displayName: 'Robin Chen' } },
     });
-    const md = renderThread(post({ reactions: REACTIONS }), [replyByRobin], NO_IMAGES, false);
+    const md = renderThread(CONVERTERS, post({ reactions: REACTIONS }), [replyByRobin], NO_IMAGES, false);
     expect(md).toContain(
       '_reactions: 👍 2, ❤️ 1, 😮 1_\n\n_reacted: 👍 Robin Chen 2026-09-22 10:14 · 👍 Jordan Avery 2026-09-22 11:00 · 😮 someone 2026-09-22 12:00 · ❤️ user u9 2026-09-23 08:02_'
     );
@@ -39,14 +40,14 @@ describe('reactions on a channel post', () => {
 
   it('name reactors from every post of a transcript, and add nothing when Graph gives no reaction time', () => {
     const byRobin = post({ id: '1700000000002', createdDateTime: '2026-01-05T09:00:00Z', from: { user: { id: 'u2', displayName: 'Robin Chen' } } });
-    const { text } = renderTranscript([post({ reactions: [REACTIONS[1] ?? {}] }), byRobin], { images: NO_IMAGES, inline: false });
+    const { text } = renderTranscript(CONVERTERS, [post({ reactions: [REACTIONS[1] ?? {}] }), byRobin], { images: NO_IMAGES, inline: false });
     expect(text).toContain('_reacted: 👍 Robin Chen 2026-09-22 10:14_');
     const robinReplied = post({
       reactions: [REACTIONS[1] ?? {}],
       replies: [post({ id: '1700000000003', replyToId: '1700000000000', from: { user: { id: 'u2', displayName: 'Robin Chen' } } })],
     });
-    expect(renderTranscript([robinReplied], { images: NO_IMAGES, inline: false }).text).toContain('_reacted: 👍 Robin Chen 2026-09-22 10:14_');
-    const undated = renderThread(post({ reactions: [{ reactionType: '👍' }] }), [], NO_IMAGES, false);
+    expect(renderTranscript(CONVERTERS, [robinReplied], { images: NO_IMAGES, inline: false }).text).toContain('_reacted: 👍 Robin Chen 2026-09-22 10:14_');
+    const undated = renderThread(CONVERTERS, post({ reactions: [{ reactionType: '👍' }] }), [], NO_IMAGES, false);
     expect(undated).toContain('_reactions: 👍 1_');
     expect(undated).not.toContain('_reacted:');
   });

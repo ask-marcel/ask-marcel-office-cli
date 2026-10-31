@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { bodyMarkdown, isChannelPost } from './channel-message-html.ts';
 import type { ChannelMessage } from './channel-message-html.ts';
+import { CONVERTERS } from '../../infra/converters.ts';
 
 const NO_IMAGES: ReadonlyMap<string, string> = new Map();
 const HOSTED = 'https://graph.microsoft.com/v1.0/teams/t1/channels/c1/messages/1/hostedContents/h1/$value';
@@ -18,7 +19,7 @@ const post = (over: Partial<ChannelMessage> = {}): ChannelMessage => ({
   ...over,
 });
 
-const body = (m: ChannelMessage, images: ReadonlyMap<string, string> = NO_IMAGES, inline = false): string => bodyMarkdown(m, images, inline);
+const body = (m: ChannelMessage, images: ReadonlyMap<string, string> = NO_IMAGES, inline = false): string => bodyMarkdown(CONVERTERS, m, images, inline);
 
 describe('telling a post from a system event', () => {
   it('a post has messageType message; a membership event is unknownFutureValue with an eventDetail', () => {

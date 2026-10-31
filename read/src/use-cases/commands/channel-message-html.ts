@@ -1,5 +1,5 @@
 import { parseJson } from '@ask-marcel/office-core/domain/json.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * The body of a Teams channel message (Graph `chatMessage`) as markdown.
@@ -150,11 +150,11 @@ const restoreSlots = (md: string, slots: ReadonlyArray<string>): string => md.re
  * never fails here (it degrades to stripped text on its own), so the
  * conversion is unwrapped rather than threaded as a Result.
  */
-const bodyMarkdown = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean): string => {
+const bodyMarkdown = (converters: Converters, m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean): string => {
   if (nonEmpty(m.deletedDateTime)) return '_message deleted_';
   if (m.body?.contentType === 'text') return m.body.content ?? '';
   const prepared = prepareHtml(m, images, inline);
-  const converted = htmlToMarkdown(prepared.html);
+  const converted = converters.htmlToMarkdown(prepared.html);
   return restoreSlots(converted.ok ? converted.value : '', prepared.slots);
 };
 

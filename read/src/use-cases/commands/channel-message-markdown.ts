@@ -1,5 +1,6 @@
 import { bodyMarkdown, isChannelPost, nonEmpty } from './channel-message-html.ts';
 import type { ChannelMessage } from './channel-message-html.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * A Teams channel post with its replies as a markdown thread, or a page of
@@ -67,8 +68,8 @@ const reactedLine = (m: ChannelMessage, people: People): string | undefined => {
 };
 
 /** The body plus its trailing markers, the lines a post and a reply share. */
-const bodyLines = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): ReadonlyArray<string> => {
-  const lines = [bodyMarkdown(m, images, inline)];
+const bodyLines = (converters: Converters, m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): ReadonlyArray<string> => {
+  const lines = [bodyMarkdown(converters, m, images, inline)];
   if (!nonEmpty(m.deletedDateTime) && nonEmpty(m.lastEditedDateTime)) lines.push('', '_(edited)_');
   const reactions = reactionsLine(m);
   if (reactions !== undefined) lines.push('', reactions);
@@ -77,15 +78,15 @@ const bodyLines = (m: ChannelMessage, images: ReadonlyMap<string, string>, inlin
   return lines;
 };
 
-const postBlock = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): string => {
+const postBlock = (converters: Converters, m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): string => {
   const header = `### ${whenOf(m.createdDateTime)} · ${authorOf(m)}${m.importance === 'high' ? ' · high importance' : ''}`;
   const link = nonEmpty(m.webUrl) ? [`link: ${m.webUrl}`] : [];
   const title = nonEmpty(m.subject) ? [`**${m.subject.trim()}**`, ''] : [];
-  return [header, ...link, '', ...title, ...bodyLines(m, images, inline, people)].join('\n');
+  return [header, ...link, '', ...title, ...bodyLines(converters, m, images, inline, people)].join('\n');
 };
 
-const replyBlock = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): string => {
-  const quoted = bodyLines(m, images, inline, people)
+const replyBlock = (converters: Converters, m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean, people: People): string => {
+  const quoted = bodyLines(converters, m, images, inline, people)
     .flatMap((l) => l.split('\n'))
     .map((l) => (l === '' ? '>' : `> ${l}`));
   const link = nonEmpty(m.webUrl) ? [`> link: ${m.webUrl}`] : [];
@@ -96,20 +97,21 @@ const byCreated = (a: ChannelMessage, b: ChannelMessage): number => (a.createdDa
 
 /** One root post followed by its replies, oldest reply first. */
 const renderThread = (
+  converters: Converters,
   root: ChannelMessage,
   replies: ReadonlyArray<ChannelMessage>,
   images: ReadonlyMap<string, string>,
   inline: boolean,
   people: People = peopleOf([root, ...replies])
-): string => [postBlock(root, images, inline, people), ...replies.toSorted(byCreated).map((r) => replyBlock(r, images, inline, people))].join('\n\n');
+): string => [postBlock(converters, root, images, inline, people), ...replies.toSorted(byCreated).map((r) => replyBlock(converters, r, images, inline, people))].join('\n\n');
 
 /** A page of root posts (each with its expanded replies) as one dated transcript, oldest post first; system events are counted, not shown. */
-const renderTranscript = (messages: ReadonlyArray<ChannelMessage>, options: TranscriptOptions): Transcript => {
+const renderTranscript = (converters: Converters, messages: ReadonlyArray<ChannelMessage>, options: TranscriptOptions): Transcript => {
   const posts = messages.filter(isChannelPost).toSorted(byCreated);
   const systemEventsOmitted = messages.length - posts.length;
   const header = [nonEmpty(options.channelName) ? `# Transcript of ${options.channelName}` : '# Channel transcript', '', '_Times are UTC, oldest post first._'].join('\n');
   const people = peopleOf(posts);
-  const blocks = posts.length === 0 ? ['_No posts in this range._'] : posts.map((p) => renderThread(p, p.replies ?? [], options.images, options.inline, people));
+  const blocks = posts.length === 0 ? ['_No posts in this range._'] : posts.map((p) => renderThread(converters, p, p.replies ?? [], options.images, options.inline, people));
   return { text: [header, ...blocks].join('\n\n'), posts: posts.length, systemEventsOmitted };
 };
 

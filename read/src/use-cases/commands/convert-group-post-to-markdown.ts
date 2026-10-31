@@ -36,12 +36,12 @@ const renderPostHeaders = (m: MailLikeResource): string => {
 const POST_ATTACHMENT_HINT = '_Use `convert-group-post-attachment-to-markdown` or `get-group-post-attachment` with the attachment id to fetch._';
 
 const createExecute =
-  (_converters: Converters): ReadCommand['execute'] =>
+  (converters: Converters): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { groupId, threadId, postId } = parsed.data;
-    return renderMessageAsMarkdown(graph, `/groups/${groupId}/threads/${threadId}/posts/${postId}`, {
+    return renderMessageAsMarkdown(converters, graph, `/groups/${groupId}/threads/${threadId}/posts/${postId}`, {
       inlineImages: parsed.data.inlineImages === 'true',
       keepQuoted: parsed.data.keepQuoted === 'true',
       attachmentHint: POST_ATTACHMENT_HINT,
