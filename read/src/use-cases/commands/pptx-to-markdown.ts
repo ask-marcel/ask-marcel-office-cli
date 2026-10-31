@@ -5,6 +5,7 @@ import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatPptxMetadata } from './pptx-metadata-to-markdown.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
 import type { Slide } from './pptx-slides.ts';
+import type { Converters } from '../ports/converters.ts';
 
 /**
  * Renders a .pptx to markdown: one `## Slide N` section per slide carrying the
@@ -24,8 +25,8 @@ const slideSection = (slide: Slide, index: number): string => {
   return parts.join('\n\n');
 };
 
-const pptxToMarkdown = async (bytes: Uint8Array, options: { readonly includeMetadata?: boolean } = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
-  const meta = await extractPptxMetadata(bytes);
+const pptxToMarkdown = async (converters: Converters, bytes: Uint8Array, options: { readonly includeMetadata?: boolean } = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+  const meta = await extractPptxMetadata(converters, bytes);
   if (!meta.ok) return meta;
   const body = meta.value.slides.map(slideSection).join('\n\n');
   const text = options.includeMetadata === true ? `${body}\n\n${formatPptxMetadata(meta.value)}` : body;
