@@ -191,6 +191,44 @@ describe('findErrorHint — Graph error translation', () => {
     expect(result?.hint).toContain('expiresInSeconds');
   });
 
+  // The token helper's own message and remedy never reach an error
+  // (token-helper-answer.ts), so the caller's message names only the helper
+  // command to run by hand. Version 2.8.0 named `login` there, and the split
+  // lost it: the hint gives the instruction back.
+  it('gives a token helper failure that names `secondary_token_unavailable` a `login` instruction, so an expired elevated token names its remedy', () => {
+    const result = findErrorHint(
+      'The token helper gave no elevated token: exit code 1, errorCode secondary_token_unavailable, 901 bytes on stdout. Run it by hand (`{auth-bin} token --tier elevated`) to read its message and remedy.',
+      'secondary_token_unavailable'
+    );
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('{auth-bin} login');
+    expect(result?.hint).toContain('{auth-bin} status');
+  });
+
+  it('gives a token helper failure that names `not_authenticated` a `login` instruction, so a user with no session knows how to sign in', () => {
+    const result = findErrorHint(
+      'The token helper gave no basic token: exit code 1, errorCode not_authenticated, 212 bytes on stdout. Run it by hand (`{auth-bin} token --tier basic`) to read its message and remedy.',
+      'not_authenticated'
+    );
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('{auth-bin} login');
+    expect(result?.hint).toContain('{auth-bin} status');
+  });
+
+  // The auth bin gives the same two codes with a message that already names
+  // `login`, and a helper that named no code it knows failed for a cause this
+  // caller cannot tell: neither gets the sign-in hint.
+  it('adds no sign-in hint when the code comes with another message, or when the token helper named no code it knows', () => {
+    expect(findErrorHint('Elevated (M365) token is expired or was not captured at login.', 'secondary_token_unavailable')).toBeUndefined();
+    expect(findErrorHint('Not signed in: there is no cached token to inspect.', 'not_authenticated')).toBeUndefined();
+    expect(
+      findErrorHint(
+        'The token helper gave no elevated token: exit code 1, no errorCode it knows, 33 bytes on stdout. Run it by hand (`{auth-bin} token --tier elevated`) to read its message and remedy.',
+        'secondary_token_unavailable'
+      )
+    ).toBeUndefined();
+  });
+
   it('maps `TooManyRequests` to a throttling-recovery hint', () => {
     const result = findErrorHint('Throttled.', 'TooManyRequests');
     expect(result?.source).toBe('graph');

@@ -44,6 +44,10 @@ type HintRule = {
   readonly matchMessage?: (message: string) => boolean;
 };
 
+// The message of a token helper failure that named this code
+// (infra/token-helper-answer.ts).
+const helperGaveNoToken = (message: string, code: string): boolean => message.startsWith('The token helper gave no ') && message.includes(`errorCode ${code},`);
+
 const HINT_RULES: ReadonlyArray<HintRule> = [
   // ═══ CODE-BASED RULES (specific codes first; these always win over message-
   // pattern fallbacks below) ═══════════════════════════════════════════════
@@ -286,6 +290,25 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     matchCode: (c) => c === 'invalidAudienceUri',
     matchMessage: (m) => /invalidAudienceUri/i.test(m),
     hint: 'The file lives in a PARTNER tenant you are only a guest in. Graph cannot mint a SharePoint token for a foreign tenant, so no home token reaches it and `login` will not help — re-authenticating just loops. Pass `--tenant-id <guid>` to sign the call with a guest token for the owning tenant; `resolve-drive-share-link` returns that GUID as `tenantId` for any sharing URL whose file lives elsewhere. If this was a paginated follow-up, the cursor carries no tenant at all: pass `next-page` the SAME `--tenant-id` the originating command used.',
+  },
+  // ─── Token helper: no session, or a secondary token that is gone ─────────
+  // The helper's own message and remedy never reach an error
+  // (token-helper-answer.ts), so the remedy is said here. A plain `login` is
+  // the first step for every tier: it renews the session and captures the
+  // elevated token again when that token is missing. A guest tenant or a bad
+  // Teams region can need more, so the hint keeps the helper command as the
+  // second step. Matched on the message, not on the code
+  // alone: the auth bin gives the same codes with a message that already names
+  // `login`, and a helper failure with no code it knows keeps the bare message.
+  {
+    source: 'cli',
+    matchMessage: (m) => helperGaveNoToken(m, 'not_authenticated'),
+    hint: 'No Microsoft 365 session is available. Run `{auth-bin} login` in a terminal to sign in, then retry. `{auth-bin} status` shows every token.',
+  },
+  {
+    source: 'cli',
+    matchMessage: (m) => helperGaveNoToken(m, 'secondary_token_unavailable'),
+    hint: 'The token this command needs is expired or was not captured at login. Run `{auth-bin} login` in a terminal on a machine with a browser, then retry: a command does not open a browser for this token. `{auth-bin} status` shows every token. If the token is still absent after the sign-in (a guest tenant, a Teams region), run the helper command named in the error to read the exact cause.',
   },
   // ─── Graph: auth token expired ───────────────────────────────────────────
   {
