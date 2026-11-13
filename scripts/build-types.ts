@@ -26,7 +26,7 @@
  */
 
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
 const RAW = resolve('dist/.types');
@@ -38,8 +38,8 @@ const CORE_PREFIX = '@ask-marcel/office-core/';
 const relocate = (raw: string): string | undefined => {
   const own = join(RAW, FOLDER, 'src');
   const core = join(RAW, 'core', 'src');
-  if (raw.startsWith(`${own}/`)) return resolve('dist', relative(own, raw));
-  if (raw.startsWith(`${core}/`)) return resolve('dist', 'shared', relative(core, raw));
+  if (raw.startsWith(`${own}${sep}`)) return resolve('dist', relative(own, raw));
+  if (raw.startsWith(`${core}${sep}`)) return resolve('dist', 'shared', relative(core, raw));
   return undefined;
 };
 
@@ -53,8 +53,10 @@ const targetOf = (from: string, specifier: string): string | { readonly problem:
   return `${withoutExtension(resolve(dirname(from), specifier))}.d.ts`;
 };
 
+// A module specifier takes `/` on every platform, and `relative` gives `\` on
+// Windows.
 const respecified = (from: string, target: string): string => {
-  const path = relative(dirname(from), withoutExtension(target));
+  const path = relative(dirname(from), withoutExtension(target)).replaceAll(sep, '/');
   const dotted = path.startsWith('.') ? path : `./${path}`;
   return `${dotted}.js`;
 };

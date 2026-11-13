@@ -108,7 +108,7 @@ Run them in the folder before you commit. CI runs them all.
 | `workspace` | One job for each folder: `lint:strict`, typecheck, tests, coverage, the mutation of the changed files (not in `read/`), and for a published folder `build`, `check:docs` and `check:packed`. Auth and write also run their bundle smoke here. |
 | `mutation` | The mutation of the changed files of `read/`, in 8 shards |
 | `smoke` | The build of `read/`, its bundle smoke and its packed-install smoke |
-| `windows-helper` | The token helper round trip on Windows |
+| `windows-helper` | The token helper round trip on Windows, then the build of `auth/`, `read/` and `write/` |
 
 `gates` fails when the `workspace` matrix misses a folder
 (`scripts/check-ci-matrix.ts`).

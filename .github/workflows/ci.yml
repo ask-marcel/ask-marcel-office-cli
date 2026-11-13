@@ -294,6 +294,10 @@ jobs:
     # The token helper round trip on Windows, where spawning through an npm .cmd
     # shim fails without a shell: a fixture cache, then `token --tier basic`
     # spawned through the locator file the way read spawns it. Offline.
+    # Then the build of each published package: scripts/build-types.ts compares
+    # and writes paths, and a Windows path takes `\` (it failed there until
+    # 2026-11-13, and no job ran it). One step per folder, because pwsh gives a
+    # step the exit code of its last command only.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -307,3 +311,15 @@ jobs:
       - name: token helper round trip (node and bun runners)
         timeout-minutes: 5
         run: bun scripts/qa-token-helper-roundtrip.ts
+      - name: build auth (bundle, then the declarations)
+        timeout-minutes: 10
+        working-directory: auth
+        run: bun run build
+      - name: build read (bundle, the declarations, then the manifest)
+        timeout-minutes: 10
+        working-directory: read
+        run: bun run build
+      - name: build write (bundle, the declarations, then the manifest)
+        timeout-minutes: 10
+        working-directory: write
+        run: bun run build
