@@ -36,4 +36,10 @@ describe('Bun filesystem adapter: a path the runtime refuses, a NUL byte from a 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
+
+  it('returns io_failed, and does not throw, when the JSON file to read has such a name', async () => {
+    const result = await createBunFileSystem().readJson(join(tmp, 'token\0cache.json'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
 });

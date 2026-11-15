@@ -15,12 +15,17 @@ export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExist
   // adapters then give one answer for one path.
   exists: async (path) => (await import('./filesystem-node.ts')).exists(path),
   readJson: async <T>(path: string) => {
-    const file = Bun.file(path);
-    if (!(await file.exists())) return err({ type: 'not_found' });
+    // `Bun.file()` and `exists()` throw on a path the runtime refuses (a NUL
+    // byte): that is an io_failed. Only a body that is not JSON is a parse_failed.
     try {
-      return ok((await file.json()) as T);
+      const file = Bun.file(path);
+      if (!(await file.exists())) return err({ type: 'not_found' });
+      return await file.json().then(
+        (value: unknown) => ok(value as T),
+        (e: unknown) => err({ type: 'parse_failed', message: formatError(e) })
+      );
     } catch (e) {
-      return err({ type: 'parse_failed', message: formatError(e) });
+      return err({ type: 'io_failed', message: formatError(e) });
     }
   },
   readBytes: async (path) => {
