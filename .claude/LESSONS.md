@@ -6,6 +6,143 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-11-15 | a hint for a token helper failure matches the helper message, not the error code alone
+
+After the split, the read and write bins named only the helper command to run by hand when the token helper gave no token, and 2.8.0 named `login`. `d21ef06` gives the `login` instruction back with two hint rules, for `not_authenticated` and `secondary_token_unavailable`. The auth bin gives the same two codes with a message that already names `login`, so a rule on the code alone adds the remedy a second time.
+Rule for next time: match a hint on the error message and the code. Add a hint only when the message does not already name the remedy.
+
+## [gotcha] 2026-11-13 | on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too
+
+The CI then ran the suites on Linux only, so about 50 tests failed on Windows and nobody saw it (since `e0c6937` the `windows-helper` job runs the tests of each folder). Three causes were the path separator: `Bun.Glob.scan` gave `src\infra\x.ts`, so `path.startsWith('src/test-helpers/')` in the bin placeholder sweeps matched nothing, and the coverage report gave the same paths, so `scripts/check-coverage.ts` found no tier for each file. Tests seeded `createFileSystemFake` with `/virtual/home/.ask-marcel/...`, but `resolveAuthPaths` builds the path with `join`, which gives backslashes on Windows, so the fake answered `not_found`. The other causes were POSIX file modes, signals and pid 1, which Windows does not have.
+Rule for next time: change `\` to `/` in a path that Bun reports before a prefix check, and prove it with a Windows row in the selftest. Build each expected or seeded path of a test with `join`, as production does. Skip on `win32` only the check that Windows cannot do (a file mode, a signal), not the full test: the infra tier needs 100 % coverage on Windows too.
+
+## [gotcha] 2026-11-13 | on Windows, a `spawn` call of Bun 1.4.4 sometimes blocks for 5 to 10 seconds, more than the default test timeout
+
+The process runner tests failed at random on Windows. With Bun as the parent, the synchronous `spawn` call (`Bun.spawn` and `node:child_process` of Bun) blocked for about 5 s or 10 s, some times in the first 45 s of the parent, with each child (`bun.exe`, `sh.exe`, `cmd.exe`, `node.exe`). With Node 26 as the parent, 1219 starts had no slow call. The cause in Bun is not identified. The tests also started `sh`, `yes`, `cat`, `sleep` and `true`, which PowerShell does not have on PATH, so the result changed with the shell.
+Rule for next time: a test that starts a real process uses `process.execPath -e <script>` as the child and a timeout of 30 s, and applies a bound on the elapsed time only off Windows. When a process test is unstable, measure the `spawn` call alone, with Node as a second parent, before you change the adapter.
+
+## [gotcha] 2026-10-25 | a failed `import()` of `--package` crashed bun with exit 1, which is also the exit code of a stale doc
+
+`gen-docs.ts --check` gives exit 1 for a stale `COMMANDS.md` and exit 2 for a usage error, but with a wrong `--package` path the dynamic import threw and bun stopped with exit 1, so a typo looked like a stale doc. Commit 9 made the import of `scripts/command-packages.ts` return a `Result` error, and both scripts now give exit 2. The CI red fixture requires exit 1 exactly, after a control run of the same copy that must give exit 0, and it fails when the `sed` changed no count (`cmp -s`). The `gates` job builds nothing, so the fixture gives no `--manifest`, because a missing manifest would make each run stale for the wrong reason.
+Rule for next time: give each failure of a gate its own exit code, and catch a crash of an import as a usage error. A red fixture requires the exact code of its fault, after a control run that passes.
+
+## [gotcha] 2026-10-25 | `parseArgs` keeps only the last value of a repeated plain option and gives no error
+
+Commit 22 made `gen-docs.ts` and `check-doc-numbers.ts` take one package per run. With `--package` as a plain string option, `node:util` `parseArgs` silently keeps the last of two `--package` values, so a run with two packages documents the second one only. The option keeps `multiple: true`, and the scripts refuse a second value with exit 2.
+Rule for next time: when a script takes an option once, declare it `multiple: true` and refuse more than one value. Do not trust `parseArgs` to refuse a repeated option.
+
+## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
+
+Each claim of `check-doc-numbers.ts` checks one anchored sentence, so a new sentence such as "the 12 mail commands" matched no anchor and passed with no check, and a table row "The 204 read commands by name" did not match "the N … commands" (the rows became "Each of the N … commands, by name"). Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
+Rule for next time: write each count of a doc in digits, in an anchored form of its own package, and add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names (the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check), so write a count of another noun once, in a sentence that a claim checks.
+
+## [gotcha] 2026-10-24 | When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit
+
+`read/package.json` names `src/main.ts` and `src/index.ts` in `bin` and `exports`, and the workspace job of read builds and packs them on each push, so the 11-line skeleton entries could not go before the move and the root files could not stay after it. Commit 15 deleted the two skeleton entries and renamed the root files onto their paths, and the skeleton `bin.ts` and its test, at other paths, stayed until the commit that replaced the bin. Plain `git diff -M` shows two deletions and two edits, while `git diff -B -M` shows the root files renamed onto the skeleton paths at 100%.
+Rule for next time: in a move onto a folder that has entry files at the same paths, delete those entries in the move commit, and prove the purity with `-B -M`. Keep each skeleton file that has no collision until a later commit.
+
+## [gotcha] 2026-10-24 | A test that reads a file outside its folder fails in that folder's Stryker sandbox
+
+The root bin sweep also read `docs/commands.json` and `docs/COMMANDS.md`. After the move it would read `read/docs/` (no such folder), and read's Stryker sandbox holds only the folder, so the dry run fails before a mutant runs. Commit 5 moved that check to `check:docs` (`--manifest`, the bin placeholders), and commit 6 deleted the case from the sweep before the move.
+Rule for next time: a folder test reads only files under its folder. A check of repository files (docs, workflows, other folders) goes in a script that the `gates` job runs.
+
+## [gotcha] 2026-10-24 | When a manifest loses its dependencies, a package that no workspace declares leaves bun.lock
+
+Read imports `diff`, and only the root `dependencies` declared it. A `bun install --lockfile-only` with the root dependencies deleted dropped `diff` from `bun.lock`, and read then failed its typecheck, its tests and its build on a clean install. The hoisted install hid the gap until then. Commit 17 put `diff`, `commander`, the MCP SDK and `docx` in read's `devDependencies`, and `zod`, the MCP SDK, `commander` and `winston` in core's.
+Rule for next time: before you delete dependencies from a manifest, list the imports of each workspace and make sure that a workspace declares each package. Then do `bun install --frozen-lockfile` on a clean `node_modules` and run the typecheck in each folder.
+
+## [mistake] 2026-10-24 | The phase 6 design asked for `--incremental false`, which the 2026-05-30 entry says does not exist
+
+Open question 5 of the phase 6 design asked for read's full Stryker run with `--incremental false`. Stryker 9.6.1 reads the value as a config file name and stops. The 2026-05-30 entry and the comment of `scripts/mutate-changed.sh` already said so. The run gave each shard a new, empty `--incrementalFile` instead.
+Rule for next time: before a design names a tool flag, read the LESSONS entries and the scripts that use that tool. For a mutation run with no earlier results, point `--incrementalFile` at a new, empty file.
+
+## [gotcha] 2026-10-24 | A longer bin name moves the line breaks of commander's `--help`
+
+The read bin `ask-marcel-office-read` is 5 characters longer than `ask-marcel-office`. Commander wraps option texts at a fixed width, so in 67 `--help` texts a line break moved, and a break can come right after the bin. A comparison that changes the bin only before a space, a quote or a backtick reports these calls as defects.
+Rule for next time: when you compare the output of two bin names, change the bin also before a line end and an escaped quote, and compare `--help` with each run of white space as one space.
+
+## [gotcha] 2026-10-24 | The unit tests run under bun, so only a smoke under node proves a library's runtime pick and its export list
+
+The read library picks the file system and the process runner of the runtime that loads it (`onBun() ? createBun… : createNode…`). With the Bun pick forced, all read tests, the build, `check:packed` and both smokes passed, but a node caller got `token_helper_unavailable` ("Bun is not defined"). With two exports deleted from `read/src/index.ts`, every gate passed too: `check:packed` reads the exports that exist, and the tests import only `commands` and the types. Commit 28 now loads the library by name under node and bun, checks the exact export list, and gets a token from a stub helper that `ASKMARCEL_TOKEN_COMMAND` names. The stub builds its token at run time.
+Rule for next time: when a package exports a library, its bundle smoke loads it by name under node and under bun, checks the exact export list, and calls each export that picks a runtime. A unit test under bun cannot prove a node branch.
+
+## [gotcha] 2026-10-18 | in a root container (a cloud session), seven chmod tests fail and Stryker cannot start: measure through a scratchpad config, or run as `nobody` on a copy
+
+A cloud session runs `bun test` as uid 0, and root ignores the `chmod` modes that seven tests in `src/infra/filesystem-bun.test.ts` and `filesystem-node.test.ts` use to expect `io_failed`, so they fail on an untouched tree while CI (an ordinary user) stays green, and the Stryker dry run, which needs a green suite, stops `mutate:changed` and `mutate:staged`. On 2026-10-04 a scratchpad copy of `stryker.conf.json` whose command ran `bun test $(find ./src -name "*.test.ts" ! -name filesystem-bun.test.ts ! -name filesystem-node.test.ts)` measured `docs.ts` at 126 of 126 killed, and CI passed on the same commit: a left-out test can only let a mutant survive, so such a score is a lower bound. For the full suite, run as `nobody` on a copy of the tree that `nobody` owns: copy the `bun` binary out of `/root/.bun/bin` to a readable directory, make `bunx` a symlink to that copy, and put `/opt/node22/bin` on PATH, because Stryker starts Node children. The proxy CA bundle is in `/root/.ccr/`, which `nobody` cannot read, so bun warns on stderr for each network run, and `scripts/check-packed-package.ts`, which then joined the stdout and stderr of `bun pm pack`, took the warning as the tarball path, until a copy at `/opt/nbbun/ca-bundle.crt` in `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE` and `CURL_CA_BUNDLE` made the run clean.
+Rule for next time: when `id -u` prints 0, count the failures before you trust a gate, and if only the seven filesystem `io_failed` tests fail, read them as the environment and measure through a scratchpad config, never by an edit of the tests or of the shared `stryker.conf.json`. A script that reads a result from a child reads stdout only and gives stderr to the person.
+Merges: 2026-10-04 (gotcha, mutate:changed as root), 2026-10-04 (gotcha, seven chmod tests), 2026-10-10 (gotcha, nobody), 2026-10-18 (gotcha, CA bundle).
+
+## [gotcha] 2026-10-18 | The token helper now records the version of auth (1.0.0), not the root's 2.8.0
+
+`src/token.ts` imports the version from `../package.json`, which after the move to `auth/src/token.ts` is `auth/package.json`, so the helper and the auth bin write `version: "1.0.0"` in `~/.ask-marcel/token-helper.json`, while a locator that the root wrote before phase 4 says `2.8.0`. Such an old locator names the `src/token.ts` or `dist/token.js` of a checkout (removed in phase 4) or the helper of an installed 2.8.0, which still runs and answers in the same protocol. No reader compares the version, and `token-helper-locator.ts` passes over a locator whose entry or runtime is gone, so the old file does no damage until an auth run replaces it.
+Rule for next time: in a locator, expect the version of the package that owns the helper. Expect an old locator to name a file that is gone, or the helper of the old package. Do not add a version check to the reader for this.
+
+## [gotcha] 2026-10-18 | A dependency that a bundle reaches only through a dynamic import must be external before the first build of that entry
+
+`bun build` follows dynamic imports. The browser ladder of `auth/src/token.ts` reaches `playwright-loader.ts` through dynamic imports, so the first build of `dist/token.js` tried to inline playwright and failed on `electron`. The update notifier spawns its own `check.js`, which a bundle cannot inline. `scripts/build-package.ts` leaves external exactly the keys of `dependencies`, so `auth/package.json` declared `playwright` and `update-notifier` one commit before the first build that reaches them. The Windows round trip builds the helper itself and takes the same list from `auth/package.json`.
+Rule for next time: before you add a bundle entry or a dynamic import in a published folder, list the packages that the entry can reach. Include the dynamic imports. Declare each one that the bundle cannot inline in `dependencies` in the same or an earlier commit, and build the entry before you commit.
+
+## [gotcha] 2026-10-18 | The MCP SDK answers a call of an unregistered tool by itself, so a server cannot name the server that has the tool
+
+After phase 4 the root MCP server has no `login` and `status` tools. A call of either tool gets "MCP error -32602: Tool login not found", and the SDK sends that answer before any code of the server runs. So the root cannot tell an MCP caller to call `login` on the `ask-marcel-office-auth` server there, as the design expected. The `get-command-docs` and `run-command` tools still name the auth server for `login`, `status` and `logout`, because the root code answers them.
+Rule for next time: put the pointer to another server in the answers of the tools that exist, such as `get-command-docs` and `run-command`. The answer to a missing tool is the SDK's.
+
+## [decision] 2026-10-18 | A command names the graph it runs on, and each package gives its own CLI and MCP texts
+
+Package-split phase 5 made the core types generic: `Command<G>` runs on `G` (default `ReadGraph & WriteGraph`), and `CommandPackage`, `resolveCommand`, `withUnknownParamRejection` and the CLI and MCP shell deps take `G`. A one-kind package wraps its registry with `readCommandOf` or `writeCommandOf` (`command-graph.ts`), so write runs on `WriteGraph` alone and the root on `ReadGraph` alone. `CommandPackage` also holds `description` and `exampleCommand`, the CLI shell gives the description and then the registry facts, and the MCP shell registers `run-command` only when the registry has a read command and `run-write-command` only when it has a write command. Rejected: one text for every package, which made the write bin talk about read commands and `login`.
+Rule for next time: a deps type written as `Omit<CliShellDeps, …>` takes the default `G`. A caller that holds one graph must name it, for example `CliShellDeps<ReadGraph>`. A new package text goes in the package, never in the shell.
+
+## [gotcha] 2026-10-18 | The pre-commit hook skips the secret scan when gitleaks is not on PATH, and says so only in its log
+
+The hook runs `gitleaks protect --staged` only when `gitleaks` is installed. In phase 4 it was not installed, every hook passed, and CI found a token-shaped fixture after the merge (`a296c26`). In phase 5 gitleaks was first on PATH for every commit, and each hook log showed "no leaks found". A token-shaped fixture must have a shape that gitleaks does not flag. Do not add it to `.gitleaksignore` on your own.
+Rule for next time: before the first commit of a session, run `command -v gitleaks`. After each commit, look for "no leaks found" in the hook output, and run `gitleaks detect --redact --no-banner` before a push.
+
+## [gotcha] 2026-10-18 | bun writes its transpiler cache under HOME, so a "no file under HOME" probe must allow `.bun/install/cache/`
+
+The write bundle smoke checks that a run of the bin leaves no file under its temporary HOME except the update-notifier configstore. Under bun, each probe failed: bun itself writes `.bun/install/cache/` under HOME. The bin wrote no token cache and no locator.
+Rule for next time: a probe that looks for files under HOME allows bun's own cache folder, and names each other allowed path. Do the test under node and under bun.
+
+## [gotcha] 2026-10-16 | In a linked git worktree, a hook gets an absolute GIT_DIR, so a git command in a subfolder sees no path prefix
+
+During a hook, git sets `GIT_DIR` to an absolute path. In a linked worktree, `git diff --relative` that runs from `core/` then does not remove the `core/` prefix from the staged paths. In phase 2, the staged lint gave ESLint paths such as `core/src/x.ts` from inside `core/`, and ESLint stopped with exit 123. The commit worked in the main checkout and failed in the worktree. `scripts/lint-staged.sh` now finds its folder from its own location and does not ask git for the prefix.
+Rule for next time: a hook script must not use git's idea of the current folder. Find the folder from the script's own path, and give git explicit paths. Do a test of each hook in a linked worktree and with `GIT_DIR` set by hand.
+
+## [decision] 2026-10-15 | the lint options live in eslint.base.js: format with `bunx eslint --fix`, and change rule severity there, never inline
+
+There is no `.prettierrc`: the formatting options (single quotes, 180 columns, lf, es5 trailing commas) are arguments of the `prettier/prettier` rule, which since package-split phase 2 live in `eslint.base.js` (`baseConfig(tsconfigRootDir)`), spread by the root `eslint.config.js` and by the `eslint.config.js` of each folder (`core/`, `auth/`, `read/`, `write/`). A bare `bunx prettier --write` finds no config, uses the prettier defaults (double quotes, 80 columns) and rewrites every line, as it did on 2026-10-02 to `src/infra/auth.ts` and `src/infra/auth-browser.ts` (restored from copies taken just before). `^`-ranged toolchain drift can break `bun run lint` on an unchanged HEAD: `typescript-eslint` 8.59 (inside `^8.33.1`) began to flag `_graph` / `_params` on the redirect `execute` of local-only commands, because `@typescript-eslint/no-unused-vars` has NO default `argsIgnorePattern`, and the fix is project-level, `'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]` in `eslint.base.js`, because atelier rule 15 forbids an inline `// eslint-disable`. The same drift (eslint-plugin-prettier 5.5) gave ~29 prettier/prettier warnings, auto-fixable with `bunx eslint --fix` and landed as a style-only task, not inside a feature commit. Rejected: a copy of the rules in each folder (copies drift, and `lint:strict` would mean a different thing per folder).
+Rule for next time: format with `bunx eslint --fix <files>`, check with `bun run lint`, never call prettier directly, and copy a file aside before any bulk rewrite. When lint fails on a file that nobody touched, suspect a `^`-range devDependency bump and fix it at the rule or config level: a rule for every folder goes in `eslint.base.js`, a rule for one folder in the `eslint.config.js` of that folder.
+Merges: 2026-06-13 (gotcha), 2026-10-03 (gotcha), 2026-10-15 (decision).
+
+## [gotcha] 2026-10-15 | A mass text change in commits the size gate permits needs checks that accept both forms until the last commit
+
+Package-split step 14 put placeholders such as `{bin}` and `{auth-bin}` in about 436 command references, far above the limit of 10 files and 300 lines, so the change went in 23 batches, and between them part of the source had the old literal `ask-marcel-office` and part had the placeholder. Two checks read that text, the phantom-command guard in `meta.test.ts` and `hasActionableAdvice` in `error-hints.ts`, and a check that accepts one form only fails either the first or the later batches. So both checks accepted the two forms for a short time, and the last commit (`8ef306c`) removed the old form and added a guard that refuses a literal command reference.
+Rule for next time: before you divide a mass text change into batches, find each check that reads that text. Let each check accept both forms in the first commit, and remove the old form in the last commit. Do not use `--no-verify` to land the change in one commit.
+
+## [decision] 2026-10-15 | The auth MCP server has only the `login` and `status` tools, and no message offers `token`
+
+Step 14 made the unknown-command answers depend on the surface: on MCP, a command of another package tells the caller to register the MCP server of that package and to call the command there. Only `login` and `status` are tools of the auth server, `logout` sends the caller to a terminal (`{auth-bin} logout`), and `token` is a machine helper for read and write that did-you-mean never offers (the exact name says that it is the token helper of @ask-marcel/office-auth). The plan also says that no auth MCP tool returns a token. Rejected: one wording for all surfaces, which sent MCP callers to tools that do not exist and to command lines that they cannot run.
+Rule for next time: an MCP message names a server and a tool that exist on that server. Before you name an auth command in an MCP message, make sure that it is `login` or `status`.
+
+## [gotcha] 2026-10-15 | When test cases move out of a file in small commits, each commit must also delete the helpers that lose their last user
+
+Package-split step 16 moved the write and auth cases out of `commands.test.ts`, `cli.test.ts` and `mcp.test.ts` in 12 commits, so that each commit stayed within 10 files and 300 lines. A helper or an import in the old file, for example `pdfCmd` or the upload helpers, becomes unused when its last case moves. The staged lint of the pre-commit hook then fails on the old file. A helper that cases in the old file and in the new file both need must be copied to the new file in the same commit.
+Rule for next time: before each move commit, find the helpers and imports that the moved cases use. Delete each one that has no user left in the old file, and copy each one that the new file needs, in that same commit. Then run lint on both files before you commit.
+
+## [decision] 2026-10-10 | Commands are typed against ReadGraph or WriteGraph; the registry gives each command its view at run time
+
+Package-split phase 1 step 12 split the Graph client: `ReadGraph` (`src/infra/read-graph.ts`) has every GET tier, the chat substrate and a POST that reaches only `/search/query` and `/me/calendar/getSchedule`, and `WriteGraph` (`src/infra/write-graph.ts`) has the basic tier only, with `post`, `patch`, `put` and `delete`. A read command is a `ReadCommand` (`meta.effect: 'read'`, `execute(graph: ReadGraph)`), a write command is a `WriteCommand`, and since the single package still passed the full client `GraphClient = ReadGraph & WriteGraph`, the registry wraps each command at assembly (`withOwnGraph` in `src/use-cases/commands/command-graph.ts`) with `readGraphOf(graph)` or `writeGraphOf(graph)`. These two views are pure functions in use-cases, so the dependency points inward, and the POST check that the read graph and the read view share is in `src/use-cases/commands/read-only-post.ts`. An ESLint rule and `scripts/check-read-bundle.ts` keep read code away from the write graph.
+Rule for next time: a new read command names `ReadCommandMeta` and `ReadCommand['execute']`. A new write command names the write types and joins the ignores of the ESLint rule. A new read-only POST path goes in `READ_ONLY_POST_PATHS` and nowhere else.
+
+## [decision] 2026-10-10 | SUPERSEDES 2026-06-15: the graph fakes are fakeReadGraph and fakeWriteGraph, and fakeGraphClient only composes them
+
+The 2026-06-15 entry put every `GraphClient` member in one shared builder. Step 12 split the client, so the fakes split too. `src/test-helpers/read-graph-fake.ts` exports `fakeReadGraph(overrides?)` and `src/test-helpers/write-graph-fake.ts` exports `fakeWriteGraph(overrides?)`. `fakeGraphClient` in `src/test-helpers/graph-client-fake.ts` spreads the two and adds no member of its own. `src/test-helpers/graph-fakes.test.ts` checks that each fake has the same members as its real graph. The rule of the old entry stays: never write an inline full-literal fake.
+Rule for next time: a new member goes in the fake of its graph. When both graphs have the member, it goes in both fakes. Do not add a member to `fakeGraphClient` directly.
+
+## [gotcha] 2026-10-10 | To decide on a 401 replay, read the error code from `res.clone()`, so the body is still readable after
+
+The basic and guest tiers replay a request once when Graph answers 401 with `InvalidAuthenticationToken` or `TokenExpired`. To know the code, the request core must read the body of the 401. A `Response` body can be read only one time. If the core reads the original answer, a caller that gets the same 401 back (no newer token, so no replay) cannot read the error body, and the error message is lost. `refusesTheToken` in `src/infra/graph-request.ts` reads `res.clone()` and gives the original answer back untouched.
+Rule for next time: when code must look at a response body and then return the same response, read a clone. Read the original only at the place that consumes the answer.
+
 ## [gotcha] 2026-10-01 | errexit is off inside `$(...)`, so a failing `git diff` in a grouped command substitution read as "nothing changed" and the mutation gate passed
 
 `mutate-changed.sh` built its scope as `files=$( { diff1; diff2; diff3; untracked; } | filter )` under `set -euo pipefail`. Inside a command substitution bash turns errexit off and the group returns its last command's status, so a diff that failed (no merge base on a shallow checkout, a base from rewritten history) printed git's error, then "no files in mutation scope changed", and exited 0 having mutated nothing; the script had the flaw before the split work too. The sources are now chained with `&&`, and `mutation-scope-selftest.sh` runs the real caller against an unrelated base and expects a non-zero exit.
@@ -236,12 +373,6 @@ Applies to: any new field on the `{ok, error, errorCode?, hint?, source}` envelo
 Applies to: any future command whose input is the local filesystem: mirror `convert-local-file` / `extract-local-file-images`, never a new shape.
 Merges: 2026-06-10 (decision), 2026-06-13 (decision).
 
-## [decision] 2026-10-15 | the lint options live in eslint.base.js: format with `bunx eslint --fix`, and change rule severity there, never inline
-
-There is no `.prettierrc`: the formatting options (single quotes, 180 columns, lf, es5 trailing commas) are arguments of the `prettier/prettier` rule, which since package-split phase 2 live in `eslint.base.js` (`baseConfig(tsconfigRootDir)`), spread by the root `eslint.config.js` and by the `eslint.config.js` of each folder (`core/`, `auth/`, `read/`, `write/`). A bare `bunx prettier --write` finds no config, uses the prettier defaults (double quotes, 80 columns) and rewrites every line, as it did on 2026-10-02 to `src/infra/auth.ts` and `src/infra/auth-browser.ts` (restored from copies taken just before). `^`-ranged toolchain drift can break `bun run lint` on an unchanged HEAD: `typescript-eslint` 8.59 (inside `^8.33.1`) began to flag `_graph` / `_params` on the redirect `execute` of local-only commands, because `@typescript-eslint/no-unused-vars` has NO default `argsIgnorePattern`, and the fix is project-level, `'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]` in `eslint.base.js`, because atelier rule 15 forbids an inline `// eslint-disable`. The same drift (eslint-plugin-prettier 5.5) gave ~29 prettier/prettier warnings, auto-fixable with `bunx eslint --fix` and landed as a style-only task, not inside a feature commit. Rejected: a copy of the rules in each folder (copies drift, and `lint:strict` would mean a different thing per folder).
-Rule for next time: format with `bunx eslint --fix <files>`, check with `bun run lint`, never call prettier directly, and copy a file aside before any bulk rewrite. When lint fails on a file that nobody touched, suspect a `^`-range devDependency bump and fix it at the rule or config level: a rule for every folder goes in `eslint.base.js`, a rule for one folder in the `eslint.config.js` of that folder.
-Merges: 2026-06-13 (gotcha), 2026-10-03 (gotcha), 2026-10-15 (decision).
-
 ## [gotcha] 2026-06-02 | the Search index returns non-navigable site TYPES (404s) the archive probe misses — filter by URL shape + a 404 probe
 
 `POST /search/query entityTypes:['site']` also returns sites whose `webUrl` 404s and that are NOT archived, so the 423 probe misses them: SharePoint Add-in webs on isolated `<tenant>-<hex>.sharepoint.com` hosts (they redirect to `/_layouts/15/AddinDeprecationAnnoucement.aspx`), SharePoint Embedded containers on `/contentstorage/...`, and `/_layouts/` system pages. `src/domain/utilities/site-url-classifier.ts` (`isNonNavigableSiteUrl`) drops these three by URL shape BEFORE the probe (no Graph call, `nonNavigableExcluded`), and `filterOutArchivedSites` also drops a probe that returns HTTP 404 (`notFoundExcluded`), which removes an inaccessible personal OneDrive whose webUrl 404s, while active OneDrives that probe OK stay. The host regex needs `-[0-9a-f]{10,}` (10 hex or more), so that it does not match `-my`/`-admin`. Verified live 2026-06-02: 80 kept, 58 archived + 1 nonNavigable + 2 notFound excluded, and a legit `…/sites/PROJECTSITE/…` on the normal host stayed while the add-in `-<hex>…/PROJECTSITE/_layouts/…` variant dropped.
@@ -439,138 +570,8 @@ Rule for next time: to add a tier, add it in `getTokenInfo`, and `status` and th
 Rule 17 allows the top-level catch for unexpected crashes "exactly once in src/main.ts". Phase 1 step 9 of the package split added a second bundle entry, `src/token.ts` (built to `dist/token.js`), which read and write will spawn for their bearers. It has its own top-level try/catch around `runTokenHelper`, because without it Node prints the uncaught error, and its message can quote what was being parsed, a token included. That catch prints only the error's type (`[crash] the token helper stopped on an unexpected TypeError; its message is withheld.`) and exits 1. Rejected: dropping the catch (a token could reach stderr), and routing the helper through `src/main.ts` (it would load commander, winston and the update notifier, which the helper's startup budget forbids).
 Rule for next time: read rule 17's "once in src/main.ts" as "once per entry point that runs as a process" (the library entry, src/index.ts, has none). A new process entry gets exactly one crash catch, says so in its header comment and in the eslint.config.js block that guards its imports, and never prints a message that could carry a secret. Any other try/catch outside src/infra/** stays banned.
 
-## [gotcha] 2026-10-18 | in a root container (a cloud session), seven chmod tests fail and Stryker cannot start: measure through a scratchpad config, or run as `nobody` on a copy
-
-A cloud session runs `bun test` as uid 0, and root ignores the `chmod` modes that seven tests in `src/infra/filesystem-bun.test.ts` and `filesystem-node.test.ts` use to expect `io_failed`, so they fail on an untouched tree while CI (an ordinary user) stays green, and the Stryker dry run, which needs a green suite, stops `mutate:changed` and `mutate:staged`. On 2026-10-04 a scratchpad copy of `stryker.conf.json` whose command ran `bun test $(find ./src -name "*.test.ts" ! -name filesystem-bun.test.ts ! -name filesystem-node.test.ts)` measured `docs.ts` at 126 of 126 killed, and CI passed on the same commit: a left-out test can only let a mutant survive, so such a score is a lower bound. For the full suite, run as `nobody` on a copy of the tree that `nobody` owns: copy the `bun` binary out of `/root/.bun/bin` to a readable directory, make `bunx` a symlink to that copy, and put `/opt/node22/bin` on PATH, because Stryker starts Node children. The proxy CA bundle is in `/root/.ccr/`, which `nobody` cannot read, so bun warns on stderr for each network run, and `scripts/check-packed-package.ts`, which then joined the stdout and stderr of `bun pm pack`, took the warning as the tarball path, until a copy at `/opt/nbbun/ca-bundle.crt` in `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE` and `CURL_CA_BUNDLE` made the run clean.
-Rule for next time: when `id -u` prints 0, count the failures before you trust a gate, and if only the seven filesystem `io_failed` tests fail, read them as the environment and measure through a scratchpad config, never by an edit of the tests or of the shared `stryker.conf.json`. A script that reads a result from a child reads stdout only and gives stderr to the person.
-Merges: 2026-10-04 (gotcha, mutate:changed as root), 2026-10-04 (gotcha, seven chmod tests), 2026-10-10 (gotcha, nobody), 2026-10-18 (gotcha, CA bundle).
-
 ## [decision] 2026-10-09 | SUPERSEDES the graph-scopes pointers of 2026-06-10, 2026-06-13 and 2026-08-30: each command declares its effect and its scopes in its own meta
 
 Package-split phase 1 step 11 replaced the boolean `meta.mutates` with a required `meta.effect`: `read`, `draft` (the four mail-draft commands) or `transient-upload` (the three PDF converters, which upload a temporary OneDrive file and try to delete it). `src/use-cases/commands/command-effect.ts` words each write class once, and the MCP routing (`run-command` takes only `read`), the MCP annotations, the top-level `--help` text, the per-command docs line and `scripts/qa-live-sweep.ts` (an allow-list on `effect === 'read'`) all derive from it. The central `graph-scopes.ts` table and its test were deleted: every command declares `scopesRequired` inline, and the PDF converters declare `Files.ReadWrite`. `COMMANDS_WITHOUT_SCOPES` moved to `src/use-cases/commands/meta.test.ts` under the same name, and the scope conventions (least privilege, why group posts list `Group.Read.All`) moved to the `CommandMeta.scopesRequired` doc comment. Rejected: an optional `effect` that defaults to `read` (a new write could ship as a read with no warning).
 Rule for next time: a new command chooses its `effect`; a new write class gets one entry in `command-effect.ts` and nothing else. In the older entries, `graph-scopes.ts` means the command's own `meta.scopesRequired`, and `graph-scopes.test`'s `COMMANDS_WITHOUT_SCOPES` means the set in `meta.test.ts`. Wording about a cleanup says "tries to delete": the converters' cleanup is best effort.
 
-## [decision] 2026-10-10 | Commands are typed against ReadGraph or WriteGraph; the registry gives each command its view at run time
-
-Package-split phase 1 step 12 split the Graph client: `ReadGraph` (`src/infra/read-graph.ts`) has every GET tier, the chat substrate and a POST that reaches only `/search/query` and `/me/calendar/getSchedule`, and `WriteGraph` (`src/infra/write-graph.ts`) has the basic tier only, with `post`, `patch`, `put` and `delete`. A read command is a `ReadCommand` (`meta.effect: 'read'`, `execute(graph: ReadGraph)`), a write command is a `WriteCommand`, and since the single package still passed the full client `GraphClient = ReadGraph & WriteGraph`, the registry wraps each command at assembly (`withOwnGraph` in `src/use-cases/commands/command-graph.ts`) with `readGraphOf(graph)` or `writeGraphOf(graph)`. These two views are pure functions in use-cases, so the dependency points inward, and the POST check that the read graph and the read view share is in `src/use-cases/commands/read-only-post.ts`. An ESLint rule and `scripts/check-read-bundle.ts` keep read code away from the write graph.
-Rule for next time: a new read command names `ReadCommandMeta` and `ReadCommand['execute']`. A new write command names the write types and joins the ignores of the ESLint rule. A new read-only POST path goes in `READ_ONLY_POST_PATHS` and nowhere else.
-
-## [decision] 2026-10-10 | SUPERSEDES 2026-06-15: the graph fakes are fakeReadGraph and fakeWriteGraph, and fakeGraphClient only composes them
-
-The 2026-06-15 entry put every `GraphClient` member in one shared builder. Step 12 split the client, so the fakes split too. `src/test-helpers/read-graph-fake.ts` exports `fakeReadGraph(overrides?)` and `src/test-helpers/write-graph-fake.ts` exports `fakeWriteGraph(overrides?)`. `fakeGraphClient` in `src/test-helpers/graph-client-fake.ts` spreads the two and adds no member of its own. `src/test-helpers/graph-fakes.test.ts` checks that each fake has the same members as its real graph. The rule of the old entry stays: never write an inline full-literal fake.
-Rule for next time: a new member goes in the fake of its graph. When both graphs have the member, it goes in both fakes. Do not add a member to `fakeGraphClient` directly.
-
-## [gotcha] 2026-10-10 | To decide on a 401 replay, read the error code from `res.clone()`, so the body is still readable after
-
-The basic and guest tiers replay a request once when Graph answers 401 with `InvalidAuthenticationToken` or `TokenExpired`. To know the code, the request core must read the body of the 401. A `Response` body can be read only one time. If the core reads the original answer, a caller that gets the same 401 back (no newer token, so no replay) cannot read the error body, and the error message is lost. `refusesTheToken` in `src/infra/graph-request.ts` reads `res.clone()` and gives the original answer back untouched.
-Rule for next time: when code must look at a response body and then return the same response, read a clone. Read the original only at the place that consumes the answer.
-
-## [gotcha] 2026-10-15 | A mass text change in commits the size gate permits needs checks that accept both forms until the last commit
-
-Package-split step 14 put placeholders such as `{bin}` and `{auth-bin}` in about 436 command references, far above the limit of 10 files and 300 lines, so the change went in 23 batches, and between them part of the source had the old literal `ask-marcel-office` and part had the placeholder. Two checks read that text, the phantom-command guard in `meta.test.ts` and `hasActionableAdvice` in `error-hints.ts`, and a check that accepts one form only fails either the first or the later batches. So both checks accepted the two forms for a short time, and the last commit (`8ef306c`) removed the old form and added a guard that refuses a literal command reference.
-Rule for next time: before you divide a mass text change into batches, find each check that reads that text. Let each check accept both forms in the first commit, and remove the old form in the last commit. Do not use `--no-verify` to land the change in one commit.
-
-## [decision] 2026-10-15 | The auth MCP server has only the `login` and `status` tools, and no message offers `token`
-
-Step 14 made the unknown-command answers depend on the surface: on MCP, a command of another package tells the caller to register the MCP server of that package and to call the command there. Only `login` and `status` are tools of the auth server, `logout` sends the caller to a terminal (`{auth-bin} logout`), and `token` is a machine helper for read and write that did-you-mean never offers (the exact name says that it is the token helper of @ask-marcel/office-auth). The plan also says that no auth MCP tool returns a token. Rejected: one wording for all surfaces, which sent MCP callers to tools that do not exist and to command lines that they cannot run.
-Rule for next time: an MCP message names a server and a tool that exist on that server. Before you name an auth command in an MCP message, make sure that it is `login` or `status`.
-
-## [gotcha] 2026-10-15 | When test cases move out of a file in small commits, each commit must also delete the helpers that lose their last user
-
-Package-split step 16 moved the write and auth cases out of `commands.test.ts`, `cli.test.ts` and `mcp.test.ts` in 12 commits, so that each commit stayed within 10 files and 300 lines. A helper or an import in the old file, for example `pdfCmd` or the upload helpers, becomes unused when its last case moves. The staged lint of the pre-commit hook then fails on the old file. A helper that cases in the old file and in the new file both need must be copied to the new file in the same commit.
-Rule for next time: before each move commit, find the helpers and imports that the moved cases use. Delete each one that has no user left in the old file, and copy each one that the new file needs, in that same commit. Then run lint on both files before you commit.
-
-## [gotcha] 2026-10-16 | In a linked git worktree, a hook gets an absolute GIT_DIR, so a git command in a subfolder sees no path prefix
-
-During a hook, git sets `GIT_DIR` to an absolute path. In a linked worktree, `git diff --relative` that runs from `core/` then does not remove the `core/` prefix from the staged paths. In phase 2, the staged lint gave ESLint paths such as `core/src/x.ts` from inside `core/`, and ESLint stopped with exit 123. The commit worked in the main checkout and failed in the worktree. `scripts/lint-staged.sh` now finds its folder from its own location and does not ask git for the prefix.
-Rule for next time: a hook script must not use git's idea of the current folder. Find the folder from the script's own path, and give git explicit paths. Do a test of each hook in a linked worktree and with `GIT_DIR` set by hand.
-
-## [gotcha] 2026-10-18 | The token helper now records the version of auth (1.0.0), not the root's 2.8.0
-
-`src/token.ts` imports the version from `../package.json`, which after the move to `auth/src/token.ts` is `auth/package.json`, so the helper and the auth bin write `version: "1.0.0"` in `~/.ask-marcel/token-helper.json`, while a locator that the root wrote before phase 4 says `2.8.0`. Such an old locator names the `src/token.ts` or `dist/token.js` of a checkout (removed in phase 4) or the helper of an installed 2.8.0, which still runs and answers in the same protocol. No reader compares the version, and `token-helper-locator.ts` passes over a locator whose entry or runtime is gone, so the old file does no damage until an auth run replaces it.
-Rule for next time: in a locator, expect the version of the package that owns the helper. Expect an old locator to name a file that is gone, or the helper of the old package. Do not add a version check to the reader for this.
-
-## [gotcha] 2026-10-18 | A dependency that a bundle reaches only through a dynamic import must be external before the first build of that entry
-
-`bun build` follows dynamic imports. The browser ladder of `auth/src/token.ts` reaches `playwright-loader.ts` through dynamic imports, so the first build of `dist/token.js` tried to inline playwright and failed on `electron`. The update notifier spawns its own `check.js`, which a bundle cannot inline. `scripts/build-package.ts` leaves external exactly the keys of `dependencies`, so `auth/package.json` declared `playwright` and `update-notifier` one commit before the first build that reaches them. The Windows round trip builds the helper itself and takes the same list from `auth/package.json`.
-Rule for next time: before you add a bundle entry or a dynamic import in a published folder, list the packages that the entry can reach. Include the dynamic imports. Declare each one that the bundle cannot inline in `dependencies` in the same or an earlier commit, and build the entry before you commit.
-
-## [gotcha] 2026-10-18 | The MCP SDK answers a call of an unregistered tool by itself, so a server cannot name the server that has the tool
-
-After phase 4 the root MCP server has no `login` and `status` tools. A call of either tool gets "MCP error -32602: Tool login not found", and the SDK sends that answer before any code of the server runs. So the root cannot tell an MCP caller to call `login` on the `ask-marcel-office-auth` server there, as the design expected. The `get-command-docs` and `run-command` tools still name the auth server for `login`, `status` and `logout`, because the root code answers them.
-Rule for next time: put the pointer to another server in the answers of the tools that exist, such as `get-command-docs` and `run-command`. The answer to a missing tool is the SDK's.
-
-## [decision] 2026-10-18 | A command names the graph it runs on, and each package gives its own CLI and MCP texts
-
-Package-split phase 5 made the core types generic: `Command<G>` runs on `G` (default `ReadGraph & WriteGraph`), and `CommandPackage`, `resolveCommand`, `withUnknownParamRejection` and the CLI and MCP shell deps take `G`. A one-kind package wraps its registry with `readCommandOf` or `writeCommandOf` (`command-graph.ts`), so write runs on `WriteGraph` alone and the root on `ReadGraph` alone. `CommandPackage` also holds `description` and `exampleCommand`, the CLI shell gives the description and then the registry facts, and the MCP shell registers `run-command` only when the registry has a read command and `run-write-command` only when it has a write command. Rejected: one text for every package, which made the write bin talk about read commands and `login`.
-Rule for next time: a deps type written as `Omit<CliShellDeps, …>` takes the default `G`. A caller that holds one graph must name it, for example `CliShellDeps<ReadGraph>`. A new package text goes in the package, never in the shell.
-
-## [gotcha] 2026-10-18 | The pre-commit hook skips the secret scan when gitleaks is not on PATH, and says so only in its log
-
-The hook runs `gitleaks protect --staged` only when `gitleaks` is installed. In phase 4 it was not installed, every hook passed, and CI found a token-shaped fixture after the merge (`a296c26`). In phase 5 gitleaks was first on PATH for every commit, and each hook log showed "no leaks found". A token-shaped fixture must have a shape that gitleaks does not flag. Do not add it to `.gitleaksignore` on your own.
-Rule for next time: before the first commit of a session, run `command -v gitleaks`. After each commit, look for "no leaks found" in the hook output, and run `gitleaks detect --redact --no-banner` before a push.
-
-## [gotcha] 2026-10-18 | bun writes its transpiler cache under HOME, so a "no file under HOME" probe must allow `.bun/install/cache/`
-
-The write bundle smoke checks that a run of the bin leaves no file under its temporary HOME except the update-notifier configstore. Under bun, each probe failed: bun itself writes `.bun/install/cache/` under HOME. The bin wrote no token cache and no locator.
-Rule for next time: a probe that looks for files under HOME allows bun's own cache folder, and names each other allowed path. Do the test under node and under bun.
-
-## [gotcha] 2026-10-24 | When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit
-
-`read/package.json` names `src/main.ts` and `src/index.ts` in `bin` and `exports`, and the workspace job of read builds and packs them on each push, so the 11-line skeleton entries could not go before the move and the root files could not stay after it. Commit 15 deleted the two skeleton entries and renamed the root files onto their paths, and the skeleton `bin.ts` and its test, at other paths, stayed until the commit that replaced the bin. Plain `git diff -M` shows two deletions and two edits, while `git diff -B -M` shows the root files renamed onto the skeleton paths at 100%.
-Rule for next time: in a move onto a folder that has entry files at the same paths, delete those entries in the move commit, and prove the purity with `-B -M`. Keep each skeleton file that has no collision until a later commit.
-
-## [gotcha] 2026-10-24 | A test that reads a file outside its folder fails in that folder's Stryker sandbox
-
-The root bin sweep also read `docs/commands.json` and `docs/COMMANDS.md`. After the move it would read `read/docs/` (no such folder), and read's Stryker sandbox holds only the folder, so the dry run fails before a mutant runs. Commit 5 moved that check to `check:docs` (`--manifest`, the bin placeholders), and commit 6 deleted the case from the sweep before the move.
-Rule for next time: a folder test reads only files under its folder. A check of repository files (docs, workflows, other folders) goes in a script that the `gates` job runs.
-
-## [gotcha] 2026-10-24 | When a manifest loses its dependencies, a package that no workspace declares leaves bun.lock
-
-Read imports `diff`, and only the root `dependencies` declared it. A `bun install --lockfile-only` with the root dependencies deleted dropped `diff` from `bun.lock`, and read then failed its typecheck, its tests and its build on a clean install. The hoisted install hid the gap until then. Commit 17 put `diff`, `commander`, the MCP SDK and `docx` in read's `devDependencies`, and `zod`, the MCP SDK, `commander` and `winston` in core's.
-Rule for next time: before you delete dependencies from a manifest, list the imports of each workspace and make sure that a workspace declares each package. Then do `bun install --frozen-lockfile` on a clean `node_modules` and run the typecheck in each folder.
-
-## [mistake] 2026-10-24 | The phase 6 design asked for `--incremental false`, which the 2026-05-30 entry says does not exist
-
-Open question 5 of the phase 6 design asked for read's full Stryker run with `--incremental false`. Stryker 9.6.1 reads the value as a config file name and stops. The 2026-05-30 entry and the comment of `scripts/mutate-changed.sh` already said so. The run gave each shard a new, empty `--incrementalFile` instead.
-Rule for next time: before a design names a tool flag, read the LESSONS entries and the scripts that use that tool. For a mutation run with no earlier results, point `--incrementalFile` at a new, empty file.
-
-## [gotcha] 2026-10-24 | A longer bin name moves the line breaks of commander's `--help`
-
-The read bin `ask-marcel-office-read` is 5 characters longer than `ask-marcel-office`. Commander wraps option texts at a fixed width, so in 67 `--help` texts a line break moved, and a break can come right after the bin. A comparison that changes the bin only before a space, a quote or a backtick reports these calls as defects.
-Rule for next time: when you compare the output of two bin names, change the bin also before a line end and an escaped quote, and compare `--help` with each run of white space as one space.
-
-## [gotcha] 2026-10-24 | The unit tests run under bun, so only a smoke under node proves a library's runtime pick and its export list
-
-The read library picks the file system and the process runner of the runtime that loads it (`onBun() ? createBun… : createNode…`). With the Bun pick forced, all read tests, the build, `check:packed` and both smokes passed, but a node caller got `token_helper_unavailable` ("Bun is not defined"). With two exports deleted from `read/src/index.ts`, every gate passed too: `check:packed` reads the exports that exist, and the tests import only `commands` and the types. Commit 28 now loads the library by name under node and bun, checks the exact export list, and gets a token from a stub helper that `ASKMARCEL_TOKEN_COMMAND` names. The stub builds its token at run time.
-Rule for next time: when a package exports a library, its bundle smoke loads it by name under node and under bun, checks the exact export list, and calls each export that picks a runtime. A unit test under bun cannot prove a node branch.
-
-## [gotcha] 2026-10-25 | a failed `import()` of `--package` crashed bun with exit 1, which is also the exit code of a stale doc
-
-`gen-docs.ts --check` gives exit 1 for a stale `COMMANDS.md` and exit 2 for a usage error, but with a wrong `--package` path the dynamic import threw and bun stopped with exit 1, so a typo looked like a stale doc. Commit 9 made the import of `scripts/command-packages.ts` return a `Result` error, and both scripts now give exit 2. The CI red fixture requires exit 1 exactly, after a control run of the same copy that must give exit 0, and it fails when the `sed` changed no count (`cmp -s`). The `gates` job builds nothing, so the fixture gives no `--manifest`, because a missing manifest would make each run stale for the wrong reason.
-Rule for next time: give each failure of a gate its own exit code, and catch a crash of an import as a usage error. A red fixture requires the exact code of its fault, after a control run that passes.
-
-## [gotcha] 2026-10-25 | `parseArgs` keeps only the last value of a repeated plain option and gives no error
-
-Commit 22 made `gen-docs.ts` and `check-doc-numbers.ts` take one package per run. With `--package` as a plain string option, `node:util` `parseArgs` silently keeps the last of two `--package` values, so a run with two packages documents the second one only. The option keeps `multiple: true`, and the scripts refuse a second value with exit 2.
-Rule for next time: when a script takes an option once, declare it `multiple: true` and refuse more than one value. Do not trust `parseArgs` to refuse a repeated option.
-
-## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
-
-Each claim of `check-doc-numbers.ts` checks one anchored sentence, so a new sentence such as "the 12 mail commands" matched no anchor and passed with no check, and a table row "The 204 read commands by name" did not match "the N … commands" (the rows became "Each of the N … commands, by name"). Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
-Rule for next time: write each count of a doc in digits, in an anchored form of its own package, and add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names (the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check), so write a count of another noun once, in a sentence that a claim checks.
-
-## [gotcha] 2026-11-13 | on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too
-
-The CI then ran the suites on Linux only, so about 50 tests failed on Windows and nobody saw it (since `e0c6937` the `windows-helper` job runs the tests of each folder). Three causes were the path separator: `Bun.Glob.scan` gave `src\infra\x.ts`, so `path.startsWith('src/test-helpers/')` in the bin placeholder sweeps matched nothing, and the coverage report gave the same paths, so `scripts/check-coverage.ts` found no tier for each file. Tests seeded `createFileSystemFake` with `/virtual/home/.ask-marcel/...`, but `resolveAuthPaths` builds the path with `join`, which gives backslashes on Windows, so the fake answered `not_found`. The other causes were POSIX file modes, signals and pid 1, which Windows does not have.
-Rule for next time: change `\` to `/` in a path that Bun reports before a prefix check, and prove it with a Windows row in the selftest. Build each expected or seeded path of a test with `join`, as production does. Skip on `win32` only the check that Windows cannot do (a file mode, a signal), not the full test: the infra tier needs 100 % coverage on Windows too.
-
-## [gotcha] 2026-11-13 | on Windows, a `spawn` call of Bun 1.4.4 sometimes blocks for 5 to 10 seconds, more than the default test timeout
-
-The process runner tests failed at random on Windows. With Bun as the parent, the synchronous `spawn` call (`Bun.spawn` and `node:child_process` of Bun) blocked for about 5 s or 10 s, some times in the first 45 s of the parent, with each child (`bun.exe`, `sh.exe`, `cmd.exe`, `node.exe`). With Node 26 as the parent, 1219 starts had no slow call. The cause in Bun is not identified. The tests also started `sh`, `yes`, `cat`, `sleep` and `true`, which PowerShell does not have on PATH, so the result changed with the shell.
-Rule for next time: a test that starts a real process uses `process.execPath -e <script>` as the child and a timeout of 30 s, and applies a bound on the elapsed time only off Windows. When a process test is unstable, measure the `spawn` call alone, with Node as a second parent, before you change the adapter.
-
-## [decision] 2026-11-15 | a hint for a token helper failure matches the helper message, not the error code alone
-
-After the split, the read and write bins named only the helper command to run by hand when the token helper gave no token, and 2.8.0 named `login`. `d21ef06` gives the `login` instruction back with two hint rules, for `not_authenticated` and `secondary_token_unavailable`. The auth bin gives the same two codes with a message that already names `login`, so a rule on the code alone adds the remedy a second time.
-Rule for next time: match a hint on the error message and the code. Add a hint only when the message does not already name the remedy.
