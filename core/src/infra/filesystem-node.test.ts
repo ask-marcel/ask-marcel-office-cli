@@ -6,6 +6,10 @@ import { describeAtomicFileWritesContract } from '../test-helpers/atomic-file-wr
 import { describeFileExistsContract } from '../test-helpers/file-exists-contract.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 
+// POSIX permissions: on Windows chmod removes no access, stat reports no owner-only
+// mode, and a symbolic link needs a privilege, so these tests run off Windows only.
+const itOnPosix = it.skipIf(process.platform === 'win32');
+
 let tmp: string;
 
 beforeEach(() => {
@@ -47,7 +51,7 @@ describe('Node filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('parse_failed');
   });
 
-  it('returns io_failed when the file is unreadable', async () => {
+  itOnPosix('returns io_failed when the file is unreadable', async () => {
     const path = join(tmp, 'forbidden.json');
     writeFileSync(path, '{}');
     chmodSync(path, 0o000);
@@ -74,7 +78,7 @@ describe('Node filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('not_found');
   });
 
-  it('returns io_failed when reading bytes of an unreadable file', async () => {
+  itOnPosix('returns io_failed when reading bytes of an unreadable file', async () => {
     const path = join(tmp, 'forbidden.bin');
     writeFileSync(path, 'secret');
     chmodSync(path, 0o000);
@@ -93,7 +97,7 @@ describe('Node filesystem adapter', () => {
     expect(readFileSync(path, 'utf-8')).toBe('{"hello":"world"}');
   });
 
-  it('returns io_failed when the destination directory is not writable', async () => {
+  itOnPosix('returns io_failed when the destination directory is not writable', async () => {
     const dir = join(tmp, 'ro');
     writeFileSync(join(tmp, 'placeholder'), 'x');
     chmodSync(tmp, 0o500);
@@ -128,7 +132,7 @@ describe('Node filesystem adapter', () => {
     expect(Array.from(readFileSync(path))).toEqual([0x25, 0x50, 0x44, 0x46, 0x2d]);
   });
 
-  it('returns io_failed when the destination directory is not writable for writeBytes', async () => {
+  itOnPosix('returns io_failed when the destination directory is not writable for writeBytes', async () => {
     const dir = join(tmp, 'ro');
     writeFileSync(join(tmp, 'placeholder'), 'x');
     chmodSync(tmp, 0o500);
@@ -159,7 +163,7 @@ describe('Node filesystem adapter', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('returns io_failed when deleteDirIfExists cannot remove a child due to a read-only parent', async () => {
+  itOnPosix('returns io_failed when deleteDirIfExists cannot remove a child due to a read-only parent', async () => {
     // Build a nested directory with one file in it, then strip write perms
     // on the parent — the recursive `rm` needs to delete the inner file first
     // and surfaces EACCES from the parent inode.
@@ -191,7 +195,8 @@ describe('Node filesystem adapter — chmod', () => {
     const result = await fs.chmod(path, 0o600);
     expect(result.ok).toBe(true);
     const { statSync } = await import('node:fs');
-    expect(statSync(path).mode & 0o777).toBe(0o600);
+    // Windows keeps no POSIX file mode: the call succeeds there and stat reports 0666.
+    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 
   it('returns io_failed when the target does not exist', async () => {
@@ -207,7 +212,7 @@ describeAtomicFileWritesContract('Node filesystem adapter', createNodeFileSystem
 describeFileExistsContract('Node filesystem adapter', createNodeFileSystem);
 
 describe('Node filesystem adapter — exists', () => {
-  it('returns io_failed when the path cannot be looked up, rather than call a runtime gone', async () => {
+  itOnPosix('returns io_failed when the path cannot be looked up, rather than call a runtime gone', async () => {
     // Two links that point at each other: the lookup fails with ELOOP.
     symlinkSync(join(tmp, 'b'), join(tmp, 'a'));
     symlinkSync(join(tmp, 'a'), join(tmp, 'b'));

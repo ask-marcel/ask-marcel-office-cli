@@ -16,6 +16,8 @@ export const describeAtomicFileWritesContract = (name: string, create: () => Ato
       return dir;
     };
     const modeOf = (path: string): number => statSync(path).mode & 0o777;
+    // Windows keeps no POSIX file mode: stat reports 0666 for each writable file.
+    const itOnPosix = it.skipIf(process.platform === 'win32');
     afterEach(() => {
       for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
     });
@@ -37,7 +39,7 @@ export const describeAtomicFileWritesContract = (name: string, create: () => Ato
       expect(readFileSync(target, 'utf8')).toBe('{"new":1}');
     });
 
-    it('gives a new file mode 0600 from the start, and a replaced 0644 file comes out 0600', async () => {
+    itOnPosix('gives a new file mode 0600 from the start, and a replaced 0644 file comes out 0600', async () => {
       const dir = scratch();
       const fresh = join(dir, 'fresh.json');
       const replaced = join(dir, 'replaced.json');
@@ -74,7 +76,7 @@ export const describeAtomicFileWritesContract = (name: string, create: () => Ato
       const result = await create().createExclusive(lock, '{"pid":1}', 0o600);
       expect(result).toEqual({ ok: true, value: undefined });
       expect(readFileSync(lock, 'utf8')).toBe('{"pid":1}');
-      expect(modeOf(lock)).toBe(0o600);
+      if (process.platform !== 'win32') expect(modeOf(lock)).toBe(0o600);
     });
 
     it('answers already_exists and leaves an existing file untouched', async () => {

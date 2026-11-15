@@ -36,7 +36,9 @@ const BIN_BY_HAND = /ask-marcel-office(-(auth|read|write))?\s/;
 
 const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
   const lines: Line[] = [];
-  for await (const path of new Bun.Glob('src/**/*.ts').scan(CORE)) {
+  for await (const found of new Bun.Glob('src/**/*.ts').scan(CORE)) {
+    // The scan gives backslashes on Windows; every check here reads forward slashes.
+    const path = found.replaceAll('\\', '/');
     if (path.endsWith('.test.ts') || path.startsWith('src/test-helpers/')) continue;
     const text = await Bun.file(join(CORE, path)).text();
     text.split('\n').forEach((line, at) => {

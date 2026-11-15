@@ -6,6 +6,10 @@ import { describeAtomicFileWritesContract } from '../test-helpers/atomic-file-wr
 import { describeFileExistsContract } from '../test-helpers/file-exists-contract.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 
+// POSIX permissions: on Windows chmod removes no access, stat reports no owner-only
+// mode, so these tests run off Windows only.
+const itOnPosix = it.skipIf(process.platform === 'win32');
+
 let tmp: string;
 
 beforeEach(() => {
@@ -111,7 +115,7 @@ describe('Bun filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('not_found');
   });
 
-  it('returns io_failed when reading bytes of an unreadable file', async () => {
+  itOnPosix('returns io_failed when reading bytes of an unreadable file', async () => {
     const { chmodSync } = await import('node:fs');
     const path = join(tmp, 'forbidden.bin');
     writeFileSync(path, 'secret');
@@ -163,7 +167,7 @@ describe('Bun filesystem adapter', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('returns io_failed when deleteDirIfExists cannot remove a child due to a read-only parent', async () => {
+  itOnPosix('returns io_failed when deleteDirIfExists cannot remove a child due to a read-only parent', async () => {
     const { mkdirSync, chmodSync } = await import('node:fs');
     const profileDir = join(tmp, 'browser-profile');
     const innerDir = join(profileDir, 'Default');
@@ -189,7 +193,8 @@ describe('Bun filesystem adapter — chmod', () => {
     const result = await fs.chmod(path, 0o600);
     expect(result.ok).toBe(true);
     const { statSync } = await import('node:fs');
-    expect(statSync(path).mode & 0o777).toBe(0o600);
+    // Windows keeps no POSIX file mode: the call succeeds there and stat reports 0666.
+    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 
   it('returns io_failed when the target does not exist', async () => {

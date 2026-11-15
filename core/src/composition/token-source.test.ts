@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { join } from 'node:path';
 import type { AccessToken } from '../domain/access-token.ts';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
 import { ok } from '../domain/result.ts';
@@ -14,7 +15,8 @@ import { createEnvThenHelperTokenSource } from './token-source.ts';
  */
 
 const HOME = '/virtual/home';
-const LOCATOR = '/virtual/home/.ask-marcel/token-helper.json';
+// Built with join, as production builds it: the separator is a backslash on Windows.
+const LOCATOR = join(HOME, '.ask-marcel', 'token-helper.json');
 const HELPER = '/opt/ask-marcel/auth/dist/token.js';
 const NODE = '/usr/local/bin/node';
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
@@ -72,7 +74,9 @@ describe('the token source of a package that takes its tokens from the auth pack
     expect(messageOf(await source.substrateToken('ic3'))).toEndWith('to read its message and remedy.');
   });
 
-  it('looks for the auth bin on PATH with the platform of this process when no locator names a helper', async () => {
+  // On Windows the locator does the PATH search itself (token-helper-locator.test.ts) and finds
+  // nothing in an empty env, so the bare bin name is the answer off Windows only.
+  it.skipIf(process.platform === 'win32')('looks for the auth bin on PATH with the platform of this process when no locator names a helper', async () => {
     const runner = answering();
     const source = createEnvThenHelperTokenSource({ home: HOME, env: {}, fs: createFileSystemFake(), runner, interactive: true });
     expect(await source.graphToken('basic')).toEqual(ok(HELPER_TOKEN));
