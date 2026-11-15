@@ -112,7 +112,9 @@ const parseRow = (line: string): FileRow | undefined => {
     const funcs = Number.parseFloat(parts[layout.funcs] ?? '');
     const lines = Number.parseFloat(parts[layout.lines] ?? '');
     if (Number.isNaN(funcs) || Number.isNaN(lines)) continue;
-    const normalised = path.startsWith('./') ? path.slice(2) : path;
+    // Bun prints `src\infra\a.ts` on Windows; the tiers and the skip rules read forward slashes.
+    const slashed = path.replaceAll('\\', '/');
+    const normalised = slashed.startsWith('./') ? slashed.slice(2) : slashed;
     return { path: normalised, funcs, lines };
   }
   return undefined;
@@ -234,6 +236,12 @@ const SELFTEST_CASES: ReadonlyArray<{ readonly name: string; readonly row: strin
   { name: 'a source of another package', row: ' ../read/src/domain/a.ts          |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a root script other than the preloads', row: ' ../scripts/gen-docs.ts           |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a JavaScript file outside every tier', row: ' src/legacy.js                    |  100.00 |  100.00 | ', expected: 1 },
+  // Bun prints backslashes on Windows: the same rules must apply to those rows.
+  { name: 'a Windows path in a tier', row: ' src\\domain\\a.ts                 |  100.00 |  100.00 | ', expected: 0 },
+  { name: 'a Windows path below on lines', row: ' src\\infra\\c.ts                  |  100.00 |   99.00 | 7', expected: 1 },
+  { name: 'a Windows path of a preload', row: ' ..\\scripts\\no-network-preload.ts |   50.00 |   50.00 | 25-30', expected: 0 },
+  { name: 'a Windows path of a core source', row: ' ..\\core\\src\\infra\\d.ts          |   50.00 |   50.00 | 3', expected: 0 },
+  { name: 'a Windows path outside every tier', row: ' read\\src\\domain\\a.ts            |  100.00 |  100.00 | ', expected: 1 },
 ];
 
 const runSelftest = (): number => {
