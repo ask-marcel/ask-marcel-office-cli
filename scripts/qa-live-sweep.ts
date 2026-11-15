@@ -37,14 +37,17 @@ if (withoutEffect.length > 0) {
 }
 
 let browserOpens = 0;
-const run = (args: string[], timeoutMs = 90000): { ok: boolean; data?: any; code?: string } => {
-  const p = spawnSync(BIN, [...args, '--output', 'json'], { timeout: timeoutMs, maxBuffer: 128 * 1024 * 1024, env: { ...process.env, ASKMARCEL_LOG_LEVEL: 'info' } });
+// The paging cursor is on the envelope, `{ok, data, nextLink?}`, not in `data`.
+const run = (args: string[], timeoutMs = 90000): { ok: boolean; data?: any; nextLink?: string; code?: string } => {
+  // Windows cannot run a .js file as a program (EFTYPE): start it with node, as on each system.
+  const [cmd, ...pre] = BIN.endsWith('.js') ? ['node', BIN] : [BIN];
+  const p = spawnSync(cmd!, [...pre, ...args, '--output', 'json'], { timeout: timeoutMs, maxBuffer: 128 * 1024 * 1024, env: { ...process.env, ASKMARCEL_LOG_LEVEL: 'info' } });
   const errout = p.stderr?.toString() || '';
   if (/system_browser|"rung":"browser"|ask_marcel_port|fallback_to_playwright/.test(errout)) browserOpens++;
   if (p.signal === 'SIGTERM') return { ok: false, code: 'TIMEOUT' };
   try {
     const d = JSON.parse(p.stdout?.toString() || '');
-    return d.ok ? { ok: true, data: d.data } : { ok: false, code: d.errorCode || 'err' };
+    return d.ok ? { ok: true, data: d.data, nextLink: d.nextLink } : { ok: false, code: d.errorCode || 'err' };
   } catch {
     return { ok: false, code: 'UNPARSEABLE' };
   }
@@ -178,7 +181,7 @@ let convGroup: any, convId: any;
 for (const g of [...unifiedGroups, ...val(run(['list-groups', '--top', '15']))]) { const conv = first(run(['list-group-conversations', '--group-id', g.id])); if (conv) { convGroup = g.id; convId = conv.id; break; } }
 // a real nextLink for next-page
 const nlProbe = run(['list-mail-messages', '--top', '2']);
-const nextLink = (nlProbe as any).data?.nextLink ?? undefined;
+const nextLink = nlProbe.nextLink;
 
 if (browserOpens > 0) { console.log(`!! browserOpens=${browserOpens} during harvest — ABORT (would storm)`); process.exit(1); }
 
