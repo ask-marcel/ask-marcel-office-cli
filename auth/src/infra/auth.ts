@@ -384,6 +384,31 @@ const readTokenAnswer = async (res: Response): Promise<Result<TokenAnswer, AuthE
   return ok(body);
 };
 
+// The two codes of a refusal from the token endpoint: `error` (`invalid_grant`)
+// and the AADSTS number in its description (AADSTS700084 is a single-page-app
+// refresh token past its fixed 24 h life). The rest of the body (trace id,
+// correlation id, description text) is never kept. An `error` that is not a
+// plain lower-case code can hold anything a proxy put there, so it is dropped.
+type RefusalCodes = { readonly error?: string; readonly aadsts?: string };
+
+const refusalCodes = async (res: Response): Promise<RefusalCodes> => {
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return {};
+  }
+  if (typeof body !== 'object' || body === null) return {};
+  const fields = body as Record<string, unknown>;
+  const error = typeof fields['error'] === 'string' && /^[a-z_]+$/.test(fields['error']) ? fields['error'] : undefined;
+  const aadsts = typeof fields['error_description'] === 'string' ? /\bAADSTS\d+\b/.exec(fields['error_description'])?.[0] : undefined;
+  return { ...(error === undefined ? {} : { error }), ...(aadsts === undefined ? {} : { aadsts }) };
+};
+
+// The tier a redemption is for, named in its failure event. A guest call is
+// named `guest`, never by its tenant.
+type RedemptionTier = 'basic' | 'chatsvcagg' | 'ic3' | 'guest';
+
 // The rungs of the ladder that need a browser. auth-browser.ts supplies them to
 // a session allowed to open one; a rung left out fails fast with the "run login"
 // message instead.
@@ -549,7 +574,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   const redeemRefreshToken = async (
     refreshTokenValue: string,
     authority: string,
-    scope: string
+    scope: string,
+    tier: RedemptionTier
   ): Promise<Result<{ readonly accessToken: string; readonly expiresIn: number; readonly refreshToken: string | undefined }, AuthError>> => {
     const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: refreshTokenValue, scope });
     let res: Response;
@@ -564,7 +590,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       const msg = e instanceof Error ? e.message : String(e);
       return err({ type: 'auth_failed', message: msg });
     }
-    if (!res.ok) return err({ type: 'auth_failed', message: `refresh failed (${res.status})` });
+    if (!res.ok) {
+      // Without the codes a dead refresh token reads as a bare 400, and the
+      // callers that fall back to "run login" drop even that.
+      const codes = await refusalCodes(res);
+      logger.warn('auth.refresh.redeem_failed', { tier, status: res.status, ...codes });
+      const detail = [res.status, codes.error, codes.aadsts].filter((part) => part !== undefined).join(', ');
+      return err({ type: 'auth_failed', message: `refresh failed (${detail})` });
+    }
     const answer = await readTokenAnswer(res);
     if (!answer.ok) return answer;
     const json = answer.value;
@@ -572,7 +605,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   };
 
   const refreshToken = async (cached: CachedToken): Promise<Result<AccessToken, AuthError>> => {
-    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', SCOPES);
+    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', SCOPES, 'basic');
     if (!redeemed.ok) return redeemed;
     const json = { access_token: redeemed.value.accessToken, expires_in: redeemed.value.expiresIn, refresh_token: redeemed.value.refreshToken };
     const validated = accessToken(json.access_token ?? '');
@@ -636,7 +669,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     persist: (token: AccessToken, region: string) => Promise<Result<void, AuthError>>,
     rung: string
   ): Promise<Result<AccessToken, AuthError>> => {
-    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`);
+    const tier = resource === IC3_RESOURCE ? 'ic3' : 'chatsvcagg';
+    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`, tier);
     if (!redeemed.ok) return err({ type: 'auth_failed', message: `${rung}: ${redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled'}` });
     const json = { access_token: redeemed.value.accessToken, refresh_token: redeemed.value.refreshToken };
     const raw = json.access_token ?? '';
@@ -794,7 +828,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const savedMeanwhile = freshGuestToken(current, tenant);
     if (savedMeanwhile !== undefined && savedMeanwhile !== dead) return ok(accessTokenUnsafe(savedMeanwhile));
     if (!current?.refresh_token) return noGuestCredentials(tenant);
-    const redeemed = await redeemRefreshToken(current.refresh_token, tenant, SCOPES);
+    const redeemed = await redeemRefreshToken(current.refresh_token, tenant, SCOPES, 'guest');
     if (!redeemed.ok) return guestRefusal(tenant, redeemed.error);
     const validated = accessToken(redeemed.value.accessToken);
     if (!validated.ok) return err({ type: 'auth_failed', message: `tenant ${tenant} returned an unusable guest token` });
