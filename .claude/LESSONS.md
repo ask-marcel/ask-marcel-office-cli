@@ -843,3 +843,8 @@ Rule for next time: change `\` to `/` in a path that Bun reports before a prefix
 
 The process runner tests failed at random on Windows. With Bun as the parent, the synchronous `spawn` call (`Bun.spawn` and `node:child_process` of Bun) blocked for about 5 s or 10 s, some times in the first 45 s of the parent, with each child (`bun.exe`, `sh.exe`, `cmd.exe`, `node.exe`). With Node 26 as the parent, 1219 starts had no slow call. The cause in Bun is not identified. The tests also started `sh`, `yes`, `cat`, `sleep` and `true`, which PowerShell does not have on PATH, so the result changed with the shell.
 Rule for next time: a test that starts a real process uses `process.execPath -e <script>` as the child and a timeout of 30 s, and applies a bound on the elapsed time only off Windows. When a process test is unstable, measure the `spawn` call alone, with Node as a second parent, before you change the adapter.
+
+## [decision] 2026-11-15 | a hint for a token helper failure matches the helper message, not the error code alone
+
+After the split, the read and write bins named only the helper command to run by hand when the token helper gave no token, and 2.8.0 named `login`. `d21ef06` gives the `login` instruction back with two hint rules, for `not_authenticated` and `secondary_token_unavailable`. The auth bin gives the same two codes with a message that already names `login`, so a rule on the code alone adds the remedy a second time.
+Rule for next time: match a hint on the error message and the code. Add a hint only when the message does not already name the remedy.
