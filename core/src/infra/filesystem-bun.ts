@@ -24,11 +24,13 @@ export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExist
     }
   },
   readBytes: async (path) => {
-    const file = Bun.file(path);
-    // `exists()` is false for directories too — a directory path reports
-    // not_found rather than reaching `bytes()` (matches "not a readable file").
-    if (!(await file.exists())) return err({ type: 'not_found' });
+    // The lookup is inside the try: `exists()` throws on a path the runtime
+    // refuses (a NUL byte), which is an io_failed like any other.
     try {
+      const file = Bun.file(path);
+      // `exists()` is false for directories too — a directory path reports
+      // not_found rather than reaching `bytes()` (matches "not a readable file").
+      if (!(await file.exists())) return err({ type: 'not_found' });
       return ok(await file.bytes());
     } catch (e) {
       return err({ type: 'io_failed', message: formatError(e) });

@@ -23,3 +23,17 @@ describe('Bun filesystem adapter: a delete that fails for a reason other than "m
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 });
+
+describe('Bun filesystem adapter: a path the runtime refuses, a NUL byte from a damaged file', () => {
+  it('returns io_failed, and does not throw, when the folder to delete has such a name', async () => {
+    const result = await createBunFileSystem().deleteDirIfExists(join(tmp, 'browser\0profile'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+
+  it('returns io_failed, and does not throw, when the file to read bytes from has such a name', async () => {
+    const result = await createBunFileSystem().readBytes(join(tmp, 'report\0.docx'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+});
