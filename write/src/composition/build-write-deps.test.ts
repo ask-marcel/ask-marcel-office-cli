@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { join } from 'node:path';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { FetchMock } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
 import { installFetchMock } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
@@ -12,6 +13,9 @@ import { buildWriteDeps } from './build-write-deps.ts';
 // no process runner, no token cache and no locator: only the auth bin writes them.
 
 const HOME = '/virtual/home';
+// Built with join, as production builds them: the separator is a backslash on Windows.
+const CACHE = join(HOME, '.ask-marcel', 'token-cache.json');
+const LOCATOR = join(HOME, '.ask-marcel', 'token-helper.json');
 const HELPER = '/opt/ask-marcel/auth/dist/token.js';
 const NODE = '/usr/local/bin/node';
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
@@ -56,13 +60,13 @@ describe('the deps of the write package', () => {
     const headers = fetches.calls[0]?.init?.headers as Record<string, string> | undefined;
     expect(headers?.['Authorization']).toBe(`Bearer ${TOKEN}`);
     expect(runner.calls.map((call) => [call.command, ...call.args, call.options.stdin])).toEqual([[HELPER, '--tier', 'basic', 'ignore']]);
-    expect([fs.has(`${HOME}/.ask-marcel/token-helper.json`), fs.has(`${HOME}/.ask-marcel/token-cache.json`)]).toEqual([false, false]);
+    expect([fs.has(LOCATOR), fs.has(CACHE)]).toEqual([false, false]);
   });
 
   it('signs a draft with the helper that the locator under the given home names, read through the given file system', async () => {
     fetches = graphAnswers();
     const fs = createFileSystemFake();
-    fs.seed(`${HOME}/.ask-marcel/token-helper.json`, JSON.stringify({ execPath: NODE, entry: HELPER, version: '1.0.0' }));
+    fs.seed(LOCATOR, JSON.stringify({ execPath: NODE, entry: HELPER, version: '1.0.0' }));
     fs.seed(HELPER, '');
     fs.seed(NODE, '');
     const runner = createProcessRunnerFake(() => ok({ exitCode: 0, stdout: `${JSON.stringify({ accessToken: TOKEN, expiresOn: inAnHour() })}\n` }));

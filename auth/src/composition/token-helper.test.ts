@@ -16,8 +16,9 @@ import type { BrowserLadderOptions, TokenHelperDeps } from './token-helper.ts';
 import { runTokenHelper } from './token-helper.ts';
 
 const HOME = '/virtual/home';
-const CACHE = '/virtual/home/.ask-marcel/token-cache.json';
-const LOCATOR = '/virtual/home/.ask-marcel/token-helper.json';
+// Built with join, as production builds them: the separator is a backslash on Windows.
+const CACHE = join(HOME, '.ask-marcel', 'token-cache.json');
+const LOCATOR = join(HOME, '.ask-marcel', 'token-helper.json');
 const LOCATION = { execPath: '/usr/local/bin/node', entry: '/opt/ask-marcel/dist/token.js', version: '2.8.0' };
 const ignore = (): void => undefined;
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;

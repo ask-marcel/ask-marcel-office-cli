@@ -65,7 +65,8 @@ describe('the composition root of the auth package', () => {
     const { calls, createAuth } = recording();
     const deps = buildAuthDeps({ home: HOME, env: {}, logLevel: 'error', fs: createFileSystemFake(), createAuth });
     deps.makeLoginAuth();
-    const home = ['/virtual/home/.ask-marcel/token-cache.json', '/virtual/home/.ask-marcel/browser-profile'];
+    // Built with join, as production builds them: the separator is a backslash on Windows.
+    const home = [join(HOME, '.ask-marcel', 'token-cache.json'), join(HOME, '.ask-marcel', 'browser-profile')];
     expect(calls.map((c) => [c.cachePath, c.browserProfileDir])).toEqual([home, home]);
   });
 

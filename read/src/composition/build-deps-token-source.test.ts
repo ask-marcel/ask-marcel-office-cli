@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { join } from 'node:path';
 import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
 import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
@@ -12,8 +13,9 @@ import { buildDeps } from './build-deps.ts';
 import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 
 const HOME = '/virtual/home';
-const CACHE = '/virtual/home/.ask-marcel/token-cache.json';
-const LOCATOR = '/virtual/home/.ask-marcel/token-helper.json';
+// Built with join, as production builds them: the separator is a backslash on Windows.
+const CACHE = join(HOME, '.ask-marcel', 'token-cache.json');
+const LOCATOR = join(HOME, '.ask-marcel', 'token-helper.json');
 const HELPER = '/opt/ask-marcel/dist/token.js';
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
 const segment = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url');

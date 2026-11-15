@@ -128,13 +128,16 @@ describe('processIsAlive', () => {
     expect(processIsAlive(process.pid)).toBe(true);
   });
 
+  // The child is this runtime, so the test needs no `true` on PATH. On Windows a
+  // spawn call of Bun 1.4 sometimes blocks for 5 to 10 seconds, hence the timeout.
   it('sees a process that has exited as gone', async () => {
-    const child = Bun.spawn(['true']);
+    const child = Bun.spawn([process.execPath, '-e', '']);
     await child.exited;
     expect(processIsAlive(child.pid)).toBe(false);
-  });
+  }, 30_000);
 
+  // Windows has no pid 1: there the System process (pid 4) is the one no user may signal.
   it('counts a process it may not signal (pid 1) as alive', () => {
-    expect(processIsAlive(1)).toBe(true);
+    expect(processIsAlive(process.platform === 'win32' ? 4 : 1)).toBe(true);
   });
 });
