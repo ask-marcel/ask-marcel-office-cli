@@ -52,6 +52,9 @@ password again.
 | `browser-profile/` | The browser profile of the sign-in. It keeps the "Stay signed in" cookie. `ASKMARCEL_BROWSER_PROFILE` sets another folder. |
 | `token-helper.json` | Where the token helper is: `{ "execPath", "entry", "version" }` (mode 0600, no secret). |
 
+The mode 0600 applies only off Windows. Windows keeps no POSIX file mode: there
+the access control list of your user profile folder protects these files.
+
 Each run of the auth bin and of the token helper writes `token-helper.json`
 when its content changes. The read and write packages read it to find the
 helper. `ask-marcel-office-auth logout` removes the token cache and the browser
