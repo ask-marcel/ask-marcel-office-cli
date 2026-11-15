@@ -4,6 +4,12 @@ Entries that the atelier compaction pass retired from `.claude/LESSONS.md`, verb
 
 ---
 
+## [gotcha] 2026-11-13 | on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too
+
+The CI runs the suites on Linux only, so about 50 tests failed on Windows and nobody saw it. Three causes were the path separator. `Bun.Glob.scan` gave `src\infra\x.ts`, so `path.startsWith('src/test-helpers/')` in the bin placeholder sweeps matched nothing. The coverage report gave the same paths, so `scripts/check-coverage.ts` found no tier for each file. Tests seeded `createFileSystemFake` with `/virtual/home/.ask-marcel/...`, but `resolveAuthPaths` builds the path with `join`, which gives backslashes on Windows, so the fake answered `not_found`. The other causes were POSIX file modes, signals and pid 1, which Windows does not have.
+Rule for next time: change `\` to `/` in a path that Bun reports before a prefix check, and prove it with a Windows row in the selftest. Build each expected or seeded path of a test with `join`, as production does. Skip on `win32` only the check that Windows cannot do (a file mode, a signal), not the full test: the infra tier needs 100 % coverage on Windows too.
+Archived 2026-11-15: tighten, rewritten to five sentences (6 sentences, and "CI runs on Linux only" is no longer true (`windows-helper` job, `e0c6937`), the rewrite says so), rewritten as "on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too".
+
 ## [gotcha] 2026-10-25 | a conventional commit scope cannot hold a comma, and the commit-msg hook refuses it only after the pre-commit gates pass
 
 The phase 7 design gave commit 8 the subject `docs(write,auth): …`. The pre-commit gates ran and passed, and then the commit-msg hook refused the subject, because a scope is one word with no comma. No commit was made, and the gates had to run again with `docs: …`. `--no-verify` also skips the commit-msg hook, so commit 27 ran `scripts/check-commit-messages.sh` by hand.
@@ -16,11 +22,29 @@ The npm page of `ask-marcel-office-cli` 2.8.0 links `docs/COMMANDS.md`, `docs/US
 Rule for next time: change only the banner of a frozen doc. To check a file that must not change, hash its bytes, and prove in a selftest that a changed byte which a decode hides is refused.
 Archived 2026-11-15: graduate, `scripts/check-frozen-docs.ts:82` (`arrayBuffer()`), `.github/workflows/ci.yml:120-123` (selftest, then the gate).
 
+## [gotcha] 2026-10-25 | a failed `import()` of `--package` crashed bun with exit 1, which is also the exit code of a stale doc
+
+`gen-docs.ts --check` gives exit 1 for a stale `COMMANDS.md` and exit 2 for a usage error. With a wrong `--package` path, the dynamic import threw and bun stopped with exit 1, so a typo looked like a stale doc. Commit 9 made the import of `scripts/command-packages.ts` return a `Result` error, and both scripts now give exit 2. The CI red fixture requires exit 1 exactly, after a control run of the same copy that must give exit 0, and it fails when the `sed` changed no count (`cmp -s`). The `gates` job builds nothing, so the fixture gives no `--manifest`: a missing manifest would make each run stale for the wrong reason.
+Rule for next time: give each failure of a gate its own exit code, and catch a crash of an import as a usage error. A red fixture requires the exact code of its fault, after a control run that passes.
+Archived 2026-11-15: tighten, rewritten to five sentences (6 sentences), rewritten as "a failed `import()` of `--package` crashed bun with exit 1, which is also the exit code of a stale doc".
+
+## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
+
+Each claim of `check-doc-numbers.ts` checks one anchored sentence. A new sentence such as "the 12 mail commands" matched no anchor, so it passed with no check. Also, a table row "The 204 read commands by name" did not match the anchor "the N … commands", and the rows were rewritten as "Each of the N … commands, by name". Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
+Rule for next time: write each count of a doc in digits, in an anchored form of its own package. Add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names: the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check. Write a count of another noun once, in a sentence that a claim checks.
+Archived 2026-11-15: tighten, rewritten to five sentences (7 sentences), rewritten as "a count gate of anchored claims does not see a new count sentence, so it needs a sweep".
+
 ## [decision] 2026-10-24 | SUPERSEDES the root parts of the 2026-10-18 folder entries: the root holds no package, and the folder decides the package of every file
 
 Package-split phase 6 moved the rest of `src/` to `read/src/` and deleted the root package. The root `package.json` has no source, build, bin or runtime dependency. `bun run test` at the root runs the tests of each folder. `coverage`, `mutate:changed` and `build` run in a folder only. The root lints its three config files and typechecks `scripts/`. `check-package-imports` gives each file the package of its folder (core, auth, read or write), and `SINGLE_PACKAGE_FILES` and the `single` owner are deleted. The ban reasons are next to their data in `eslint.ownership.js`, and each folder's `eslint.config.js` applies them. CI keeps the job ids `gates`, `mutation` and `smoke` (required checks): `gates` has no root test, and `mutation` and `smoke` run in `read/`. `check:docs` and `docs:gen` join `read/src/composition/single-package.ts` and `write/src/composition/write-package.ts` until the per-package docs of phase 7. Rejected: the literal F5 reading (shards and smokes in the `read` row of the workspace matrix), because it changes the required checks of branch protection.
 Rule for next time: run the gates of a change in the folder of each changed file. In the 2026-10-18 entries, "the root `src/`" and "the root package" now mean `read/src/` and the read package.
 Archived 2026-11-15: graduate, `CLAUDE.md:17` (root holds no package and no `src/`), `CONTRIBUTING.md:9-21` (the folder decides the package), `CONTRIBUTING.md:98-99` (run the gates in the folder), `.github/workflows/ci.yml:32-33` (job ids kept for branch protection).
+
+## [gotcha] 2026-10-24 | When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit
+
+`read/package.json` names `src/main.ts` and `src/index.ts` in `bin` and `exports`, and read's workspace job builds and packs them on every push. So the 11-line skeleton entries could not go before the move, and the root files could not stay after it. Commit 15 deleted the two skeleton entries and renamed the root files onto their paths. Plain `git diff -M` shows two deletions and two edits. `git diff -B -M` shows the root files renamed onto the skeleton paths at 100%. The skeleton `bin.ts` and its test had other paths, so they stayed until the commit that replaced the bin.
+Rule for next time: in a move onto a folder that has entry files at the same paths, delete those entries in the move commit, and prove the purity with `-B -M`. Keep each skeleton file that has no collision until a later commit.
+Archived 2026-11-15: tighten, rewritten to five sentences (6 sentences), rewritten as "When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit".
 
 ## [decision] 2026-10-18 | Under core/ and auth/ the folder decides the package of a file; the ownership lists apply to the root src/ only
 
@@ -64,6 +88,18 @@ The 2026-10-10 entry runs the gates as `nobody` on a copy. The proxy CA bundle o
 Rule for next time: before a run as `nobody` that installs or packs, copy the CA bundle to a folder that `nobody` can read. Point the three variables at the copy. A script that reads a result from a child must read stdout only, and give stderr to the person.
 Archived 2026-11-15: merge (M13, survivor M13), merged into "in a root container (a cloud session), seven chmod tests fail and Stryker cannot start: measure through a scratchpad config, or run as `nobody` on a copy".
 
+## [gotcha] 2026-10-18 | The token helper now records the version of auth (1.0.0), not the root's 2.8.0
+
+`src/token.ts` imports the version from `../package.json`. After the move to `auth/src/token.ts`, that file is `auth/package.json`, so the helper and the auth bin write `version: "1.0.0"` in `~/.ask-marcel/token-helper.json`. A locator that the root wrote before phase 4 says `2.8.0`. It names the `src/token.ts` or the `dist/token.js` of a checkout, which phase 4 removed, or the helper of an installed 2.8.0, which still runs and answers in the same protocol. No reader compares the version, and `token-helper-locator.ts` passes over a locator whose entry or runtime is gone. So the old file does no damage until an auth run replaces it.
+Rule for next time: in a locator, expect the version of the package that owns the helper. Expect an old locator to name a file that is gone, or the helper of the old package. Do not add a version check to the reader for this.
+Archived 2026-11-15: tighten, rewritten to five sentences (6 sentences), rewritten as "The token helper now records the version of auth (1.0.0), not the root's 2.8.0".
+
+## [decision] 2026-10-18 | A command names the graph it runs on, and each package gives its own CLI and MCP texts
+
+Package-split phase 5 made the core types generic. `Command<G>` runs on `G` (default `ReadGraph & WriteGraph`), and `CommandPackage`, `resolveCommand`, `withUnknownParamRejection` and the CLI and MCP shell deps take `G`. A one-kind package wraps its registry with `readCommandOf` or `writeCommandOf` (`command-graph.ts`), so write runs on `WriteGraph` alone and the root on `ReadGraph` alone. `CommandPackage` also holds `description` and `exampleCommand`. The CLI shell gives the description, then the registry facts. The MCP shell registers `run-command` only when the registry has a read command, and `run-write-command` only when it has a write command. Rejected: one text for every package, which made the write bin talk about read commands and `login`.
+Rule for next time: a deps type written as `Omit<CliShellDeps, …>` takes the default `G`. A caller that holds one graph must name it, for example `CliShellDeps<ReadGraph>`. A new package text goes in the package, never in the shell.
+Archived 2026-11-15: tighten, rewritten to five sentences (8 sentences), rewritten as "A command names the graph it runs on, and each package gives its own CLI and MCP texts".
+
 ## [gotcha] 2026-10-16 | `bun pm pack` changes `workspace:*` to the version number, also in devDependencies
 
 The plan keeps `@ask-marcel/office-core` out of `dependencies`, because core is never published and an install would get a 404. Core stays only in `devDependencies` as `workspace:*`. `bun pm pack` changes that `workspace:*` to the version of core in the packed `package.json`, also in `devDependencies`. An install does not get devDependencies, so the packed package still installs. But a check that searches the packed manifest for `workspace:` finds nothing. `scripts/check-packed-package.ts` checks that core is in no field except `devDependencies`.
@@ -82,6 +118,18 @@ Package-split phase 2 moved the lint rules that the root and every workspace fol
 Rule for next time: in the 2026-06-13 and 2026-10-03 entries, `eslint.config.js` means `eslint.base.js` for these options. A rule that every folder must obey goes in `eslint.base.js`; a rule for one folder goes in that folder's `eslint.config.js`. The 2026-10-03 rule stays: format with `bunx eslint --fix <files>`, never with bare prettier.
 Archived 2026-11-15: merge (M10, survivor M10 (a pointer entry for 61 and 117)), merged into "the lint options live in eslint.base.js: format with `bunx eslint --fix`, and change rule severity there, never inline".
 
+## [gotcha] 2026-10-15 | A mass text change in commits the size gate permits needs checks that accept both forms until the last commit
+
+Package-split step 14 put placeholders such as `{bin}` and `{auth-bin}` in about 436 command references. One commit for all of them is far above the limit of 10 files and 300 lines, so the change went in 23 batches. Between the batches, part of the source had the old literal `ask-marcel-office` and part had the placeholder. Two checks read that text: the phantom-command guard in `meta.test.ts` and `hasActionableAdvice` in `error-hints.ts`. If a check accepts only the new form, the first batches fail it. If it accepts only the old form, the later batches fail it. So both checks accepted the two forms for a short time, and the last commit (`8ef306c`) removed the old form and added a guard that refuses a literal command reference.
+Rule for next time: before you divide a mass text change into batches, find each check that reads that text. Let each check accept both forms in the first commit, and remove the old form in the last commit. Do not use `--no-verify` to land the change in one commit.
+Archived 2026-11-15: tighten, rewritten to five sentences (7 sentences), rewritten as "A mass text change in commits the size gate permits needs checks that accept both forms until the last commit".
+
+## [decision] 2026-10-15 | The auth MCP server has only the `login` and `status` tools, and no message offers `token`
+
+Step 14 made the unknown-command answers depend on the surface that asked. On MCP, a command of another package tells the caller to register that package's MCP server and to call the command there. Only `login` and `status` are tools of the auth server. `logout` sends the caller to a terminal (`{auth-bin} logout`). `token` is a machine helper for the read and write packages: did-you-mean never offers it, and the exact name says that it is the token helper of @ask-marcel/office-auth. The plan also says that no auth MCP tool returns a token. Rejected: one wording for all surfaces. That wording sent MCP callers to tools that do not exist and to command lines that they cannot run.
+Rule for next time: an MCP message names a server and a tool that exist on that server. Before you name an auth command in an MCP message, make sure that it is `login` or `status`.
+Archived 2026-11-15: tighten, rewritten to five sentences (8 sentences), rewritten as "The auth MCP server has only the `login` and `status` tools, and no message offers `token`".
+
 ## [gotcha] 2026-10-10 | The read-bundle check must match plain "PUT", "PATCH" and "DELETE" strings, not `method: 'PUT'`
 
 `scripts/check-read-bundle.ts` searches the built read bundle for the markers of write code. A pattern such as `method: 'PUT'` depends on the quotes and the layout that the bundler writes. It also misses a method name that the code gives as a plain argument, for example the network-error label in `wrapNetworkError(e, 'PUT', path, 'binary')`. Thus the check matches the quoted string alone (`"PUT"`, `"PATCH"`, `"DELETE"`, in any quote) and `createUploadSession`. The control bundle with `createWriteGraph` must show all four markers, or the check fails. A check that sees nothing must not pass.
@@ -93,6 +141,12 @@ Archived 2026-11-15: graduate, `scripts/check-read-bundle.ts:11-12, 27-28, 49-51
 As root, seven filesystem tests fail (see the 2026-10-04 entry). To run the full suite with no failure, run it as `nobody` on a copy of the tree. The user `nobody` cannot run the root-owned `bun` in `/root/.bun/bin`. Copy the `bun` binary to a directory that `nobody` can read, and make `bunx` a symlink to that copy, because `bunx` is `bun` under another name. Stryker starts Node child processes, so `/opt/node22/bin` must also be on the PATH of `nobody`.
 Rule for next time: before a run as `nobody`, put the `bun` copy, the `bunx` symlink and `/opt/node22/bin` on its PATH. Run the gates on a copy of the tree that `nobody` owns, not on the checkout.
 Archived 2026-11-15: merge (M13, survivor M13), merged into "in a root container (a cloud session), seven chmod tests fail and Stryker cannot start: measure through a scratchpad config, or run as `nobody` on a copy".
+
+## [decision] 2026-10-10 | Commands are typed against ReadGraph or WriteGraph; the registry gives each command its view at run time
+
+Package-split phase 1 step 12 split the Graph client. `ReadGraph` (`src/infra/read-graph.ts`) has every GET tier, the chat substrate and a POST that reaches only `/search/query` and `/me/calendar/getSchedule`. `WriteGraph` (`src/infra/write-graph.ts`) has the basic tier only, with `post`, `patch`, `put` and `delete`. A read command is a `ReadCommand` (`meta.effect: 'read'`, `execute(graph: ReadGraph)`). A write command is a `WriteCommand`. The single package still passes the full client, `GraphClient = ReadGraph & WriteGraph`. Thus the registry wraps each command at assembly (`withOwnGraph` in `src/use-cases/commands/command-graph.ts`): a read command gets `readGraphOf(graph)` and a write command gets `writeGraphOf(graph)`. These two views are pure functions in use-cases, so the dependency points inward. The POST check that both the read graph and the read view use is in `src/use-cases/commands/read-only-post.ts`. An ESLint rule and `scripts/check-read-bundle.ts` keep read code away from the write graph.
+Rule for next time: a new read command names `ReadCommandMeta` and `ReadCommand['execute']`. A new write command names the write types and joins the ignores of the ESLint rule. A new read-only POST path goes in `READ_ONLY_POST_PATHS` and nowhere else.
+Archived 2026-11-15: tighten, rewritten to five sentences (9 sentences, `read-only-post.ts` is now `core/src/domain/read-only-post.ts`), rewritten as "Commands are typed against ReadGraph or WriteGraph; the registry gives each command its view at run time".
 
 ## [decision] 2026-10-04 | Each CLI and MCP run writes the token helper locator file, so a smoke test must use a temporary HOME
 
@@ -154,6 +208,12 @@ Slice D probed `/drives/{d}/items/{i}/versions/{id}/content?format=html` on two 
 
 Rule for next time: a Graph conversion (`?format=`) on a path that selects a version or a snapshot must be proven to read that version, by comparing its output with the current item's; a 200 proves nothing.
 Archived 2026-11-15: tighten, rewritten to five sentences (6 body sentences, blank line before the tail), rewritten as "Graph never converts a historical version: `?format=html` answers the current page, and `?format=pdf` answers the version's raw bytes".
+
+## [decision] 2026-09-10 | Channel transcripts walk the delta route on lastModifiedDateTime; Teams HTML tags become markdown through parked slots
+
+The channel transcript (`convert-team-channel-messages-to-markdown --since`) does not page the plain message list until a date: it walks `/messages/delta?$filter=lastModifiedDateTime gt <since>&$expand=replies`, because that is the one filter Graph accepts on channel messages, a fresh reply bumps its root's `lastModifiedDateTime` (probed on seven threads, the lag was minutes at most), and the delta route inlines replies with `$expand`. Without `--since` the newest page is the transcript. Teams-specific HTML (`<at id>`, `<attachment id>`, `<emoji alt>`, `<img src=".../hostedContents/{id}/$value">`) is resolved BEFORE turndown into markdown parked in alphanumeric slots (`AMSLOT0X`) and restored after, because turndown escapes `[`, `]` and `_` in text and would break an injected link. Rejected: rendering one message at a time only (an agent wants the conversation), and passing nextLink URLs back into the transcript command (a date bound is what the question carries).
+Rule for next time: Teams glues `<attachment>` to the text before it (`Scheduled a meeting<attachment …>`), so an attachment placeholder needs a leading space and HTML whitespace collapsing absorbs the double; a meeting post's `from.user` has an id and no displayName, so name it `user <id>` rather than "unknown sender"; `messageType` is `message` for a post and `unknownFutureValue` (not `systemEventMessage`) for a membership event, with the kind in `eventDetail['@odata.type']`; the delta route returns root posts only. Live checks are the only way to see these shapes: none is in the Graph docs.
+Archived 2026-11-15: tighten, rewritten to five sentences (tail of 5 sentences), rewritten as "Channel transcripts walk the delta route on lastModifiedDateTime; Teams HTML tags become markdown through parked slots".
 
 ## [gotcha] 2026-09-04 | Improving a below-90 file can BREAK the mutation gate, because `mutate:changed` aggregates only the diff and a small commit makes one weak file the whole score
 
