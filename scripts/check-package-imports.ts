@@ -16,7 +16,10 @@
  *   - an auth module reaches only core and auth modules, and the package.json
  *     of its own package (phase 4: auth builds alone);
  *   - a read module reaches only core and read modules, and the package.json
- *     of its own package (phase 6: read builds alone).
+ *     of its own package (phase 6: read builds alone);
+ *   - a facade module (cli/, ADR 0005) reaches only core and facade modules,
+ *     and the package.json of its own package: the facade starts the bin of
+ *     an installed package and bundles none of them.
  *
  * Phases 3 to 6 moved core, auth, write and read into core/src/, auth/src/,
  * write/src/ and read/src/, and the root holds no source. The folder decides
@@ -57,10 +60,13 @@ import ts from 'typescript';
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
 // The workspace folders whose files the check reads; each package name reaches its folder's src/.
-const FOLDERS = ['core', 'auth', 'read', 'write'] as const;
+const FOLDERS = ['core', 'auth', 'read', 'write', 'cli'] as const;
 const WORKSPACE_PACKAGE = /^@ask-marcel\/office-(core|auth|read|write)\/(.+)$/;
 
 type Folder = (typeof FOLDERS)[number];
+
+// A path with `/` on every platform: the check compares repo-relative paths as text, and Windows gives `\`.
+const posix = (path: string): string => path.replaceAll('\\', '/');
 
 // The workspace folder that holds a fixture's module. A path that no folder holds is an error, so a
 // fixture never names a file that is gone.
@@ -71,7 +77,7 @@ const located = (path: string): string => {
 };
 // A relative specifier from `from` to the module `to`, both repo-relative.
 const specifierTo = (from: string, to: string): string => {
-  const path = relative(dirname(from), to);
+  const path = posix(relative(dirname(from), to));
   return path.startsWith('.') ? path : `./${path}`;
 };
 const CORE_FIXTURE = located(`${COMMANDS}/format-zod-error.ts`);
@@ -92,6 +98,9 @@ const LIST_DRIVES = located(`${COMMANDS}/list-drives.ts`);
 const LINK_EXTRACTOR = located(`${COMMANDS}/sharepoint-link-extractor.ts`);
 const REGISTRY = located(`${COMMANDS}/index.ts`);
 const READ_TEST_FIXTURE = 'read/src/composition/fixture-read.test.ts';
+// A facade module and a new facade test that the fixtures name (cli/, ADR 0005).
+const RUN_BIN = located('src/composition/run-bin.ts');
+const CLI_TEST_FIXTURE = 'cli/src/composition/fixture-cli.test.ts';
 // A new test file in no workspace folder.
 const OUTSIDE_TEST_FIXTURE = `${COMMANDS}/fixture-outside.test.ts`;
 
@@ -179,6 +188,13 @@ const FIXTURES: ReadonlyArray<Fixture> = [
     source: `import { slimDraftResult } from '${specifierTo(TOKEN_ARGS, DRAFT_RESPONSE)}';\nexport const f = slimDraftResult;\n`,
     reported: `${TOKEN_ARGS} reaches ${DRAFT_RESPONSE}`,
   },
+  {
+    // A read module, not an auth or a write one: only the facade rule reports it.
+    name: 'a facade module that imports a read module by the package name',
+    path: RUN_BIN,
+    source: "import type { Result } from '@ask-marcel/office-read/index.ts';\nexport type F = Result<1, 2>;\n",
+    reported: `${RUN_BIN} reaches read/src/index.ts`,
+  },
 ];
 
 // Each must be reported by the test-file rule. The last replaces a real test's
@@ -232,6 +248,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     source: `import { parseTokenArgs } from '${specifierTo(MAIL_DRAFT_TEST, TOKEN_ARGS)}';\nexport const f = parseTokenArgs;\n`,
     reported: `${MAIL_DRAFT_TEST} (write) imports ${TOKEN_ARGS} (auth)`,
   },
+  {
+    name: 'a test under cli/ that imports the read registry',
+    path: CLI_TEST_FIXTURE,
+    source: `import { commands } from '${specifierTo(CLI_TEST_FIXTURE, REGISTRY)}';\nexport const f = commands;\n`,
+    reported: `${CLI_TEST_FIXTURE} (cli) imports ${REGISTRY} (read)`,
+  },
 ];
 
 // Must be refused: the hoisted workspace would resolve it, and the check would not see its module.
@@ -242,7 +264,7 @@ const SPECIFIER_FIXTURE = {
 } as const;
 
 // The files under src/ of a workspace folder, repo-relative.
-const scan = (folder: Folder): ReadonlyArray<string> => [...new Bun.Glob('src/**/*.ts').scanSync(join(ROOT, folder))].map((path) => `${folder}/${path}`);
+const scan = (folder: Folder): ReadonlyArray<string> => [...new Bun.Glob('src/**/*.ts').scanSync(join(ROOT, folder))].map((path) => `${folder}/${posix(path)}`);
 
 // The modules of a package: every file under its folder's src/ but the tests.
 const modulesOf = (folder: Folder): ReadonlySet<string> => new Set(scan(folder).filter((path) => !path.endsWith('.test.ts')));
@@ -254,7 +276,7 @@ const readSources = async (tests: boolean): Promise<Sources> => {
   const sources = new Map<string, string>();
   for (const path of FOLDERS.flatMap((folder) => scan(folder))) {
     const test = path.endsWith('.test.ts');
-    if (test !== tests || (!test && /^(core|auth|read|write)\/src\/test-helpers\//.test(path))) continue;
+    if (test !== tests || (!test && /^(core|auth|read|write|cli)\/src\/test-helpers\//.test(path))) continue;
     sources.set(path, await Bun.file(join(ROOT, path)).text());
   }
   return sources;
@@ -268,8 +290,8 @@ const resolveSpecifier = (from: string, specifier: string): string | undefined =
   if (workspace !== null) return resolveSpecifier(`${workspace[1]}/src/index.ts`, `./${workspace[2]}`);
   if (specifier.startsWith('@ask-marcel/')) throw new Error(`${from}: the import '${specifier}' names a workspace package whose folder this check does not read`);
   if (!specifier.startsWith('.')) return undefined;
-  const path = relative(ROOT, resolve(ROOT, dirname(from), specifier));
-  const candidates = [path, `${path}.ts`, join(path, 'index.ts')];
+  const path = posix(relative(ROOT, resolve(ROOT, dirname(from), specifier)));
+  const candidates = [path, `${path}.ts`, `${path}/index.ts`];
   const found = candidates.find((candidate) => /\.[a-z]+$/.test(candidate) && existsSync(join(ROOT, candidate)));
   if (found === undefined) throw new Error(`${from}: the import '${specifier}' names no module`);
   return found;
@@ -324,7 +346,8 @@ const violations = (graph: Graph, owners: Owners): ReadonlyArray<string> => {
   const authReached = outsideAuth.flatMap((start) => crossing(graph, start, (path) => !owners.auth.has(path)));
   const authReach = [...owners.auth].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.auth.has(path) || path === packageJsonOf(start)));
   const readReach = [...owners.read].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.read.has(path) || path === packageJsonOf(start)));
-  return [...new Set([...writeReach, ...writeReached, ...coreReach, ...authReached, ...authReach, ...readReach])];
+  const cliReach = [...owners.cli].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.cli.has(path) || path === packageJsonOf(start)));
+  return [...new Set([...writeReach, ...writeReached, ...coreReach, ...authReached, ...authReach, ...readReach, ...cliReach])];
 };
 
 // A test runs with its own package and core only (core's with core only), so it imports no other package.
@@ -338,7 +361,7 @@ const testViolations = (tests: Graph): ReadonlyArray<string> =>
 
 // The test graph keeps only the imports of modules under a folder's src/ (not package.json, not a package).
 const buildTestGraph = (sources: Sources): Graph =>
-  new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => /^(core|auth|read|write)\/src\//.test(target))]));
+  new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => /^(core|auth|read|write|cli)\/src\//.test(target))]));
 
 type CommandModule = { readonly meta?: { readonly effect?: unknown }; readonly execute?: unknown };
 
@@ -361,7 +384,7 @@ const registryCommands = async (): Promise<{ readonly reads: ReadonlyArray<strin
 };
 
 const main = async (): Promise<number> => {
-  const owners: Owners = { core: modulesOf('core'), auth: modulesOf('auth'), read: modulesOf('read'), write: modulesOf('write') };
+  const owners: Owners = { core: modulesOf('core'), auth: modulesOf('auth'), read: modulesOf('read'), write: modulesOf('write'), cli: modulesOf('cli') };
   const tests = await readSources(true);
   if (process.argv.includes('--test-map')) {
     console.log(
@@ -386,13 +409,13 @@ const main = async (): Promise<number> => {
     ...(refuses(SPECIFIER_FIXTURE.path, SPECIFIER_FIXTURE.specifier) ? [] : [SPECIFIER_FIXTURE]),
   ];
   console.log(
-    `check-package-imports: ${owners.write.size} write modules, ${owners.core.size} core modules, ${owners.auth.size} auth modules, ${owners.read.size} read modules, ${reads.length} read commands, ${sources.size} modules and ${tests.size} test files read.`
+    `check-package-imports: ${owners.write.size} write modules, ${owners.core.size} core modules, ${owners.auth.size} auth modules, ${owners.read.size} read modules, ${owners.cli.size} facade modules, ${reads.length} read commands, ${sources.size} modules and ${tests.size} test files read.`
   );
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
   console.log(
-    'check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; read reaches only core and read; no test file imports a module of another package, and every test sits in the folder of its package; every fixture is reported.'
+    'check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; read reaches only core and read; the facade reaches only core and the facade; no test file imports a module of another package, and every test sits in the folder of its package; every fixture is reported.'
   );
   return 0;
 };
