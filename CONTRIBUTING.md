@@ -6,7 +6,7 @@ packages, read the README of each package:
 
 ## The workspace
 
-The repository is one Bun workspace with four folders. The root holds no
+The repository is one Bun workspace with five folders. The root holds no
 package and no `src/`. It keeps the shared configs, `scripts/` and the docs.
 
 | Folder | npm name | Published | What it holds |
@@ -15,12 +15,15 @@ package and no `src/`. It keeps the shared configs, `scripts/` and the docs.
 | `auth/` | `@ask-marcel/office-auth` | Yes | The sign-in, the token cache and the token helper |
 | `read/` | `@ask-marcel/office-read` | Yes | The read commands and the converters |
 | `write/` | `@ask-marcel/office-write` | Yes | The mail drafts and the PDF conversions |
+| `cli/` | `ask-marcel-office-cli` | Not yet (3.0.0) | The facade: it depends on the three packages and installs their three bins. It holds no command. |
 
 Each folder has its own `package.json`, configs, tests and gates, and the same
 layout: `src/{domain,use-cases,infra,presenter,composition}`. The folder of a
 file decides its package (`scripts/check-package-imports.ts`). The plan of the
 split is [docs/plans/2026-10-01-package-split.md](docs/plans/2026-10-01-package-split.md),
 and the decision is [ADR 0003](docs/adr/0003-split-into-auth-read-write-packages.md).
+The decision for the facade is
+[ADR 0005](docs/adr/0005-facade-package-ask-marcel-office-cli-3.md).
 
 Set up a checkout one time:
 
@@ -45,8 +48,8 @@ Run these commands in the folder that you change:
 | `bun run typecheck` | `tsc --noEmit` | all |
 | `bun run coverage` | 100% on every tier of `src/` | all |
 | `bun run mutate:changed` | Stryker on the changed domain and use-case files (90% or more for each file) | all |
-| `bun run build` | `dist/`: the bundles with core inlined, and the declarations | auth, read, write |
-| `bun run check:packed` | Packs the package, and installs the tarball in a clean consumer | auth, read, write |
+| `bun run build` | `dist/`: the bundles with core inlined, and the declarations (in `cli/`: the three bins, no declarations) | auth, read, write, cli |
+| `bun run check:packed` | Packs the package, and installs the tarball in a clean consumer. In `cli/` it installs the local bundle and runs each bin, after a build of the four folders. | auth, read, write, cli |
 | `bun run docs:gen` | Makes the generated tables of `COMMANDS.md` (and, in `build`, `dist/commands.json`) | auth, read, write |
 | `bun run check:docs` | Fails when `COMMANDS.md` is out of date. In read and write, it also fails when `dist/commands.json` is out of date. It also fails when a count in `README.md`, `USAGE.md` or `COMMANDS.md` does not match the registry, or when a count in `README.md` or `USAGE.md` has no claim. | auth, read, write |
 | `bun run smoke` | Runs `dist/` under node and bun | auth, read, write |
@@ -60,6 +63,24 @@ package borders.
 When you change the registry of a package, run `bun run docs:gen` in its
 folder and commit the new `COMMANDS.md`. Do not edit the generated tables by
 hand.
+
+## The local install of the facade
+
+`ask-marcel-office-cli` 3.0.0 and the three packages are not on npm. To install
+this code on your computer, build the four folders, then make the local bundle
+and install it:
+
+```sh
+for folder in auth read write cli; do (cd "$folder" && bun run build); done
+bun scripts/facade-bundle.ts ~/.ask-marcel-office-local --global
+ask-marcel-office-auth status
+```
+
+`scripts/facade-bundle.ts` writes one tarball that holds the facade and the
+three packed packages. With `--global` it runs `bun add -g` on that tarball,
+which replaces an installed `ask-marcel-office-cli`. Keep the tarball: Bun
+records its path. The last command makes the token helper point to the global
+auth bin. The install is a copy: build and install again after a change.
 
 ## How the code is built
 
@@ -105,10 +126,10 @@ Run them in the folder before you commit. CI runs them all.
 | Job | What it runs |
 |:--|:--|
 | `gates` | The scripts and their selftests, the commit messages, the size of each commit and no merge commit in the range, the secret scan of the full history, the root lint and typecheck, the package borders, the red fixture of the command reference and the dependency audit |
-| `workspace` | One job for each folder: `lint:strict`, typecheck, tests, coverage, the mutation of the changed files (not in `read/`), and for a published folder `build`, `check:docs` and `check:packed`. Auth and write also run their bundle smoke here. |
+| `workspace` | One job for each folder: `lint:strict`, typecheck, tests, coverage, the mutation of the changed files (not in `read/`), and for a published folder `build`, `check:docs` and `check:packed`. Auth and write also run their bundle smoke here. The `cli` job builds the four folders and runs the packed check of the facade. |
 | `mutation` | The mutation of the changed files of `read/`, in 8 shards |
 | `smoke` | The build of `read/`, its bundle smoke and its packed-install smoke |
-| `windows-helper` | The token helper round trip on Windows, then the tests of `core/`, `auth/`, `read/` and `write/`, then the build of `auth/`, `read/` and `write/` |
+| `windows-helper` | The token helper round trip on Windows, then the tests of `core/`, `auth/`, `read/`, `write/` and `cli/`, then the build of `auth/`, `read/`, `write/` and `cli/`, then the packed check of the facade |
 
 `gates` fails when the `workspace` matrix misses a folder
 (`scripts/check-ci-matrix.ts`).

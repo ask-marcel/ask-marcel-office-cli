@@ -34,11 +34,18 @@ server, its own library and its own docs.
 Start with the [read package README](read/README.md). It shows what an agent
 can do with your Microsoft 365 data.
 
+A fourth package, `ask-marcel-office-cli` 3.0.0, installs the three packages
+and their three bins in one step. It holds no command of its own
+([README](cli/README.md)). Install the packages one by one for a host that must
+never write.
+
 ## Install
 
-> The three packages are not on npm yet. npm installs `ask-marcel-office-cli`
-> 2.8.0 now. Its docs are [docs/USAGE.md](docs/USAGE.md) and
-> [docs/COMMANDS.md](docs/COMMANDS.md).
+> The three packages and `ask-marcel-office-cli` 3.0.0 are not on npm yet. npm
+> installs `ask-marcel-office-cli` 2.8.0 now. Its docs are
+> [docs/USAGE.md](docs/USAGE.md) and [docs/COMMANDS.md](docs/COMMANDS.md). To
+> install this code from a checkout, read
+> [CONTRIBUTING.md](CONTRIBUTING.md#the-local-install-of-the-facade).
 
 To read only, install auth and read, then sign in:
 
