@@ -104,6 +104,7 @@ const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['auth', 'src/composition/auth-program.ts'],
   ['read', 'src/use-cases/commands/list-drives.ts'],
   ['write', 'src/composition/write-program.ts'],
+  ['cli', 'src/composition/run-bin.ts'],
 ];
 
 // One real test file per workspace folder, relative to the folder.
@@ -112,6 +113,7 @@ const WORKSPACE_TESTS: ReadonlyArray<readonly [string, string]> = [
   ['auth', 'src/composition/auth-names.test.ts'],
   ['read', 'src/composition/build-deps.test.ts'],
   ['write', 'src/composition/cli-write.test.ts'],
+  ['cli', 'src/composition/run-bin.test.ts'],
 ];
 
 // The rule 13 and rule 15 bans of eslint.base.js, in each folder.
@@ -139,6 +141,7 @@ const USE_CASE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['auth', 'src/use-cases/commands/status.ts'],
   ['read', 'src/use-cases/commands/list-drives.ts'],
   ['write', 'src/use-cases/commands/draft-response.ts'],
+  ['cli', 'src/use-cases/start-package-bin.ts'],
 ];
 
 const tryBanFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArray<Fixture> => [
@@ -182,6 +185,7 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the auth MCP tools never write stdout', path: 'src/composition/auth-mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'write: the write bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'write' },
   { name: 'read: the read bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'read' },
+  { name: 'cli: a facade bin never writes stdout', path: 'src/bin.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'cli' },
   { name: 'the write CLI builder never writes stdout', path: 'src/composition/write-program.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'control: a write test may write stdout', path: 'src/composition/write-program.test.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
   { name: 'stdout is banned by default, not only in MCP files', path: 'src/composition/run-registry-command.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
