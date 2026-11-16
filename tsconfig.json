@@ -18,9 +18,9 @@
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun"]
   },
-  // Each workspace folder (core/, auth/, read/, write/) typechecks itself with
+  // Each workspace folder (core/, auth/, read/, write/, cli/) typechecks itself with
   // its own tsconfig.json (package split, D7). The root checks its scripts and
   // configs only; dist/, .stryker-tmp/ and reports/ are build and run output
   // that an old local run can leave at the root.
-  "exclude": ["node_modules", "auth", "core", "read", "write", "dist", ".stryker-tmp", "reports"]
+  "exclude": ["node_modules", "auth", "core", "read", "write", "cli", "dist", ".stryker-tmp", "reports"]
 }

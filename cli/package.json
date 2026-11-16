@@ -1,0 +1,55 @@
+{
+  "name": "ask-marcel-office-cli",
+  "version": "3.0.0",
+  "description": "All the ask-marcel-office commands in one install: the auth, read and write packages, with their three bins.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ask-marcel/ask-marcel-office-cli.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/ask-marcel/ask-marcel-office-cli/issues"
+  },
+  "homepage": "https://github.com/ask-marcel/ask-marcel-office-cli/tree/main/cli#readme",
+  "type": "module",
+  "bin": {
+    "ask-marcel-office-auth": "./dist/auth.js",
+    "ask-marcel-office-read": "./dist/read.js",
+    "ask-marcel-office-write": "./dist/write.js"
+  },
+  "files": [
+    "dist/",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "lint": "eslint --cache --max-warnings=0",
+    "lint:staged": "bash ../scripts/lint-staged.sh",
+    "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
+    "typecheck": "bun --bun x tsc --noEmit",
+    "test": "bun test --randomize",
+    "coverage": "bun run ../scripts/check-coverage.ts --preload ../scripts/coverage-preload-tiers.ts",
+    "mutate": "stryker run",
+    "mutate:changed": "bash ../scripts/mutate-changed.sh",
+    "mutate:staged": "bash ../scripts/mutate-staged.sh",
+    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/auth.js dist/read.js dist/write.js",
+    "check:packed": "bun ../scripts/check-packed-facade.ts"
+  },
+  "dependencies": {
+    "@ask-marcel/office-auth": "workspace:*",
+    "@ask-marcel/office-read": "workspace:*",
+    "@ask-marcel/office-write": "workspace:*"
+  },
+  "devDependencies": {
+    "@ask-marcel/office-core": "workspace:*"
+  }
+}

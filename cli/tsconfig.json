@@ -1,0 +1,5 @@
+{
+  // The root compiler options; this folder typechecks its own files only.
+  "extends": "../tsconfig.json",
+  "exclude": ["node_modules", "dist"]
+}
