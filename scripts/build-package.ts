@@ -23,14 +23,14 @@
 
 import { existsSync } from 'node:fs';
 import type { TargetManifest } from './package-targets.ts';
-import { ENTRIES, bundleTargets } from './package-targets.ts';
+import { bundleTargets, sourceOf } from './package-targets.ts';
 
 type Manifest = TargetManifest & { readonly dependencies?: Readonly<Record<string, string>> };
 
 const build = async (target: string, external: ReadonlyArray<string>): Promise<boolean> => {
-  const entry = ENTRIES[target];
+  const entry = sourceOf(target);
   if (entry === undefined) {
-    process.stderr.write(`build-package: package.json names ${target}, and no source entry is known for it (scripts/build-package.ts, ENTRIES)\n`);
+    process.stderr.write(`build-package: package.json names ${target}, and no source entry is known for it (scripts/package-targets.ts, ENTRIES and BIN_ENTRIES)\n`);
     return false;
   }
   const result = await Bun.build({ entrypoints: [entry], outdir: 'dist', naming: target.slice('dist/'.length), target: 'node', format: 'esm', external: [...external] });
