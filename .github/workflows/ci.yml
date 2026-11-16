@@ -60,6 +60,7 @@ jobs:
           bash scripts/staged-folders.sh --selftest
           bun scripts/coverage-preload-tiers-selftest.ts
           bun scripts/check-packed-package.ts --selftest
+          bun scripts/check-packed-facade.ts --selftest
           bun scripts/check-ci-matrix.ts --selftest
       - name: the workspace matrix covers every workspace folder (no folder goes ungated or unmutated)
         run: bun scripts/check-ci-matrix.ts
@@ -239,6 +240,11 @@ jobs:
             published: true
           - folder: write
             published: true
+          # The facade (ADR 0005) has no command registry and no library, so the
+          # `published` steps do not fit it: it has its own build and packed
+          # check below.
+          - folder: cli
+            published: false
     defaults:
       run:
         working-directory: ${{ matrix.folder }}
@@ -290,6 +296,15 @@ jobs:
         if: matrix.folder == 'auth' || matrix.folder == 'write'
         timeout-minutes: 10
         run: bun run smoke
+      - name: build the three packages and the facade (a facade bin starts the bin of an installed package, so its check needs the four builds)
+        if: matrix.folder == 'cli'
+        timeout-minutes: 10
+        run: |
+          for folder in auth read write cli; do (cd "../$folder" && bun run build); done
+      - name: packed facade (the tarball and its manifest, then a clean consumer that installs the local bundle and runs each bin; a removed package must fail)
+        if: matrix.folder == 'cli'
+        timeout-minutes: 10
+        run: bun run check:packed
   windows-helper:
     # The token helper round trip on Windows, where spawning through an npm .cmd
     # shim fails without a shell: a fixture cache, then `token --tier basic`
@@ -331,6 +346,10 @@ jobs:
         timeout-minutes: 10
         working-directory: write
         run: bun test --randomize
+      - name: tests of cli on Windows (random order, rule 36)
+        timeout-minutes: 10
+        working-directory: cli
+        run: bun test --randomize
       - name: build auth (bundle, then the declarations)
         timeout-minutes: 10
         working-directory: auth
@@ -343,3 +362,11 @@ jobs:
         timeout-minutes: 10
         working-directory: write
         run: bun run build
+      - name: build cli (the three bins of the facade)
+        timeout-minutes: 10
+        working-directory: cli
+        run: bun run build
+      - name: packed facade on Windows (the local bundle installs in a clean consumer, and each bin starts)
+        timeout-minutes: 10
+        working-directory: cli
+        run: bun run check:packed
