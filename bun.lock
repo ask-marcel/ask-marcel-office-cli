@@ -35,6 +35,23 @@
         "@ask-marcel/office-core": "workspace:*",
       },
     },
+    "cli": {
+      "name": "ask-marcel-office-cli",
+      "version": "3.0.0",
+      "bin": {
+        "ask-marcel-office-auth": "./dist/auth.js",
+        "ask-marcel-office-read": "./dist/read.js",
+        "ask-marcel-office-write": "./dist/write.js",
+      },
+      "dependencies": {
+        "@ask-marcel/office-auth": "workspace:*",
+        "@ask-marcel/office-read": "workspace:*",
+        "@ask-marcel/office-write": "workspace:*",
+      },
+      "devDependencies": {
+        "@ask-marcel/office-core": "workspace:*",
+      },
+    },
     "core": {
       "name": "@ask-marcel/office-core",
       "version": "1.0.0",
@@ -332,6 +349,8 @@
     "ansi-styles": ["ansi-styles@4.3.0", "", { "dependencies": { "color-convert": "^2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
 
     "argparse": ["argparse@1.0.10", "", { "dependencies": { "sprintf-js": "~1.0.2" } }, "sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg=="],
+
+    "ask-marcel-office-cli": ["ask-marcel-office-cli@workspace:cli"],
 
     "async": ["async@3.2.6", "", {}, "sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA=="],
 

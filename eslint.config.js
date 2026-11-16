@@ -11,6 +11,6 @@ import { baseConfig } from './eslint.base.js';
 export default [
   ...baseConfig(import.meta.dirname),
   {
-    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**', 'auth/**', 'core/**', 'read/**', 'write/**'],
+    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**', 'auth/**', 'core/**', 'read/**', 'write/**', 'cli/**'],
   },
 ];
