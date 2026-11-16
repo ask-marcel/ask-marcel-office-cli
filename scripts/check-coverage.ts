@@ -57,7 +57,8 @@ const TEST_PRELOADS: ReadonlyArray<string> = ['../scripts/no-network-preload.ts'
 
 const SKIPPED: ReadonlyArray<SkipRule> = [
   { name: 'test-helpers', match: (p) => p.startsWith('src/test-helpers/') },
-  { name: 'entry point', match: (p) => p === 'src/main.ts' || p === 'src/token.ts' },
+  // src/bin.ts and the three bins that call it are the entries of the facade (cli/, ADR 0005).
+  { name: 'entry point', match: (p) => ['src/main.ts', 'src/token.ts', 'src/bin.ts', 'src/auth.ts', 'src/read.ts', 'src/write.ts'].includes(p) },
   // production-wiring: a one-line dynamic-import boundary to the `playwright`
   // runtime dep. Cannot be unit-tested without launching a real browser.
   // Documented at the top of the file itself.

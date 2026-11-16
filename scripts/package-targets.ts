@@ -8,6 +8,9 @@
  *     src/token.ts, so only auth ships dist/token.js, the token helper that the
  *     locator names. It is not a bin (it would put a command on PATH that no
  *     person runs) and not an export (an import would run the helper).
+ *
+ * The facade (cli/, ADR 0005) has three bins and no library: dist/auth.js,
+ * dist/read.js and dist/write.js, each from the source of the same name.
  */
 
 export type TargetManifest = {
@@ -19,6 +22,9 @@ export const ENTRIES: Readonly<Record<string, string>> = {
   'dist/cli.js': 'src/main.ts',
   'dist/index.js': 'src/index.ts',
   'dist/token.js': 'src/token.ts',
+  'dist/auth.js': 'src/auth.ts',
+  'dist/read.js': 'src/read.ts',
+  'dist/write.js': 'src/write.ts',
 };
 
 const withoutDot = (path: string): string => (path.startsWith('./') ? path.slice(2) : path);
