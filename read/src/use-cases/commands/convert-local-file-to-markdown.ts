@@ -127,7 +127,7 @@ const meta: ReadCommandMeta = {
       key: 'includeImages',
       required: false,
       description:
-        'Pass `--include-images true` (a `.zip` only) to also extract each archive entry’s embedded images (docx/xlsx/pptx OOXML media parts, pdf page images) — every entry gains an `images: [{ path, contentType, sizeBytes, base64 }]` array (the same shape `extract-*-images` returns). Best-effort: an entry that carries no extractable images has no `images` key. Default `false`. Lets a caller OCR a secret pasted as a screenshot inside a zipped document.',
+        'Pass `--include-images true` (a `.zip` only) to also extract each archive entry’s embedded images (docx/xlsx/pptx OOXML media parts, pdf page images) — every entry gains an `images: [{ path, contentType, sizeBytes, base64 }]` array (the same shape `extract-*-images` returns). Best-effort: an entry that carries no extractable images has no `images` key. Pair with the global `--output-dir` to write the images to disk (each image then carries `savedTo` instead of `base64`); more than 1 MB of inline images is refused with `inline_too_large`. Default `false`. Lets a caller OCR a secret pasted as a screenshot inside a zipped document.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     {
@@ -141,7 +141,7 @@ const meta: ReadCommandMeta = {
   ],
   example: '{read-bin} convert-local-file-to-markdown --path ./report.docx',
   responseShape:
-    '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
+    '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk; for a `.zip` the file holds every entry under a `# File: <entry path>` heading, and `files[]` loses its `text`.',
   producesBytes: true,
   effect: 'read',
 };
