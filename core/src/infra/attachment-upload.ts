@@ -1,5 +1,6 @@
 import type { AttachmentFile, AttachmentTarget, UploadedAttachment } from '../domain/attachment-upload.ts';
 import { ATTACHMENT_MAX_BYTES, SMALL_ATTACHMENT_BYTES } from '../domain/attachment-upload.ts';
+import { unlessSendsMail } from '../domain/mail-send-guard.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
@@ -123,17 +124,22 @@ const tooLarge = (file: AttachmentFile, maxBytes: number, label: string): Result
     message: `${file.name} is ${file.bytes.byteLength} bytes, above the limit of ${maxBytes} bytes for ${label}.`,
   });
 
+const uploadTo = async (core: GraphRequestCore, protocol: Protocol, target: AttachmentTarget, file: AttachmentFile): Promise<Result<UploadedAttachment, GraphError>> => {
+  if (file.bytes.byteLength > ATTACHMENT_MAX_BYTES[target.kind]) return tooLarge(file, ATTACHMENT_MAX_BYTES[target.kind], protocol.label);
+  if (file.bytes.byteLength < SMALL_ATTACHMENT_BYTES) return postSmall(core, protocol, file);
+  const session = await openSession(core, protocol, file);
+  if (!session.ok) return session.error.code === BELOW_SESSION_MINIMUM ? postSmall(core, protocol, file) : session;
+  const id = await sendRanges(protocol, session.value, file.bytes);
+  return id.ok ? ok(uploaded(file, id.value)) : id;
+};
+
 /** Attaches a file: in one POST under 3 MB, through an upload session from 3 MB, up to the limit of the target. */
 const createAttachmentUpload =
   (core: GraphRequestCore, fetchFn: FetchFn): AttachmentUpload =>
   async (target, file) => {
     const protocol = protocolOf(target, core, fetchFn);
-    if (file.bytes.byteLength > ATTACHMENT_MAX_BYTES[target.kind]) return tooLarge(file, ATTACHMENT_MAX_BYTES[target.kind], protocol.label);
-    if (file.bytes.byteLength < SMALL_ATTACHMENT_BYTES) return postSmall(core, protocol, file);
-    const session = await openSession(core, protocol, file);
-    if (!session.ok) return session.error.code === BELOW_SESSION_MINIMUM ? postSmall(core, protocol, file) : session;
-    const id = await sendRanges(protocol, session.value, file.bytes);
-    return id.ok ? ok(uploaded(file, id.value)) : id;
+    // An id that resolves the attachments path to a send is refused, as on every write.
+    return unlessSendsMail('POST', protocol.collection, () => uploadTo(core, protocol, target, file));
   };
 
 export { createAttachmentUpload };

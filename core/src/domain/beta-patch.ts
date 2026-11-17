@@ -10,8 +10,10 @@ import { err } from './result.ts';
  * graph both send a beta PATCH through `patchOnAllowedRoot`.
  */
 
+// A Planner id is base64url (letters, digits, `-`, `_`), so `..` or an escape
+// cannot stand for one and move the PATCH to another beta path.
 const BETA_PATCH_PATHS: ReadonlyArray<{ readonly template: string; readonly pattern: RegExp }> = [
-  { template: '/planner/tasks/{task-id}/details', pattern: /^\/planner\/tasks\/[^/?#]+\/details$/ },
+  { template: '/planner/tasks/{task-id}/details', pattern: /^\/planner\/tasks\/[\w-]+\/details$/ },
 ];
 
 const mayUseBeta = (path: string): boolean => BETA_PATCH_PATHS.some((entry) => entry.pattern.test(path));
