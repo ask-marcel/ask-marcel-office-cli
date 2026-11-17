@@ -1,6 +1,6 @@
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
-import type { WriteGraph } from '../use-cases/ports/graph.ts';
+import type { WriteGraph, WriteOptions } from '../use-cases/ports/graph.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
@@ -102,10 +102,13 @@ const chunkedPut = async (core: GraphRequestCore, fetchFn: FetchFn, basePath: st
   return putChunks(fetchFn, uploadUrl, body);
 };
 
-const deleteWith = async (core: GraphRequestCore, path: string): Promise<Result<unknown, GraphError>> => {
+// The `If-Match` header of a change that names the ETag it read; none otherwise.
+const ifMatchHeader = (options: WriteOptions = {}): Readonly<Record<string, string>> => (options.ifMatch === undefined ? {} : { 'If-Match': options.ifMatch });
+
+const deleteWith = async (core: GraphRequestCore, path: string, options?: WriteOptions): Promise<Result<unknown, GraphError>> => {
   const url = `${GRAPH_ROOT}${path}`;
   try {
-    const sent = await core.send('basic', url, { method: 'DELETE', timeoutMs: REQUEST_TIMEOUT_MS });
+    const sent = await core.send('basic', url, { method: 'DELETE', headers: ifMatchHeader(options), timeoutMs: REQUEST_TIMEOUT_MS });
     if (!sent.ok) return sent;
     if (!sent.value.ok) return err(await apiErrorFrom(sent.value, url));
     return ok(undefined);
@@ -121,10 +124,10 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
     getBinary: (path) => core.getBinary('basic', path),
     fetchUrl: core.fetchUrl,
     post: (path, body) => core.json('basic', 'POST', path, { body, readBody: readWriteAnswer }),
-    patch: (path, body) => core.json('basic', 'PATCH', path, { body, readBody: readWriteAnswer }),
+    patch: (path, body, options) => core.json('basic', 'PATCH', path, { body, readBody: readWriteAnswer, extraHeaders: ifMatchHeader(options) }),
     put: (basePath, body, contentType) =>
       body.byteLength <= SIMPLE_PUT_THRESHOLD ? simplePut(core, `${basePath}:/content`, body, contentType) : chunkedPut(core, fetchFn, basePath, body),
-    delete: (path) => deleteWith(core, path),
+    delete: (path, options) => deleteWith(core, path, options),
   };
 };
 
