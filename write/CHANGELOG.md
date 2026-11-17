@@ -6,6 +6,26 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: dry-run, run id and undo of the draft commands
+
+- The four draft commands take `--dry-run` (MCP: `dryRun: true` on
+  `run-write-command`). A dry-run does the reads that the command needs and no
+  write, and shows each change: its `action`, its `target` and the ids `before`
+  it.
+- A run that is not a dry-run adds `runId` and `changes` (the ids before and
+  after each change) to the output. The run journal keeps the run 30 days in
+  `~/.ask-marcel/runs/`, one file for each run. Each write removes the older
+  runs.
+- `undo <runId>` shows the undo of a run, and `undo <runId> --apply` does it.
+  The undo of a new draft moves it to Deleted Items. The undo of
+  `update-mail-draft` writes back the fields as they were. The undo passes over
+  a message that is no longer a draft or whose `changeKey` changed after the
+  run, and reports it. A run that is fully undone cannot be undone again.
+- The MCP server gets the tools `undo` (read-only) and `undo-apply` (marked
+  destructive).
+- The PDF conversions have no dry-run and no undo: they leave nothing in the
+  tenant.
+
 ### Changed since ask-marcel-office-cli 2.8.0
 
 If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
