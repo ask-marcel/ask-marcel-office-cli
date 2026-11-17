@@ -17,6 +17,15 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
     action:
       'upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)',
   },
+  'mail-state': {
+    destructive: false,
+    action: 'change the state of a mail message: mark it read or unread, flag it, set its categories, or move it to another folder (nothing is sent)',
+  },
+  'task-write': {
+    destructive: false,
+    action:
+      'create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove)',
+  },
 };
 
 /** The registry's write commands, one group per effect (in the order the registry first names it), names sorted. */

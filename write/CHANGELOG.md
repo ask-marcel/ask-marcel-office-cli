@@ -53,6 +53,9 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
   `sendMail`, `reply`, `replyAll` or `forward` (in any case), and a `$batch`.
   The code is `send_refused`. `createReply`, `createReplyAll` and
   `createForward` make drafts, so they stay permitted.
+- Two write classes for the next commands, not used by a command yet:
+  `mail-state` (a state change of a mail message) and `task-write` (a write to
+  a To Do or Planner item). Neither is destructive.
 
 ### Added: the write commands, the bin, the MCP server and the library
 
