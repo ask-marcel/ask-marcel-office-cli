@@ -28,7 +28,7 @@ const answering = (response: Response): FetchFn => {
 
 const writeGraphAnswering = (response: Response): ReturnType<typeof createWriteGraph> => createWriteGraph(tokens, answering(response));
 
-const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
+const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment'];
 
 describe('the write graph', () => {
   it('answers a POST that Graph accepted with no body (202) as a success with no value', async () => {

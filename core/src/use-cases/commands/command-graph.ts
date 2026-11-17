@@ -55,6 +55,7 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
   patch: (path, body, options) => unlessSendsMail('PATCH', path, () => patchOnAllowedRoot(path, options?.api, () => graph.patch(path, body, options))),
   put: (basePath, body, contentType) => graph.put(basePath, body, contentType),
   delete: (path, options) => unlessSendsMail('DELETE', path, () => graph.delete(path, options)),
+  uploadAttachment: (target, file) => graph.uploadAttachment(target, file),
 });
 
 /** A read command that runs on the read view of any read graph it is given. */

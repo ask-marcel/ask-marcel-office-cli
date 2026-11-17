@@ -28,7 +28,7 @@ const READ_MEMBERS = [
   'teamsChatIc3',
   'teamsChatMedia',
 ];
-const WRITE_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
+const WRITE_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment'];
 
 describe('a command of a package that holds only reads', () => {
   it('runs on the read view of the graph it is given, with its params', async () => {

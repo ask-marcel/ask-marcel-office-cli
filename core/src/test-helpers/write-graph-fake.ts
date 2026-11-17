@@ -16,5 +16,6 @@ export const fakeWriteGraph = (overrides: Partial<WriteGraph> = {}): WriteGraph 
   patch: async () => ok({}),
   put: async () => ok({}),
   delete: async () => ok({}),
+  uploadAttachment: async (_target, file) => ok({ name: file.name, size: file.bytes.byteLength }),
   ...overrides,
 });
