@@ -32,7 +32,7 @@ const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 
 
 describe('the write graph', () => {
   it('answers a POST that Graph accepted with no body (202) as a success with no value', async () => {
-    expect(await writeGraphAnswering(new Response(null, { status: 202 })).post('/me/messages/m1/send', {})).toEqual(ok(undefined));
+    expect(await writeGraphAnswering(new Response(null, { status: 202 })).post('/me/messages/m1/move', {})).toEqual(ok(undefined));
   });
 
   it('answers a PATCH that Graph applied with no content (204) as a success with no value', async () => {
