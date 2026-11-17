@@ -115,8 +115,9 @@ run-write-command { command, params?, outputPath?, outputDir? }  → runs a writ
 ```
 
 `run-write-command` runs the 7 write commands. It has `readOnlyHint: false`.
-`params` are the flags without the `--` prefix, in camelCase, and each value is
-a string. A read command gets a pointer to the read server
+`params` are the flags as `get-command-docs` shows them. A key is the flag
+name, with or without the `--` prefix (`body-content`), or its camelCase form
+(`bodyContent`). A value is a string, a number or a boolean. A read command gets a pointer to the read server
 (`ask-marcel-office-read mcp`). Register this server only on hosts that may
 write drafts.
 

@@ -34,6 +34,27 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
   `createEnvThenHelperTokenSource`, `createReadClient` and four types. It has
   no `buildDeps`, `createGraphClient` or ports of 2.8.0.
 
+### Fixed: zip images and the MCP parameter keys (QA of 2026-11-16)
+
+- `convert-local-file-to-markdown --include-images true` on a `.zip` printed
+  all the images of the entries as base64 on stdout. More than 1 MB of inline
+  images is now refused with `inline_too_large`, and the message names
+  `--output-dir`.
+- `--output-dir` on that result writes each image as
+  `<dir>/<entry path>_<image path>` and puts `savedTo` in the place of
+  `base64`. Before, it failed with `no_media`.
+- `--output-path` on the result of a zip conversion writes one markdown file,
+  with a `# File: <entry path>` heading for each entry. Before, it failed with
+  `no_inlined_bytes`. `--output-dir` and `--output-path` work in one call.
+- `--output-dir` replaces `\` in an image path, as it replaces `/`. A path from
+  a hostile document or zip cannot put a file outside the directory on Windows.
+- The MCP `params` take the flag name that the docs show (`message-id`, with or
+  without `--`) and the camelCase key (`messageId`). Before, only the camelCase
+  key ran, and the error named the key that it refused. One parameter in two
+  spellings fails with `duplicate_parameter`.
+- The MCP `params` take a number or a boolean as a value. Before, a number
+  failed with MCP error -32602.
+
 ### Added: the read commands, the bin, the MCP server and the library
 
 The read commands moved here from `ask-marcel-office-cli` 2.8.0 (phase 6 of the

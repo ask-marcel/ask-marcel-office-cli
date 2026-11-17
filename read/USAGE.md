@@ -204,6 +204,13 @@ savedTo: ./out/mail.md
 - A command that gives plain JSON (for example `get-current-user`) refuses the
   flag. Use `> out.json` for it.
 - `help-json` and `docs` also take `--output-path`.
+- A zip conversion gives one text for each entry of the archive.
+  `--output-path` writes them as one markdown file, with a
+  `# File: <entry path>` heading for each entry.
+- `convert-local-file-to-markdown --include-images true` on a `.zip` gives the
+  images of each entry. `--output-dir <dir>` writes them to disk, and you can
+  give `--output-path` in the same call. Without `--output-dir`, more than 1 MB
+  of images is refused (`inline_too_large`).
 - When a `*-as-pdf` command gives the source bytes (`passthrough: true`), the bin
   refuses a `.pdf` name. Use the extension of the source.
 
@@ -258,11 +265,13 @@ run-command { command, params?, outputPath?, outputDir? }  → runs a command
 ```
 
 `run-command` runs the 204 read commands. `params` are the flags of the
-command without the `--` prefix, in camelCase, and each value is a string:
+command, as `get-command-docs` shows them. A key is the flag name, with or
+without the `--` prefix (`message-id`), or its camelCase form (`messageId`). A
+value is a string, a number or a boolean:
 
 ```jsonc
 // CLI: ask-marcel-office-read list-mail-messages --top 10
-{ "command": "list-mail-messages", "params": { "top": "10" } }
+{ "command": "list-mail-messages", "params": { "top": 10 } }
 ```
 
 - `run-command` has `readOnlyHint: true`, so a client can approve it
