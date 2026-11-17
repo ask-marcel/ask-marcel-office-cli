@@ -30,6 +30,15 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
 - The library is new: `commands`, `createWriteGraph`,
   `createEnvThenHelperTokenSource`, `createWriteClient` and four types.
 
+### Fixed: the MCP parameter keys (QA of 2026-11-16)
+
+- The MCP `params` take the flag name that the docs show (`body-content`, with or
+  without `--`) and the camelCase key (`bodyContent`). Before, only the camelCase
+  key ran, and the error named the key that it refused. One parameter in two
+  spellings fails with `duplicate_parameter`.
+- The MCP `params` take a number or a boolean as a value. Before, a number
+  failed with MCP error -32602.
+
 ### Added: the write commands, the bin, the MCP server and the library
 
 The write commands moved here from `ask-marcel-office-cli` 2.8.0 (phase 5 of the
