@@ -17,7 +17,8 @@ import { chmod, mkdir, open, readFile, rename, rm, stat, unlink, writeFile } fro
 import { basename, dirname, join } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { Stats } from 'node:fs';
+import type { AtomicFileWrites, FileExistence, FileInfo, FileStat, FileSystem } from '../use-cases/ports/filesystem.ts';
 import { renameWithRetry } from './rename-with-retry.ts';
 
 const isNodeError = (e: unknown): e is NodeJS.ErrnoException => e instanceof Error && 'code' in e;
@@ -78,10 +79,28 @@ export const exists: FileExistence['exists'] = async (path) => {
   }
 };
 
-export const createNodeFileSystem = (): FileSystem & AtomicFileWrites & FileExistence => ({
+const kindOf = (entry: Stats): FileInfo['kind'] => {
+  if (entry.isFile()) return 'file';
+  return entry.isDirectory() ? 'folder' : 'other';
+};
+
+// A stat, never a read: the kind and the size of what is at the path. Like
+// `exists`, ENOTDIR means nothing is there. Exported for the Bun adapter.
+export const statPath: FileStat['stat'] = async (path) => {
+  try {
+    const entry = await stat(path);
+    return ok({ kind: kindOf(entry), size: entry.size });
+  } catch (e) {
+    if (isNodeError(e) && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) return err({ type: 'not_found' });
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+export const createNodeFileSystem = (): FileSystem & AtomicFileWrites & FileExistence & FileStat => ({
   writeTextAtomic,
   createExclusive,
   exists,
+  stat: statPath,
   readJson: async <T>(path: string) => {
     let raw: string;
     try {

@@ -37,6 +37,20 @@ export type FileExistence = {
   readonly exists: (path: string) => Promise<Result<boolean, FileSystemError>>;
 };
 
+/** What is at a path: its kind and its size in bytes. `other` is a device, a pipe or a socket. */
+export type FileInfo = { readonly kind: 'file' | 'folder' | 'other'; readonly size: number };
+
+/**
+ * What is at a path, from its folder entry alone (a stat): the file is never
+ * opened, so a write command refuses a folder or a file above its upload limit
+ * before it reads a byte. Kept apart from FileSystem because only the local
+ * file read of the write commands needs it.
+ */
+export type FileStat = {
+  /** not_found when nothing is there (or a file stands where a folder of the path should be); io_failed when the lookup fails. */
+  readonly stat: (path: string) => Promise<Result<FileInfo, FileSystemError>>;
+};
+
 /**
  * Writes that other processes race on: the token cache, replaced whole so a
  * reader never sees half a file, and its lock, created only when absent. Kept
