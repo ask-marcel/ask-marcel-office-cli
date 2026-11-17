@@ -91,6 +91,7 @@ describe('a write command that asks to send mail', () => {
     expect([patched.ok, deleted.ok]).toEqual([false, false]);
     if (patched.ok || deleted.ok) return;
     expect([patched.error.code, deleted.error.code]).toEqual(['send_refused', 'send_refused']);
+    expect([patched.error.message, deleted.error.message].map((message) => message.split(' ', 1)[0])).toEqual(['PATCH', 'DELETE']);
   });
 });
 
