@@ -6,6 +6,7 @@ import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
+import { cancelUnsigned, uploadChunks } from './upload-chunks.ts';
 
 // Graph beta: reached only by a PATCH on the beta allow-list (domain/beta-patch.ts).
 const GRAPH_BETA_ROOT = 'https://graph.microsoft.com/beta';
@@ -18,16 +19,6 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320
 const readWriteAnswer = async (res: Response): Promise<unknown> => {
   const text = await res.text();
   return text === '' ? undefined : JSON.parse(text);
-};
-
-// Best-effort session cancellation; ignore failure. DELETE keeps the
-// short-tier budget — it's a Graph-side cleanup that should return promptly.
-const cancelUploadSession = async (fetchFn: FetchFn, uploadUrl: string): Promise<void> => {
-  try {
-    await fetchFn(uploadUrl, { method: 'DELETE', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  } catch {
-    /* ignore */
-  }
 };
 
 const uploadUrlHost = (uploadUrl: string): string | undefined => {
@@ -55,34 +46,25 @@ const simplePut = async (core: GraphRequestCore, path: string, body: Uint8Array,
   }
 };
 
-// 2. PUT chunks to the pre-signed upload URL — no auth header.
-const putChunks = async (fetchFn: FetchFn, uploadUrl: string, body: Uint8Array): Promise<Result<unknown, GraphError>> => {
-  const total = body.byteLength;
-  for (let start = 0; start < total; start += CHUNK_SIZE) {
-    const end = Math.min(start + CHUNK_SIZE, total) - 1;
-    const chunk = body.slice(start, end + 1);
-    try {
-      const res = await fetchFn(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Range': `bytes ${start}-${end}/${total}` },
-        body: chunk as unknown as BodyInit,
-        signal: AbortSignal.timeout(timeoutMsFor('binary')),
-      });
-      if (!res.ok) {
-        await cancelUploadSession(fetchFn, uploadUrl);
-        return err({ type: 'api_error', status: res.status, message: `chunk PUT failed at byte ${start}` });
-      }
-      if (res.status === 200 || res.status === 201) {
-        return ok(await res.json());
-      }
-      // 202 Accepted — continue uploading.
-    } catch (e: unknown) {
-      await cancelUploadSession(fetchFn, uploadUrl);
-      return err(wrapNetworkError(e, 'PUT', `chunk @ byte ${start}`, 'binary'));
-    }
-  }
-  return err({ type: 'api_error', status: 500, message: 'chunked upload completed without final response' });
-};
+// 2. PUT chunks to the pre-signed upload URL, no auth header: 200 or 201
+// completes the file, 202 asks for the next range.
+const putChunks = (fetchFn: FetchFn, uploadUrl: string, body: Uint8Array): Promise<Result<unknown, GraphError>> =>
+  uploadChunks({
+    bytes: body,
+    chunkSize: CHUNK_SIZE,
+    sendChunk: async (contentRange, chunk) =>
+      ok(
+        await fetchFn(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Range': contentRange },
+          body: chunk as unknown as BodyInit,
+          signal: AbortSignal.timeout(timeoutMsFor('binary')),
+        })
+      ),
+    isComplete: (res) => res.status === 200 || res.status === 201,
+    readComplete: (res): Promise<unknown> => res.json(),
+    cancel: () => cancelUnsigned(fetchFn, uploadUrl),
+  });
 
 const chunkedPut = async (core: GraphRequestCore, fetchFn: FetchFn, basePath: string, body: Uint8Array): Promise<Result<unknown, GraphError>> => {
   // 1. Create upload session via the authenticated request helper.
