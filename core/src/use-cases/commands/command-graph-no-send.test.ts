@@ -10,7 +10,8 @@ import { writeGraphOf } from './command-graph.ts';
  * `sendMail`, `reply`, `replyAll`, `forward`, in any case, with or without a
  * query string, a trailing slash, the `microsoft.graph.` namespace or a
  * percent-encoded letter, and a JSON batch, which can carry a send in its
- * body. The actions that make a draft stay permitted.
+ * body. The actions that make a draft stay permitted, and so does a path whose
+ * last segment holds a malformed escape, which names no action.
  */
 
 // A write graph that records each request it is asked to send.
@@ -59,6 +60,7 @@ const DRAFT_PATHS = [
   '/me/messages/m1/attachments',
   '/me/messages/m1/attachments/createUploadSession',
   '/me/messages/send-later-draft',
+  '/me/messages/m1/attachments/%E0%A4%A',
   '/me/todo/lists/l1/tasks',
   '/planner/tasks',
 ];
