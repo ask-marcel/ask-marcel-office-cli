@@ -1,6 +1,7 @@
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import { patchOnAllowedRoot } from '../domain/beta-patch.ts';
+import { unlessSendsMail } from '../domain/mail-send-guard.ts';
 import type { WriteGraph, WriteOptions } from '../use-cases/ports/graph.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
@@ -108,14 +109,21 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
     get: (path, extraHeaders) => core.json('basic', 'GET', path, { extraHeaders }),
     getBinary: (path) => core.getBinary('basic', path),
     fetchUrl: core.fetchUrl,
-    post: (path, body) => core.json('basic', 'POST', path, { body, readBody: readWriteAnswer }),
+    post: (path, body) => unlessSendsMail('POST', path, () => core.json('basic', 'POST', path, { body, readBody: readWriteAnswer })),
     patch: (path, body, options) =>
-      patchOnAllowedRoot(path, options?.api, () =>
-        core.json('basic', 'PATCH', path, { body, readBody: readWriteAnswer, extraHeaders: ifMatchHeader(options), ...(options?.api === 'beta' ? { root: GRAPH_BETA_ROOT } : {}) })
+      unlessSendsMail('PATCH', path, () =>
+        patchOnAllowedRoot(path, options?.api, () =>
+          core.json('basic', 'PATCH', path, {
+            body,
+            readBody: readWriteAnswer,
+            extraHeaders: ifMatchHeader(options),
+            ...(options?.api === 'beta' ? { root: GRAPH_BETA_ROOT } : {}),
+          })
+        )
       ),
     put: (basePath, body, contentType) =>
       body.byteLength <= SIMPLE_PUT_THRESHOLD ? simplePut(core, `${basePath}:/content`, body, contentType) : chunkedPut(core, fetchFn, basePath, body),
-    delete: (path, options) => deleteWith(core, path, options),
+    delete: (path, options) => unlessSendsMail('DELETE', path, () => deleteWith(core, path, options)),
   };
 };
 
