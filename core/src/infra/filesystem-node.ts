@@ -45,8 +45,18 @@ export const writeTextAtomic: AtomicFileWrites['writeTextAtomic'] = async (path,
     await renameWithRetry(rename, temp, path);
     return ok(undefined);
   } catch (e) {
-    await rm(temp, { force: true });
+    await removeTemp(temp);
     return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+// The cleanup of a failed write never throws: under Bun on Linux, `rm` of a path
+// below a file throws EFAULT even with `force`, and the write error must stay the answer.
+const removeTemp = async (temp: string): Promise<void> => {
+  try {
+    await rm(temp, { force: true });
+  } catch {
+    // Nothing to clean: the temp file was never made.
   }
 };
 
