@@ -90,7 +90,7 @@ type PaginationStrategy =
   | 'preferMaxPageSize';
 
 /** What a command does to the tenant; see `CommandMeta.effect`. Extended as the writes grow. */
-type CommandEffect = 'read' | 'draft' | 'transient-upload';
+type CommandEffect = 'read' | 'draft' | 'transient-upload' | 'mail-state' | 'task-write';
 
 type CommandMeta = {
   readonly summary: string;
@@ -171,7 +171,9 @@ type CommandMeta = {
    * What the command does to the tenant. `read` changes nothing (a search POST
    * included). Every other value is a write class, worded in `command-effect.ts`:
    * `draft` creates or updates an UNSENT mail draft; `transient-upload` puts a
-   * temporary file in the user's OneDrive and tries to delete it. Required, so a new
+   * temporary file in the user's OneDrive and tries to delete it; `mail-state`
+   * changes the state of a mail message (read, flag, categories, folder);
+   * `task-write` creates or changes a To Do or Planner item. Required, so a new
    * command chooses its class instead of inheriting `read`. The MCP routing
    * (run-command takes only `read`), the MCP annotations, the top-level `--help`
    * narrative and the per-command docs derive from it, and the manifest /
