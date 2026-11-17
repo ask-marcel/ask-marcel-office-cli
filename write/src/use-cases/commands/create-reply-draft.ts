@@ -6,6 +6,8 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
+import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 const schema = z.object({
@@ -81,23 +83,29 @@ const createUnsentDraft = async (graph: WriteGraph, replyToMessageId: string, ac
   return ok(created.value);
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
+type CheckedReply = z.infer<typeof schema> & { readonly action: 'createReply' | 'createReplyAll' };
+
+// The checks before any write, which the dry-run makes too.
+const checkReply = (params: Record<string, string>): Result<CheckedReply, GraphError> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { replyToMessageId, comment, subject, replyAll, bodyContentType } = parsed.data;
-
-  // Reply-all stays the default: dropping recipients is a deliberate act, so it
-  // takes an explicit `false`. Anything else (absent, or `true`) replies to all.
-  const action = replyAll === 'false' ? 'createReply' : 'createReplyAll';
-  const asHtml = bodyContentType === 'HTML';
-
   // A reply that carries a boundary marker of its own would be kept verbatim by
   // the splice, and the NEXT `update-mail-draft --comment` edit would cut the
   // draft AT the pasted marker, silently dropping everything below it. Refuse
   // before creating anything, so there is no orphan draft to clean up.
-  if (asHtml && commentCarriesQuoteBoundary(comment)) {
+  if (parsed.data.bodyContentType === 'HTML' && commentCarriesQuoteBoundary(parsed.data.comment)) {
     return err({ type: 'validation_error', message: boundaryMarkerRefusal('--comment') });
   }
+  // Reply-all stays the default: dropping recipients is a deliberate act, so it
+  // takes an explicit `false`. Anything else (absent, or `true`) replies to all.
+  return ok({ ...parsed.data, action: parsed.data.replyAll === 'false' ? 'createReply' : 'createReplyAll' });
+};
+
+const execute: WriteCommand['execute'] = async (graph, params) => {
+  const checked = checkReply(params);
+  if (!checked.ok) return checked;
+  const { replyToMessageId, comment, subject, bodyContentType, action } = checked.value;
+  const asHtml = bodyContentType === 'HTML';
 
   // Graph mints the threaded draft (inherited recipients, RE: subject, quoted
   // history) in one call. On the Text path the reply travels via `comment`,
@@ -116,6 +124,16 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   if (!subject) return slimDraftResult(created);
   return slimDraftResult(await graph.patch(`/me/messages/${created.value.id}`, { subject }));
 };
+
+// What the reply is made from: the dry-run shows it, and a run records it.
+const target = (params: Record<string, string>): Result<DraftTarget, GraphError> => {
+  const checked = checkReply(params);
+  if (!checked.ok) return checked;
+  const { replyToMessageId, action } = checked.value;
+  return ok({ target: `/me/messages/${replyToMessageId}/${action}`, before: { messageId: replyToMessageId } });
+};
+
+const plan = createDraftPlan({ action: 'create-reply-draft', target, execute });
 
 const meta: WriteCommandMeta = {
   summary:
@@ -166,9 +184,10 @@ const meta: WriteCommandMeta = {
   bodyTemplate:
     "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
   effect: 'draft',
+  undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
 };
 
-export { execute, meta, schema };
+export { execute, meta, plan, schema };

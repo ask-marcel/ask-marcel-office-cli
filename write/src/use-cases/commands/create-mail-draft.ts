@@ -1,7 +1,11 @@
 import { z } from 'zod';
-import { err } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
+import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
@@ -34,9 +38,19 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   if (bccRecipients) body.bccRecipients = parseRecipients(bccRecipients);
   if (importance) body.importance = importance;
 
-  const path = mailFolderId ? `/me/mailFolders/${mailFolderId}/messages` : '/me/messages';
-  return slimDraftResult(await graph.post(path, body));
+  return slimDraftResult(await graph.post(draftPath(mailFolderId), body));
 };
+
+const draftPath = (mailFolderId: string | undefined): string => (mailFolderId ? `/me/mailFolders/${mailFolderId}/messages` : '/me/messages');
+
+// What the draft is made in: the dry-run shows it, and a run records it.
+const target = (params: Record<string, string>): Result<DraftTarget, GraphError> => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  return ok({ target: draftPath(parsed.data.mailFolderId), before: {} });
+};
+
+const plan = createDraftPlan({ action: 'create-draft', target, execute });
 
 const meta: WriteCommandMeta = {
   summary:
@@ -103,9 +117,10 @@ const meta: WriteCommandMeta = {
   bodyTemplate:
     "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
   effect: 'draft',
+  undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     'A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just supplied it; read it back with `get-mail-message --id <the returned id>` if you need it. The `id` is the draft — modify it with `update-mail-draft` before sending.',
 };
 
-export { execute, meta, schema };
+export { execute, meta, plan, schema };

@@ -2,12 +2,14 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
 import { writeCommandOf } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
 import type { Command, WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
+import type { UndoHandlers } from '@ask-marcel/office-core/use-cases/commands/undo-run.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachment-to-pdf.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as createForwardDraft from './create-forward-draft.ts';
 import * as createMailDraft from './create-mail-draft.ts';
 import * as createReplyDraft from './create-reply-draft.ts';
+import { DRAFT_UNDO_HANDLERS } from './draft-runs.ts';
 import * as updateMailDraft from './update-mail-draft.ts';
 
 /*
@@ -31,4 +33,10 @@ const commands: Readonly<Record<string, Command<WriteGraph>>> = Object.fromEntri
   Object.entries(modules).map(([name, command]) => [name, withUnknownParamRejection(writeCommandOf(command))])
 );
 
-export { commands };
+/**
+ * The undo handler of each kind of change that a write of this package
+ * records (write-plan.ts). A new command with an undo adds its kinds here.
+ */
+const undoHandlers: UndoHandlers = { ...DRAFT_UNDO_HANDLERS };
+
+export { commands, undoHandlers };
