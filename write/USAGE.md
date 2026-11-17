@@ -1,8 +1,8 @@
 # Usage guide of @ask-marcel/office-write
 
 This guide tells how to use the `ask-marcel-office-write` bin: the draft flow,
-the rules of each draft command, the PDF conversions, the MCP server, the
-library and the variables. To install the package, read [README.md](README.md).
+the rules of each draft command, the dry-run and the undo, the PDF conversions,
+the MCP server, the library and the variables. To install the package, read [README.md](README.md).
 The list of commands is in [COMMANDS.md](COMMANDS.md). The output formats, the
 errors and `--output-path` are the same as in the
 [read usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/read/USAGE.md).
@@ -76,6 +76,51 @@ field.
 ask-marcel-office-write update-mail-draft --message-id "AAMkAD..." --cc-recipients ""
 ```
 
+## Dry-run and undo
+
+The four draft commands take `--dry-run`, and each run that is not a dry-run
+can be undone. The PDF conversions have neither: they leave nothing in your
+tenant.
+
+```sh
+ask-marcel-office-write create-mail-draft --subject "Agenda" --body-content "See below." --to-recipients "alice@example.com" --dry-run
+ask-marcel-office-write create-mail-draft --subject "Agenda" --body-content "See below." --to-recipients "alice@example.com"
+ask-marcel-office-write undo 20261118T090507Z-0a1b2c3d
+ask-marcel-office-write undo 20261118T090507Z-0a1b2c3d --apply
+```
+
+1. `--dry-run` does the reads that the command needs and no write. The output
+   is `{ dryRun: true, command, changes }`: each change has its `action`, its
+   `target` and the ids `before` it.
+2. A run that is not a dry-run adds `runId` and `changes` to the output. Each
+   change has the ids `before` and `after` it.
+3. `undo <runId>` shows what the undo would do, change by change, and changes
+   nothing.
+4. `undo <runId> --apply` does the undo.
+
+What the undo does:
+
+- The undo of `create-mail-draft`, `create-reply-draft` and
+  `create-forward-draft` moves the draft to Deleted Items
+  (`DELETE /me/messages/{id}`). It is not a permanent delete.
+- The undo of `update-mail-draft` writes back the fields that the update
+  changed, as they were before the run.
+- The undo reverses a change only if the message is still a draft and its
+  `changeKey` did not change after the run. Else it passes over the change and
+  gives the status `changed` (or `missing` when the message is gone).
+- A run that is fully undone cannot be undone again (`run_already_undone`).
+  A change that the undo passed over stays in the run, so a later undo tries
+  it again.
+
+Each change of an undo has a status: `will-undo`, `undone`, `already-undone`,
+`changed`, `missing` or `failed`.
+
+The run journal is in `~/.ask-marcel/runs/`, one file for each run. It keeps a
+run 30 days: each write removes the older runs. An older run gives
+`run_expired`, and an unknown run id gives `run_not_found`. The journal holds
+the ids, the subjects and the bodies that an undo writes back, so do not share
+it.
+
 ## The PDF conversions
 
 `convert-mail-attachment-to-pdf`, `convert-calendar-event-attachment-to-pdf`
@@ -111,15 +156,21 @@ stdio. The [README](README.md#mcp-server) gives the lines that register it.
 ```text
 list-commands { category? }                                      → the short manifest
 get-command-docs { command }                                     → the full docs of one command
-run-write-command { command, params?, outputPath?, outputDir? }  → runs a write command
+run-write-command { command, params?, outputPath?, outputDir?, dryRun? }  → runs a write command
+undo { runId }                                                   → shows the undo of a run (read-only)
+undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
 `run-write-command` runs the 7 write commands. It has `readOnlyHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
-(`bodyContent`). A value is a string, a number or a boolean. A read command gets a pointer to the read server
+(`bodyContent`). A value is a string, a number or a boolean. `dryRun: true`
+shows the changes of a draft command and makes none. A read command gets a pointer to the read server
 (`ask-marcel-office-read mcp`). Register this server only on hosts that may
 write drafts.
+
+`undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,
+because it can move a draft to Deleted Items: a host asks you before it runs it.
 
 ## Library
 

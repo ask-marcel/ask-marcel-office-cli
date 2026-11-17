@@ -29,6 +29,7 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write convert-mail-attachment-to-pdf` | Converts an Outlook mail attachment to PDF. |
 | `ask-marcel-office-write convert-calendar-event-attachment-to-pdf` | Converts an attachment of a calendar event to PDF. |
 | `ask-marcel-office-write convert-group-post-attachment-to-pdf` | Converts an attachment of a group post to PDF. |
+| `ask-marcel-office-write undo <runId> [--apply]` | Shows the undo of a write run, or does it with `--apply`. |
 | `ask-marcel-office-write mcp` | Serves the MCP server over stdio (see below). |
 | `ask-marcel-office-write docs <command>` | Prints the Markdown page of one command. |
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
@@ -39,6 +40,13 @@ The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md).
+
+Each draft command takes `--dry-run`: it shows the changes and makes none. A
+run that is not a dry-run gives a `runId`, and `undo <runId> --apply` reverses
+it: a new draft goes to Deleted Items, and an update gets its old fields back.
+The undo passes over a draft that changed after the run. The run journal is in
+`~/.ask-marcel/runs/` and keeps a run 30 days. The details are in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#dry-run-and-undo).
 
 A PDF conversion of a file attachment uploads it to a temporary file in the
 `.ask-marcel-temp` folder of your OneDrive. Then it tries to delete that file. A
@@ -91,8 +99,11 @@ Other MCP clients (Claude Desktop, Cursor, Cline) take an `mcpServers` block:
 }
 ```
 
-The server has three tools: `list-commands`, `get-command-docs` and
-`run-write-command`. `run-write-command` runs only the 7 write commands. A read
+The server has five tools: `list-commands`, `get-command-docs`,
+`run-write-command`, `undo` and `undo-apply`. `run-write-command` runs only the
+7 write commands, and takes `dryRun`. `undo` shows the undo of a run and is
+read-only. `undo-apply` does it and has the destructive mark, so a host asks you
+first. A read
 command gets a pointer to the read server (`ask-marcel-office-read mcp`). Register
 this server only on hosts that may write drafts. Read the npx note in the
 [auth usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/auth/USAGE.md#the-npx-cache)
@@ -153,6 +164,10 @@ helper. Then, from this folder:
 | `bun run smoke` | After the build: runs `dist/` under node and bun on temporary homes (`scripts/qa-write-bundle-smoke.ts`) |
 | `bun run docs:gen` | Makes the tables of `COMMANDS.md` from the registry |
 | `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date. It also fails when a count in `README.md`, `USAGE.md` or `COMMANDS.md` does not match the registry, or when a count in `README.md` or `USAGE.md` has no claim. |
+
+A new write command gets `--dry-run` and an undo through a plan:
+[docs/WRITE-RUNS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/docs/WRITE-RUNS.md)
+tells how.
 
 ## License
 
