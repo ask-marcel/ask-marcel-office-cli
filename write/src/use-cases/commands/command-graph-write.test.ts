@@ -24,7 +24,7 @@ const READ_MEMBERS = [
   'teamsChatIc3',
   'teamsChatMedia',
 ];
-const WRITE_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
+const WRITE_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment'];
 const BEYOND_BASIC_MEMBERS = ['getElevated', 'getGuest', 'getBinaryGuest', 'getBinaryElevated', 'discoverTenantId', 'teamsChat', 'teamsChatIc3', 'teamsChatMedia'];
 
 // A full client that records each member called, and the path of each POST.
