@@ -39,6 +39,21 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
 - The MCP `params` take a number or a boolean as a value. Before, a number
   failed with MCP error -32602.
 
+### Added: the base for the next write commands
+
+- `patch` and `delete` of the write graph take an optional `{ ifMatch }`, sent
+  as the `If-Match` header. Planner refuses a change with no ETag of the item.
+  A call with no `ifMatch` sends no `If-Match`, as before.
+- `patch` also takes `api: 'beta'`, which sends the PATCH to Graph beta. Only
+  `/planner/tasks/{task-id}/details` can use beta (the HTML `notes` of a
+  Planner task). A beta PATCH of another path is refused before any request,
+  with the code `beta_refused`.
+- No command can send mail. The write graph that each command gets refuses,
+  before any request, a POST, PATCH or DELETE to a path that ends in `send`,
+  `sendMail`, `reply`, `replyAll` or `forward` (in any case), and a `$batch`.
+  The code is `send_refused`. `createReply`, `createReplyAll` and
+  `createForward` make drafts, so they stay permitted.
+
 ### Added: the write commands, the bin, the MCP server and the library
 
 The write commands moved here from `ask-marcel-office-cli` 2.8.0 (phase 5 of the
