@@ -1,11 +1,14 @@
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
+import { patchOnAllowedRoot } from '../domain/beta-patch.ts';
 import type { WriteGraph, WriteOptions } from '../use-cases/ports/graph.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
 
+// Graph beta: reached only by a PATCH on the beta allow-list (domain/beta-patch.ts).
+const GRAPH_BETA_ROOT = 'https://graph.microsoft.com/beta';
 const SIMPLE_PUT_THRESHOLD = 4 * 1024 * 1024; // 4 MiB
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320 KiB; 5 MiB is 16 × 320 KiB
 
@@ -124,7 +127,10 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
     getBinary: (path) => core.getBinary('basic', path),
     fetchUrl: core.fetchUrl,
     post: (path, body) => core.json('basic', 'POST', path, { body, readBody: readWriteAnswer }),
-    patch: (path, body, options) => core.json('basic', 'PATCH', path, { body, readBody: readWriteAnswer, extraHeaders: ifMatchHeader(options) }),
+    patch: (path, body, options) =>
+      patchOnAllowedRoot(path, options?.api, () =>
+        core.json('basic', 'PATCH', path, { body, readBody: readWriteAnswer, extraHeaders: ifMatchHeader(options), ...(options?.api === 'beta' ? { root: GRAPH_BETA_ROOT } : {}) })
+      ),
     put: (basePath, body, contentType) =>
       body.byteLength <= SIMPLE_PUT_THRESHOLD ? simplePut(core, `${basePath}:/content`, body, contentType) : chunkedPut(core, fetchFn, basePath, body),
     delete: (path, options) => deleteWith(core, path, options),

@@ -2,6 +2,7 @@ import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './command-types.ts';
 import { postIfReadOnly } from '../../domain/read-only-post.ts';
 import { unlessSendsMail } from '../../domain/mail-send-guard.ts';
+import { patchOnAllowedRoot } from '../../domain/beta-patch.ts';
 
 /*
  * Each command runs on the graph its effect allows (package split, D9). The
@@ -40,7 +41,8 @@ const readGraphOf = (graph: ReadGraph): ReadGraph => ({
  * The write graph inside any graph, the single package's full client included:
  * its basic-tier members only, with the no-send check (mail-send-guard.ts) in
  * front of each change: a change to a path that sends mail is refused before
- * any request. The command registry gives every write command this view, so no
+ * any request, and so is a beta PATCH of a path that is not on the beta
+ * allow-list (beta-patch.ts). The command registry gives every write command this view, so no
  * write command holds an elevated, guest or chat reader, and none sends mail.
  * Each member calls the graph's own member on the graph, so a caller's graph
  * whose methods read `this` still works.
@@ -50,7 +52,7 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
   getBinary: (path) => graph.getBinary(path),
   fetchUrl: (url) => graph.fetchUrl(url),
   post: (path, body) => unlessSendsMail('POST', path, () => graph.post(path, body)),
-  patch: (path, body, options) => unlessSendsMail('PATCH', path, () => graph.patch(path, body, options)),
+  patch: (path, body, options) => unlessSendsMail('PATCH', path, () => patchOnAllowedRoot(path, options?.api, () => graph.patch(path, body, options))),
   put: (basePath, body, contentType) => graph.put(basePath, body, contentType),
   delete: (path, options) => unlessSendsMail('DELETE', path, () => graph.delete(path, options)),
 });
