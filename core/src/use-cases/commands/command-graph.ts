@@ -47,9 +47,9 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
   getBinary: (path) => graph.getBinary(path),
   fetchUrl: (url) => graph.fetchUrl(url),
   post: (path, body) => graph.post(path, body),
-  patch: (path, body) => graph.patch(path, body),
+  patch: (path, body, options) => graph.patch(path, body, options),
   put: (basePath, body, contentType) => graph.put(basePath, body, contentType),
-  delete: (path) => graph.delete(path),
+  delete: (path, options) => graph.delete(path, options),
 });
 
 /** A read command that runs on the read view of any read graph it is given. */
