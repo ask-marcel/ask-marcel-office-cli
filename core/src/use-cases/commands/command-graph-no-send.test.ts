@@ -8,8 +8,8 @@ import { writeGraphOf } from './command-graph.ts';
  * No command sends mail (product rule). The write view a write command gets
  * refuses, before any request, a change to a path that sends: `send`,
  * `sendMail`, `reply`, `replyAll`, `forward`, in any case, with or without a
- * query string, a trailing slash, the `microsoft.graph.` namespace or a
- * percent-encoded letter, and a JSON batch, which can carry a send in its
+ * query string, a trailing slash, the `microsoft.graph.` namespace, a
+ * percent-encoded letter or dot segments that the URL resolves (`x/..`), and a JSON batch, which can carry a send in its
  * body. The actions that make a draft stay permitted, and so does a path whose
  * last segment holds a malformed escape, which names no action.
  */
@@ -48,6 +48,9 @@ const SENDING_PATHS = [
   '/me/messages/m1/Microsoft.Graph.ReplyAll',
   '/me/messages/m1/%73end',
   '/$batch',
+  '/me/sendMail/x/..',
+  '/me/messages/m1/send/x/%2E%2E',
+  '/me/messages/../sendMail/.',
 ];
 
 const DRAFT_PATHS = [

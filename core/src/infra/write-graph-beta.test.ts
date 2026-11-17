@@ -54,6 +54,8 @@ describe('a path that is not on the beta allow-list', () => {
     '/planner/tasks/a/b/details',
     '/planner/tasks//details',
     '/planner/plans/p1/details',
+    '/planner/tasks/../details',
+    '/planner/tasks/%2e%2e/details',
   ])('is refused before any request when its PATCH asks for beta: %s', async (path) => {
     const sent: Sent[] = [];
     const result = await createWriteGraph(tokens, recording(sent)).patch(path, NOTES, { ifMatch: 'W/"etag-1"', api: 'beta' });
