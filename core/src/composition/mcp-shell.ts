@@ -34,6 +34,8 @@ import type { Command } from '../use-cases/commands/command-types.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
+import type { RawParamValue } from '../use-cases/commands/param-keys.ts';
+import { canonicalParams } from '../use-cases/commands/param-keys.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import { resolveDateZone } from './date-zone.ts';
@@ -169,17 +171,25 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   // losing it to the handful of write commands sharing one tool.
   const runToolInput = {
     command: z.string().describe('Command name from list-commands.'),
-    params: z.record(z.string(), z.string()).optional().describe('Command options WITHOUT the `--` prefix, e.g. {"top":"10","folderId":"inbox"}. See get-command-docs.'),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional()
+      .describe(
+        'Command options as get-command-docs shows them, e.g. {"message-id":"<id>","top":5}. A key is the flag name, with or without its `--` prefix, or its camelCase form (`messageId`). A value is a string, a number or a boolean.'
+      ),
     outputPath: z
       .string()
       .optional()
       .describe('For commands returning bytes/text: write the body to this file instead of inlining it. Avoids flooding context with a multi-MB base64 blob.'),
-    outputDir: z.string().optional().describe('For the extract-*-images commands: write each image here instead of inlining it.'),
+    outputDir: z
+      .string()
+      .optional()
+      .describe('For commands that return images (the extract-*-images commands, a zip converted with `include-images`): write each image here instead of inlining it.'),
   };
 
   const runResolved = async (
     commandName: string,
-    params: Record<string, string> | undefined,
+    rawParams: Readonly<Record<string, RawParamValue>> | undefined,
     outputPath: string | undefined,
     outputDir: string | undefined,
     wantMutating: boolean
@@ -195,11 +205,16 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
       );
     if (!isMutating && wantMutating)
       return failText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
-    const request = { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir, surface: 'mcp' as const };
+    // The keys arrive as the docs name them (`message-id`); a command reads `messageId` (param-keys.ts).
+    const canonical = canonicalParams(rawParams ?? {});
+    if (!canonical.ok)
+      return failText(`\`${canonical.error.first}\` and \`${canonical.error.second}\` are the same parameter. Give it one time.`, canonical.error.type, 'validation');
+    const params = canonical.value;
+    const request = { name: resolved.value.name, command: resolved.value.command, params, outputPath, outputDir, surface: 'mcp' as const };
     const result = await runRegistryCommand({ graph, fs, commandPackage }, request);
     if (!result.ok)
       return failText(`${result.error.message}${signInPointer(result.error.code, commandPackage)}`, result.error.code, result.error.source, result.error.retryAfterSeconds);
-    return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params ?? {}), commandPackage));
+    return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params), commandPackage));
   };
 
   const writesElsewhere = hasWrites
