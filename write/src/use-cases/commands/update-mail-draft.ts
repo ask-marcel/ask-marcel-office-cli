@@ -4,6 +4,7 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import {
   bodyCarriesQuote,
   boundaryMarkerRefusal,
@@ -13,6 +14,7 @@ import {
   replacePlainTextCommentAboveQuote,
 } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { DRAFT_UPDATE_UNDO, planDraftUpdate } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
@@ -172,6 +174,22 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   return slimDraftResult(await graph.patch(`/me/messages/${messageId}`, body));
 };
 
+// The fields that this update writes, which the undo writes back as they were.
+// The comment path writes the body too, after it reads the quote.
+const savedFieldNames = (params: UpdateParams): ReadonlyArray<string> => {
+  const names = Object.keys(patchFields(params));
+  return params.comment === undefined ? names : [...names, 'body'];
+};
+
+// The dry-run and the recorded run: the checks of `execute`, then one read of the fields it writes.
+const plan: PlanWrite = async (reads, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const refusal = refuseUpdate(parsed.data);
+  if (refusal) return err(refusal);
+  return planDraftUpdate(reads, parsed.data.messageId, savedFieldNames(parsed.data), async (graph) => execute(graph, params));
+};
+
 const meta: WriteCommandMeta = {
   summary:
     'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content replaces the whole body and would drop the thread, so it is REFUSED on a draft that still carries a quote unless you pass --replace-quoted-history true. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.',
@@ -256,9 +274,10 @@ const meta: WriteCommandMeta = {
   bodyTemplate:
     "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
   effect: 'draft',
+  undo: DRAFT_UPDATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
 };
 
-export { execute, meta, schema };
+export { execute, meta, plan, schema };

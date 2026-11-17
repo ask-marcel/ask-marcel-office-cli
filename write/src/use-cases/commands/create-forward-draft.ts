@@ -6,6 +6,8 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
+import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
@@ -75,24 +77,30 @@ const spliceHtmlComment = async (graph: WriteGraph, created: { id: string }, com
   return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, { body: { contentType: 'HTML', content: spliced.html }, ...extra }));
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
+// The checks before any write, which the dry-run makes too.
+const checkForward = (params: Record<string, string>): Result<z.infer<typeof schema>, GraphError> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success)
     return err({
       type: 'validation_error',
       message: formatZodError(parsed.error),
     });
-  const { forwardMessageId, toRecipients, ccRecipients, comment, subject, bodyContentType } = parsed.data;
-
-  const asHtml = bodyContentType === 'HTML';
-
   // A comment carrying a boundary marker of its own would be kept verbatim by the
   // splice, and the NEXT `update-mail-draft --comment` edit would cut the draft AT
   // the pasted marker, dropping the forwarded original below it. Refuse before
   // creating anything, so there is no orphan draft to clean up.
-  if (asHtml && commentCarriesQuoteBoundary(comment)) {
+  if (parsed.data.bodyContentType === 'HTML' && commentCarriesQuoteBoundary(parsed.data.comment)) {
     return err({ type: 'validation_error', message: boundaryMarkerRefusal('--comment') });
   }
+  return ok(parsed.data);
+};
+
+const execute: WriteCommand['execute'] = async (graph, params) => {
+  const checked = checkForward(params);
+  if (!checked.ok) return checked;
+  const { forwardMessageId, toRecipients, ccRecipients, comment, subject, bodyContentType } = checked.value;
+
+  const asHtml = bodyContentType === 'HTML';
 
   // Graph's createForward mints the draft in one call. On the Text path the
   // comment travels via `comment`, never a body PATCH: PATCHing `body` with
@@ -126,6 +134,16 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   if (Object.keys(extra).length === 0) return slimDraftResult(created);
   return slimDraftResult(await graph.patch(`/me/messages/${created.value.id}`, extra));
 };
+
+// What the forward is made from: the dry-run shows it, and a run records it.
+const target = (params: Record<string, string>): Result<DraftTarget, GraphError> => {
+  const checked = checkForward(params);
+  if (!checked.ok) return checked;
+  const { forwardMessageId } = checked.value;
+  return ok({ target: `/me/messages/${forwardMessageId}/createForward`, before: { messageId: forwardMessageId } });
+};
+
+const plan = createDraftPlan({ action: 'create-forward-draft', target, execute });
 
 const meta: WriteCommandMeta = {
   summary:
@@ -181,9 +199,10 @@ const meta: WriteCommandMeta = {
   bodyTemplate:
     "Text: POST { comment: '{comment}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
   effect: 'draft',
+  undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
 };
 
-export { execute, meta, schema };
+export { execute, meta, plan, schema };
