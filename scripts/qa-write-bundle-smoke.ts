@@ -8,18 +8,21 @@
  *      (createReadGraph) and no member of the read tiers (getElevated,
  *      teamsChatIc3);
  *   2. `--version` answers the package version; `--help` lists the 7 write
- *      commands, `help-json` and `docs` (not `mcp`: the bin serves it before
- *      commander); `help-json` gives the package and 10 entries, `mcp` among
- *      them; `docs create-mail-draft` prints its page;
+ *      commands, `help-json`, `docs` and `undo` (not `mcp`: the bin serves it
+ *      before commander); `help-json` gives the package and 10 entries, `mcp`
+ *      among them; `docs create-mail-draft` prints its page;
  *   3. a missing required flag and an unknown flag each exit 1 with the
  *      commander code and no crash line, before any token request (the run has
  *      a bad tier token, so a token request would answer env_token_invalid);
  *   4. a full call with `ASKMARCEL_TOKEN_BASIC=bad` answers env_token_invalid,
- *      exit 1 (never a helper search: a stale auth/dist can be on PATH);
+ *      exit 1 (never a helper search: a stale auth/dist can be on PATH); the
+ *      same call with `--dry-run` shows the draft, exit 0, with no token
+ *      request; `undo` refuses a bad run id and an unknown run, exit 1;
  *   5. `list-drives` names @ask-marcel/office-read, exit 1;
  *   6. `dist/cli.js mcp` writes only JSON-RPC frames to stdout (a tolerant SDK
  *      client skips a stray line, so this reads the raw stdout) and has exactly
- *      the tools list-commands, get-command-docs and run-write-command;
+ *      the tools list-commands, get-command-docs, run-write-command, undo and
+ *      undo-apply;
  *   7. no probe leaves a file under its HOME except the update-notifier
  *      configstore of this package and bun's own cache (the bin writes no token
  *      cache and no locator);
@@ -115,7 +118,7 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
   const version = run(rt, ['--version']);
   const help = run(rt, ['--help']);
   const helpListed = (name: string): boolean => help.out.split('\n').some((line) => line.startsWith(`  ${name} `));
-  const missingHelp = [...WRITE_COMMANDS, 'help-json', 'docs'].filter((name) => !helpListed(name));
+  const missingHelp = [...WRITE_COMMANDS, 'help-json', 'docs', 'undo'].filter((name) => !helpListed(name));
   const helpJson = run(rt, ['help-json']);
   const manifest = ((): { package?: string; commands?: ReadonlyArray<{ name: string }> } => {
     try {
@@ -130,12 +133,16 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
   const unknown = run(rt, ['create-mail-draft', ...DRAFT_FLAGS, '--subjet', 'x', '--output', 'json'], BAD_TOKEN);
   const bad = run(rt, ['create-mail-draft', ...DRAFT_FLAGS, '--output', 'json'], BAD_TOKEN);
   const readName = run(rt, ['list-drives']);
-  const all = [version, help, helpJson, docs, missing, unknown, bad, readName];
+  // A dry-run of a new draft needs no read, so it runs with no token request.
+  const dryRun = run(rt, ['create-mail-draft', ...DRAFT_FLAGS, '--dry-run', '--output', 'json'], BAD_TOKEN);
+  const badRun = run(rt, ['undo', '../token-cache', '--output', 'json']);
+  const unknownRun = run(rt, ['undo', '20261118T090507Z-00000000', '--output', 'json']);
+  const all = [version, help, helpJson, docs, missing, unknown, bad, readName, dryRun, badRun, unknownRun];
   const stray = [...new Set(all.flatMap((r) => r.strayFiles))];
   return [
     ['--version answers the package version', exited(version.p, 0) && version.out.trim() === PACKAGE.version, `${exitNote(version.p)}, ${version.out.trim()}`],
     [
-      '--help lists the 7 write commands, help-json and docs, and not mcp',
+      '--help lists the 7 write commands, help-json, docs and undo, and not mcp',
       exited(help.p, 0) && missingHelp.length === 0 && !helpListed('mcp'),
       missingHelp.length === 0 ? exitNote(help.p) : `missing ${missingHelp.join(', ')}`,
     ],
@@ -157,6 +164,9 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
     ],
     ['a bad tier token answers env_token_invalid', exited(bad.p, 1) && errorCode(bad.out) === 'env_token_invalid', `${exitNote(bad.p)}, ${errorCode(bad.out)}`],
     ['list-drives names @ask-marcel/office-read', exited(readName.p, 1) && readName.out.includes('@ask-marcel/office-read'), exitNote(readName.p)],
+    ['--dry-run shows the draft with no token request', exited(dryRun.p, 0) && dryRun.out.includes('"dryRun":true'), exitNote(dryRun.p)],
+    ['undo refuses a bad run id', exited(badRun.p, 1) && errorCode(badRun.out) === 'invalid_run_id', `${exitNote(badRun.p)}, ${errorCode(badRun.out)}`],
+    ['undo says that an unknown run is not in the journal', exited(unknownRun.p, 1) && errorCode(unknownRun.out) === 'run_not_found', `${exitNote(unknownRun.p)}, ${errorCode(unknownRun.out)}`],
     ['no file under HOME but the update-notifier configstore', stray.length === 0, stray.length === 0 ? 'clean' : stray.join(', ')],
   ];
 };
@@ -202,8 +212,8 @@ const probeMcp = (rt: string): ReadonlyArray<Check> => {
     ['stdout holds only JSON-RPC frames', ok, ok ? `${read.length} line(s)` : read],
     ['the server is ask-marcel-office-write', server === 'ask-marcel-office-write', server],
     [
-      'the tools are exactly list-commands, get-command-docs and run-write-command',
-      JSON.stringify(tools) === JSON.stringify(['get-command-docs', 'list-commands', 'run-write-command']),
+      'the tools are exactly list-commands, get-command-docs, run-write-command, undo and undo-apply',
+      JSON.stringify(tools) === JSON.stringify(['get-command-docs', 'list-commands', 'run-write-command', 'undo', 'undo-apply']),
       tools.join(', '),
     ],
     ['get-command-docs answers the create-mail-draft page', docsText.startsWith('# `create-mail-draft`'), docsText.split('\n')[0] ?? ''],

@@ -125,6 +125,7 @@ const buildManifest = (generatedAt: string): CommandManifest => {
       ...(m.needsElevatedToken ? { needsElevatedToken: m.needsElevatedToken } : {}),
       ...(m.needsSubstrateToken ? { needsSubstrateToken: m.needsSubstrateToken } : {}),
       ...(m.stability ? { stability: m.stability } : {}),
+      ...(m.undo ? { undo: m.undo } : {}),
     });
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
