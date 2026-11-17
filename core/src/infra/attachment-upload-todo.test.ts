@@ -108,6 +108,19 @@ describe('a file of 3 MB or more attached to a To Do task', () => {
     expect(sent.at(-1)).toEqual({ method: 'DELETE', url: UPLOAD_URL, authorization: 'Bearer basic-token', range: null, body: undefined });
   });
 
+  it('still answers the refused range when the cancel of the session fails on the network', async () => {
+    const sent: Sent[] = [];
+    const fetchFn = graph(sent, (method) => {
+      if (method === 'POST') return Response.json({ uploadUrl: UPLOAD_URL });
+      if (method === 'DELETE') throw new Error('socket hang up');
+      return new Response(null, { status: 416 });
+    });
+    expect(await uploadWith(fetchFn)(TASK, { name: 'scan.pdf', bytes: new Uint8Array(3_000_000) })).toEqual(
+      err({ type: 'api_error', status: 416, message: 'chunk PUT failed at byte 0' })
+    );
+    expect(sent.map((s) => s.method)).toEqual(['POST', 'PUT', 'DELETE']);
+  });
+
   it('fails when the upload session comes back with no upload URL', async () => {
     const answer = await uploadWith(graph([], () => Response.json({})))(TASK, { name: 'scan.pdf', bytes: new Uint8Array(3_000_000) });
     expect(answer).toEqual(err({ type: 'api_error', status: 500, message: 'createUploadSession returned no uploadUrl' }));
