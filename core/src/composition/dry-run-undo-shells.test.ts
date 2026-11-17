@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { err, ok } from '../domain/result.ts';
 import type { WriteGraph } from '../infra/write-graph.ts';
 import { writeCommandOf } from '../use-cases/commands/command-graph.ts';
-import type { Command } from '../use-cases/commands/command-types.ts';
 import { buildManifest, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import type { UndoHandlers } from '../use-cases/commands/undo-run.ts';
@@ -63,7 +62,7 @@ const saveWidget = writeCommandOf({
   plan,
 });
 
-const PACKAGE = fakeCommandPackage({ registry: { 'save-widget': saveWidget as Command, 'save-widget-draft': fakeCommand({ effect: 'draft', category: 'mail' }) } });
+const PACKAGE = fakeCommandPackage({ registry: { 'save-widget': saveWidget, 'save-widget-draft': fakeCommand({ effect: 'draft', category: 'mail' }) } });
 
 const HANDLERS: UndoHandlers = {
   'drop-widget': { check: async () => ok('ready'), apply: async (graph, data) => graph.delete(`/widgets/${String(data['widgetId'])}`) },
