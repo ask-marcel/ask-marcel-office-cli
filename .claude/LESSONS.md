@@ -6,6 +6,16 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-11-17 | the MCP `params` take the flag name and the camelCase key, as two spellings of one name
+
+The docs and each error name a parameter as a flag (`--message-id`), but `run-command` and `run-write-command` ran only the camelCase key, and the unknown-parameter error named the key that it refused (QA 2026-11-16, P2-1). The user decided that the MCP shell maps `message-id` and `--message-id` to `messageId` (`core/src/use-cases/commands/param-keys.ts`), that two spellings of one key in one call fail with `duplicate_parameter`, and that a value can be a string, a number or a boolean. This is not an alias, so the 2026-07-24 decision (one name for each flag) stays: the CLI and the library keep one spelling. Rejected: camelCase only with an error that names the camelCase key, because the docs pages and the "is missing" errors still show the flag form.
+Rule for next time: the key that a doc or an error message shows must be a key that the surface accepts. When you add a surface, give it the spelling of its docs, and map it at the edge of that surface.
+
+## [gotcha] 2026-11-17 | a path from inside a zip or a document goes into a file name, and `\` is a separator on Windows
+
+`--output-dir` makes the file name of an image from the path of the image, and for a zip result also from the path of the archive entry. `withDestinations` replaced only `/`, so an entry named `..\..\x.docx` put its image outside the directory on Windows. The media pattern of the OOXML extractor (`[^/]+`) permits `\` in a part name too, so the `extract-*-images` commands had the same gap. The review of pull request 31 found it, not a test, and `media-items.ts` now replaces `/` and `\`.
+Rule for next time: when a name from inside a file becomes a part of a path on disk, replace the two separators, and write the test with a `..\` name. A test that uses only `/` paths passes on all platforms and proves nothing for Windows.
+
 ## [decision] 2026-11-15 | a hint for a token helper failure matches the helper message, not the error code alone
 
 After the split, the read and write bins named only the helper command to run by hand when the token helper gave no token, and 2.8.0 named `login`. `d21ef06` gives the `login` instruction back with two hint rules, for `not_authenticated` and `secondary_token_unavailable`. The auth bin gives the same two codes with a message that already names `login`, so a rule on the code alone adds the remedy a second time.
