@@ -84,6 +84,7 @@ const toEntry = (name: string, cmd: Command<never>): CommandManifestEntry => ({
   ...shapeFields(cmd.meta),
   ...capabilityFields(cmd.meta),
   effect: cmd.meta.effect,
+  ...(cmd.meta.undo ? { undo: cmd.meta.undo } : {}),
   ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
 });
 

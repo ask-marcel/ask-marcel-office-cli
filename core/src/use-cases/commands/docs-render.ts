@@ -23,6 +23,8 @@ export type CommandManifestEntry = {
   /** Every registry command carries it; the lifecycle entries, which are not Graph commands, do not. */
   readonly effect?: CommandMeta['effect'];
   readonly stability?: CommandMeta['stability'];
+  /** Present on a write with `--dry-run` and an undo: what the undo does. */
+  readonly undo?: CommandMeta['undo'];
 };
 
 // PAGINATION_HINT used to be one
@@ -123,10 +125,18 @@ export const renderLifecycleTable = (lifecycle: ReadonlyArray<CommandManifestEnt
   return ['| Command | What it does |', '|:--|:--|', ...rows].join('\n');
 };
 
+/**
+ * The sentence on `--dry-run` and the undo of a write with a plan; `undo` says
+ * what its undo does. The CLI help and the docs page both read it.
+ */
+export const dryRunAndUndo = (undo: string): string =>
+  `\`--dry-run\` shows each change (the target and the ids before it) and makes none. A run that is not a dry-run answers a \`runId\` and the ids before and after each change, and the run journal keeps it 30 days. The command \`undo <runId>\` shows the undo, and \`undo <runId> --apply\` does it: the undo ${undo}.`;
+
 // The bullet facts below the header: the write effect, the response, paging, scopes, tokens, stability.
 const factLines = (entry: CommandManifestEntry): string[] => {
   const lines: string[] = [];
   if (entry.effect !== undefined && entry.effect !== 'read') lines.push(`- **Writes to Microsoft 365** (\`${entry.effect}\`): ${WRITE_EFFECTS[entry.effect].action}.`);
+  if (entry.undo) lines.push(`- **Dry-run and undo:** ${dryRunAndUndo(entry.undo)}`);
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {

@@ -38,6 +38,7 @@ import type { RawParamValue } from '../use-cases/commands/param-keys.ts';
 import { canonicalParams } from '../use-cases/commands/param-keys.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { unknownCommandMessage } from '../use-cases/commands/unknown-command.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
@@ -57,6 +58,8 @@ type McpShellDeps<G = ReadGraph & WriteGraph> = {
   readonly version?: string;
   /** Registers the package's own tools (`login`, `status`…) after the gateway tools. */
   readonly addTools?: (server: McpServer) => void;
+  /** The run journal of the write package: with it, a write with a plan gets a run id (run-registry-command.ts). */
+  readonly runs?: RunRecorder;
 };
 
 // The SDK's own result type rather than a hand-rolled one — it requires a
@@ -90,7 +93,7 @@ const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   // Same rule as the CLI: named days resolve in `ASKMARCEL_TZ`, else the machine's zone.
   setDateZone(resolveDateZone(undefined).zone);
-  const { commandPackage, graph, fs } = deps;
+  const { commandPackage, graph, fs, runs } = deps;
   const { registry } = commandPackage;
   const version = deps.version ?? '0.0.0';
   const server = new McpServer({ name: commandPackage.binName, version });
@@ -187,12 +190,27 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
       .describe('For commands that return images (the extract-*-images commands, a zip converted with `include-images`): write each image here instead of inlining it.'),
   };
 
+  // What every run needs; the run journal only when the package has one.
+  const runDeps = { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }) };
+
+  // The write tool also takes `dryRun`: a write with a plan then shows its changes and makes none.
+  const writeToolInput = {
+    ...runToolInput,
+    dryRun: z
+      .boolean()
+      .optional()
+      .describe(
+        'true: show each change that the command would make (the target and the ids before it), and make none. Only the commands whose docs show "Dry-run and undo" take it.'
+      ),
+  };
+
   const runResolved = async (
     commandName: string,
     rawParams: Readonly<Record<string, RawParamValue>> | undefined,
     outputPath: string | undefined,
     outputDir: string | undefined,
-    wantMutating: boolean
+    wantMutating: boolean,
+    dryRun: boolean
   ): Promise<CallToolResult> => {
     const resolved = resolveCommand(registry, commandName);
     if (!resolved.ok) return unknownCommand(resolved.error.name, resolved.error.available);
@@ -210,8 +228,8 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
     if (!canonical.ok)
       return failText(`\`${canonical.error.first}\` and \`${canonical.error.second}\` are the same parameter. Give it one time.`, canonical.error.type, 'validation');
     const params = canonical.value;
-    const request = { name: resolved.value.name, command: resolved.value.command, params, outputPath, outputDir, surface: 'mcp' as const };
-    const result = await runRegistryCommand({ graph, fs, commandPackage }, request);
+    const request = { name: resolved.value.name, command: resolved.value.command, params, outputPath, outputDir, surface: 'mcp' as const, dryRun };
+    const result = await runRegistryCommand(runDeps, request);
     if (!result.ok)
       return failText(`${result.error.message}${signInPointer(result.error.code, commandPackage)}`, result.error.code, result.error.source, result.error.retryAfterSeconds);
     return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params), commandPackage));
@@ -229,7 +247,7 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
         inputSchema: runToolInput,
         annotations: { readOnlyHint: true },
       },
-      async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, false)
+      async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, false, false)
     );
 
   const readsElsewhere = hasReads ? 'Read commands are rejected here; use run-command.' : `The read commands are on ${otherServer('read')}.`;
@@ -239,14 +257,14 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
       {
         title: 'Run a write command',
         description: `Run one of the ${writeCommandNames.length} commands that WRITE to Microsoft 365. ${describeWrites(registry)}. This CLI has no other write surface. ${readsElsewhere}`,
-        inputSchema: runToolInput,
+        inputSchema: writeToolInput,
         // Not read-only. Destructive only when one of the write classes is (none
         // today: a draft is unsent, and a temporary upload is a copy of the user's
         // own attachment that the command tries to delete; nothing is overwritten
         // or transmitted).
         annotations: { readOnlyHint: false, destructiveHint: writesAreDestructive },
       },
-      async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, true)
+      async ({ command, params, outputPath, outputDir, dryRun }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, true, dryRun === true)
     );
 
   // The tools that the package adds, if any, sit beside the gateway tools.

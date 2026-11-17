@@ -11,7 +11,8 @@ import { fillNames } from '../use-cases/commands/bin-names.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import type { Command as RegistryCommand } from '../use-cases/commands/command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
-import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
+import { CATEGORY_LABELS, CATEGORY_ORDER, dryRunAndUndo, paginationHintFor } from '../use-cases/commands/docs-render.ts';
+import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { describeWrites } from '../use-cases/commands/command-effect.ts';
@@ -55,8 +56,12 @@ type LifecycleCliDeps<C extends RegistryCommand<never> = RegistryCommand> = {
   readonly addLifecycleCommands?: (program: Command, output: CliOutput) => void;
 };
 
-/** `G` is the graph the package's commands run on: by default the full client. */
-type CliShellDeps<G = ReadGraph & WriteGraph> = LifecycleCliDeps<RegistryCommand<G>> & { readonly graph: G };
+/**
+ * `G` is the graph the package's commands run on: by default the full client.
+ * `runs` is the run journal of the write package: with it, a write with a plan
+ * gets a run id (run-registry-command.ts).
+ */
+type CliShellDeps<G = ReadGraph & WriteGraph> = LifecycleCliDeps<RegistryCommand<G>> & { readonly graph: G; readonly runs?: RunRecorder };
 
 // What the registry commands share with the CLI that holds them.
 type ShellParts = {
@@ -444,10 +449,29 @@ const registryFacts = (registry: CommandPackage<RegistryCommand<never>>['registr
   return [...writes, ...(readCount === 0 ? [] : [readCounts(registry)])].join(' ');
 };
 
+// The help text after a command's own options: its endpoint, its facts and its example.
+const commandHelpLines = (cmd: RegistryCommand<never>): ReadonlyArray<string> => [
+  `\nGraph endpoint: ${cmd.meta.graphMethod} ${cmd.meta.graphPathTemplate}`,
+  `Microsoft Learn: ${cmd.meta.graphDocsUrl}`,
+  ...(cmd.meta.stability === 'experimental'
+    ? [
+        '\nStability: experimental — rides a Microsoft-internal substrate (chatsvcagg / IC3) that is not in the public Graph API and can break on a Teams web-client update. Prefer a stable sibling when one exists.',
+      ]
+    : []),
+  ...(cmd.meta.pagination ? [`\nPagination: ${paginationHintFor(cmd.meta.paginationStrategy)}`] : []),
+  ...(cmd.meta.undo ? [`\nDry-run and undo: ${dryRunAndUndo(cmd.meta.undo)}`] : []),
+  ...(cmd.meta.bodyTemplate ? [`\nRequest body:\n  ${cmd.meta.bodyTemplate}`] : []),
+  `\nExample:\n  ${cmd.meta.example}`,
+];
+
+const DRY_RUN_FLAG = '--dry-run';
+
+const DRY_RUN_HELP = 'Show each change that the command would make (the target and the ids before it), and make none. Only the reads that the command needs go to Microsoft 365.';
+
 // The Graph commands of the registry, one group per category.
 const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void => {
   const { program, fill, renderOut, fail, onCommanderError, globalFlags } = parts;
-  const { commandPackage, graph, fs } = deps;
+  const { commandPackage, graph, fs, runs } = deps;
   const { registry } = commandPackage;
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(registry).filter(([, c]) => c.meta.category === category);
@@ -478,28 +502,20 @@ const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void 
           commandDef.option(`--${opt.name} <value>`, fill(opt.description), createNoRepeatParser(opt.name));
         }
       }
-      commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()], commandDef.args));
-      const helpLines = [
-        `\nGraph endpoint: ${cmd.meta.graphMethod} ${cmd.meta.graphPathTemplate}`,
-        `Microsoft Learn: ${cmd.meta.graphDocsUrl}`,
-        ...(cmd.meta.stability === 'experimental'
-          ? [
-              '\nStability: experimental — rides a Microsoft-internal substrate (chatsvcagg / IC3) that is not in the public Graph API and can break on a Teams web-client update. Prefer a stable sibling when one exists.',
-            ]
-          : []),
-        ...(cmd.meta.pagination ? [`\nPagination: ${paginationHintFor(cmd.meta.paginationStrategy)}`] : []),
-        ...(cmd.meta.bodyTemplate ? [`\nRequest body:\n  ${cmd.meta.bodyTemplate}`] : []),
-        `\nExample:\n  ${cmd.meta.example}`,
-      ];
-      commandDef.addHelpText('after', fill(helpLines.join('\n')));
-      commandDef.action(async (opts: Record<string, string>) => {
+      // A write with a plan takes --dry-run, a flag with no value; the shell takes it out of the params.
+      const ownFlags = cmd.plan === undefined ? [] : [DRY_RUN_FLAG];
+      if (cmd.plan !== undefined) commandDef.option(DRY_RUN_FLAG, DRY_RUN_HELP);
+      commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...ownFlags, ...globalFlags()], commandDef.args));
+      commandDef.addHelpText('after', fill(commandHelpLines(cmd).join('\n')));
+      commandDef.action(async (opts: Record<string, string> & { readonly dryRun?: true }) => {
+        const { dryRun, ...params } = opts;
         const globals = program.opts<{ outputPath?: string; outputDir?: string }>();
         const result = await runRegistryCommand(
-          { graph, fs, commandPackage },
-          { name, command: cmd, params: opts, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli' }
+          { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }) },
+          { name, command: cmd, params, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli', dryRun: dryRun === true }
         );
         if (result.ok) {
-          renderOut(result.value, buildRenderContext(name, cmd, 'cli', opts));
+          renderOut(result.value, buildRenderContext(name, cmd, 'cli', params));
           return;
         }
         fail(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
