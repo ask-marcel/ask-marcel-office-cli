@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
+import type { BoundPlanWrite, PlanWrite } from './write-plan.ts';
 
 type CommandSchema = z.ZodType;
 /** A command's run on the graph `G` it is given. */
@@ -192,6 +193,13 @@ type CommandMeta = {
    *
    */
   readonly stability?: 'experimental';
+  /**
+   * Present on a write that has a `plan` (write-plan.ts): what its undo does,
+   * completing "The undo ...", e.g. `moves the draft to Deleted Items if it is
+   * still a draft and did not change after the run`. The docs and help-json show
+   * it beside `--dry-run`. A command has it exactly when it has a plan.
+   */
+  readonly undo?: string;
 };
 
 /**
@@ -219,11 +227,15 @@ type ReadCommand = {
   readonly executeLocal?: LocalExecute;
 };
 
-/** A command that writes: it runs on the write graph, basic tier only. */
+/**
+ * A command that writes: it runs on the write graph, basic tier only. A write
+ * that can run as a dry-run and be undone also exports `plan` (write-plan.ts).
+ */
 type WriteCommand = {
   readonly schema: CommandSchema;
   readonly execute: GraphExecute<WriteGraph>;
   readonly meta: WriteCommandMeta;
+  readonly plan?: PlanWrite;
 };
 
 /** What the registry holds: each command typed against the narrower graph it runs on. */
@@ -242,6 +254,8 @@ type Command<G = ReadGraph & WriteGraph> = {
   readonly execute: GraphExecute<G>;
   readonly meta: CommandMeta;
   readonly executeLocal?: LocalExecute;
+  /** The plan of a write with a dry-run and an undo, bound to the graph of the run (command-graph.ts). */
+  readonly plan?: BoundPlanWrite<G>;
 };
 
 export type {

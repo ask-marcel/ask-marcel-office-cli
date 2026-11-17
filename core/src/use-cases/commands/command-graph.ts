@@ -3,6 +3,10 @@ import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './co
 import { postIfReadOnly } from '../../domain/read-only-post.ts';
 import { unlessSendsMail } from '../../domain/mail-send-guard.ts';
 import { patchOnAllowedRoot } from '../../domain/beta-patch.ts';
+import type { GraphError } from '../../domain/graph-error.ts';
+import type { Result } from '../../domain/result.ts';
+import { ok } from '../../domain/result.ts';
+import type { BoundPlan, GraphReads, PlanWrite } from './write-plan.ts';
 
 /*
  * Each command runs on the graph its effect allows (package split, D9). The
@@ -61,11 +65,35 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
 /** A read command that runs on the read view of any read graph it is given. */
 const readCommandOf = (command: ReadCommand): Command<ReadGraph> => ({ ...command, execute: async (graph, params) => command.execute(readGraphOf(graph), params) });
 
-/** A write command that runs on the write view of any write graph it is given. */
-const writeCommandOf = (command: WriteCommand): Command<WriteGraph> => ({ ...command, execute: async (graph, params) => command.execute(writeGraphOf(graph), params) });
+/**
+ * The read members of a write graph, in a new object: a plan (write-plan.ts)
+ * gets this, so no write member is in its reach, whatever it casts.
+ */
+const readsOf = (graph: WriteGraph): GraphReads => ({
+  get: (path, extraHeaders) => graph.get(path, extraHeaders),
+  getBinary: (path) => graph.getBinary(path),
+  fetchUrl: (url) => graph.fetchUrl(url),
+});
+
+// The plan reads through the read members only; its writes run on the graph it was planned on.
+const bindPlan = async (plan: PlanWrite, graph: WriteGraph, params: Record<string, string>): Promise<Result<BoundPlan, GraphError>> => {
+  const planned = await plan(readsOf(graph), params);
+  if (!planned.ok) return planned;
+  return ok({ changes: planned.value.changes, apply: () => planned.value.apply(graph) });
+};
+
+/** A write command that runs on the write view of any write graph it is given, its plan too. */
+const writeCommandOf = (command: WriteCommand): Command<WriteGraph> => {
+  const { plan, ...rest } = command;
+  return {
+    ...rest,
+    execute: async (graph, params) => command.execute(writeGraphOf(graph), params),
+    ...(plan === undefined ? {} : { plan: async (graph: WriteGraph, params: Record<string, string>) => bindPlan(plan, writeGraphOf(graph), params) }),
+  };
+};
 
 const isReadCommand = (command: RegisteredCommand): command is ReadCommand => command.meta.effect === 'read';
 
 const withOwnGraph = (command: RegisteredCommand): Command => (isReadCommand(command) ? readCommandOf(command) : writeCommandOf(command));
 
-export { readCommandOf, readGraphOf, withOwnGraph, writeCommandOf, writeGraphOf };
+export { readCommandOf, readGraphOf, readsOf, withOwnGraph, writeCommandOf, writeGraphOf };

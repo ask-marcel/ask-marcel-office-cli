@@ -35,6 +35,8 @@ import { persistIfRequested, persistMediaIfRequested } from '../use-cases/comman
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { RunRecorder } from '../use-cases/commands/record-run.ts';
+import { noDryRun, previewPlan, recordRun } from '../use-cases/commands/record-run.ts';
 
 // map the discriminated GraphError type to
 // the presenter's ErrorSource. `api_error` and `network_error` both surface
@@ -153,6 +155,12 @@ export type RunRegistryCommandDeps<G = ReadGraph & WriteGraph> = {
   readonly fs: FileSystem;
   /** The package the command belongs to: its errors name the package's commands and bin. */
   readonly commandPackage: ErrorWordingSource;
+  /**
+   * The run journal of the write package. With it, a write that has a plan
+   * gets a run id and a record that `undo` reads (record-run.ts). Without it (a
+   * library caller, the read package), each command runs as it is.
+   */
+  readonly runs?: RunRecorder;
 };
 
 export type RunRegistryCommandRequest<G = ReadGraph & WriteGraph> = {
@@ -165,6 +173,8 @@ export type RunRegistryCommandRequest<G = ReadGraph & WriteGraph> = {
   readonly outputDir?: string;
   /** Which front end asked. Decides whether a remedy may mention a shell. */
   readonly surface: RenderSurface;
+  /** Show the changes of a write with a plan, and make none. */
+  readonly dryRun?: boolean;
 };
 
 /**
@@ -207,12 +217,20 @@ const persistToPath = async <G>(deps: RunRegistryCommandDeps<G>, request: RunReg
   return err({ message: describeOutputPathError(persisted.error, request.name, request.surface, deps.commandPackage), code: persisted.error.type });
 };
 
-export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, RunRegistryCommandFailure>> => {
-  const { command, name } = request;
+// A dry-run shows the plan; a write with a plan and a journal is recorded; any other runs as it is.
+const runCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, GraphError>> => {
+  const { command, name, params } = request;
+  if (request.dryRun === true) return command.plan === undefined ? err(noDryRun(name)) : previewPlan(name, await command.plan(deps.graph, params));
+  if (command.plan !== undefined && deps.runs !== undefined) return recordRun(deps.runs, name, await command.plan(deps.graph, params));
   // `convert-local-file-to-markdown` / `extract-local-file-images` are the commands whose
   // input is the local filesystem, not Graph — route them to executeLocal with the
   // composition-selected FileSystem (the same instance --output-path uses).
-  const result = command.executeLocal !== undefined ? await command.executeLocal(deps.fs, request.params) : await command.execute(deps.graph, request.params);
+  return command.executeLocal !== undefined ? command.executeLocal(deps.fs, params) : command.execute(deps.graph, params);
+};
+
+export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, RunRegistryCommandFailure>> => {
+  const { command, name } = request;
+  const result = await runCommand(deps, request);
   if (!result.ok) return err(toFailure(command, result.error));
 
   // --output-dir is checked BEFORE --output-path: a media-producing command
