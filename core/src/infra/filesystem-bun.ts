@@ -1,10 +1,10 @@
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileExistence, FileStat, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileExistence, FileStat, FileSystem, FolderListing } from '../use-cases/ports/filesystem.ts';
 
 const isMissingError = (e: unknown): boolean => e instanceof Error && (e as { code?: string }).code === 'ENOENT';
 
-export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExistence & FileStat => ({
+export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExistence & FileStat & FolderListing => ({
   // Bun has neither a rename nor an exclusive create; both live on node:fs, so
   // these two delegate to the Node adapter, lazily (the same Rule-20 boundary
   // exception as chmod and the recursive delete below).
@@ -16,6 +16,8 @@ export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExist
   exists: async (path) => (await import('./filesystem-node.ts')).exists(path),
   // Bun.file() has no folder kind, so the stat delegates to the Node adapter too.
   stat: async (path) => (await import('./filesystem-node.ts')).statPath(path),
+  // Bun has no folder listing of its own, so it delegates to the Node adapter too.
+  list: async (folder) => (await import('./filesystem-node.ts')).listFolder(folder),
   readJson: async <T>(path: string) => {
     // `Bun.file()` and `exists()` throw on a path the runtime refuses (a NUL
     // byte): that is an io_failed. Only a body that is not JSON is a parse_failed.

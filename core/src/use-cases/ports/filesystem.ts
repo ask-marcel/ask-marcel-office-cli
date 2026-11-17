@@ -52,6 +52,15 @@ export type FileStat = {
 };
 
 /**
+ * The names of the entries of a folder. Kept apart from FileSystem because only
+ * the run journal needs it: it finds the runs older than 30 days by their names.
+ */
+export type FolderListing = {
+  /** The entry names, in no order; an empty list when the folder is not there. */
+  readonly list: (folder: string) => Promise<Result<ReadonlyArray<string>, FileSystemError>>;
+};
+
+/**
  * Writes that other processes race on: the token cache, replaced whole so a
  * reader never sees half a file, and its lock, created only when absent. Kept
  * apart from FileSystem because only the auth code needs them.

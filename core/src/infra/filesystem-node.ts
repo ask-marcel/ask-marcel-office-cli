@@ -13,12 +13,12 @@
  * either runtime directly.
  */
 
-import { chmod, mkdir, open, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
 import type { Stats } from 'node:fs';
-import type { AtomicFileWrites, FileExistence, FileInfo, FileStat, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileExistence, FileInfo, FileStat, FileSystem, FolderListing } from '../use-cases/ports/filesystem.ts';
 import { renameWithRetry } from './rename-with-retry.ts';
 
 const isNodeError = (e: unknown): e is NodeJS.ErrnoException => e instanceof Error && 'code' in e;
@@ -96,8 +96,19 @@ export const statPath: FileStat['stat'] = async (path) => {
   }
 };
 
-export const createNodeFileSystem = (): FileSystem & AtomicFileWrites & FileExistence & FileStat => ({
+// The entry names of a folder; a folder that is not there has none. Exported for the Bun adapter.
+export const listFolder: FolderListing['list'] = async (folder) => {
+  try {
+    return ok(await readdir(folder));
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') return ok([]);
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+export const createNodeFileSystem = (): FileSystem & AtomicFileWrites & FileExistence & FileStat & FolderListing => ({
   writeTextAtomic,
+  list: listFolder,
   createExclusive,
   exists,
   stat: statPath,
