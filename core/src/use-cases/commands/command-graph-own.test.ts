@@ -40,7 +40,7 @@ describe('a command run on the full client', () => {
       },
     };
     expect(await withOwnGraph(write).execute(fakeGraphClient(), { messageId: 'm1' })).toEqual(ok('ran'));
-    expect(seen).toEqual([['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put']]);
+    expect(seen).toEqual([['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment']]);
     expect(params).toEqual([{ messageId: 'm1' }]);
   });
 });

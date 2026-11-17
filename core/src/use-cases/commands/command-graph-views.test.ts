@@ -45,7 +45,7 @@ const answering = (response: Response): FetchFn => {
 
 const writeGraphAnswering = (response: Response): ReturnType<typeof createWriteGraph> => createWriteGraph(tokens, answering(response));
 
-const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
+const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment'];
 
 describe('the read view of a graph that can also write', () => {
   // A full client, as in the 2.8.0 single package: its POST sends to any path.
@@ -193,6 +193,10 @@ describe('the write view of a graph that can also read every tier', () => {
       async delete(path: string) {
         this.calls.push(`delete ${path}`);
         return ok(undefined);
+      },
+      async uploadAttachment(_target: unknown, file: { readonly name: string; readonly bytes: Uint8Array }) {
+        this.calls.push(`uploadAttachment ${file.name}`);
+        return ok({ name: file.name, size: file.bytes.byteLength });
       },
     };
     const view = writeGraphOf(graph);

@@ -30,4 +30,17 @@ describe('the write view of a graph', () => {
       { method: 'DELETE', path: '/planner/tasks/t1', options: { ifMatch: 'W/"etag-2"' } },
     ]);
   });
+
+  it('passes an attachment upload on to the graph, with its target and its file', async () => {
+    const seen: unknown[] = [];
+    const graph = fakeWriteGraph({
+      uploadAttachment: async (target, file) => {
+        seen.push({ target, name: file.name });
+        return ok({ id: 'att-1', name: file.name, size: file.bytes.byteLength });
+      },
+    });
+    const answer = await writeGraphOf(graph).uploadAttachment({ kind: 'mail-draft', messageId: 'd1' }, { name: 'notes.txt', bytes: new Uint8Array(3) });
+    expect(answer).toEqual(ok({ id: 'att-1', name: 'notes.txt', size: 3 }));
+    expect(seen).toEqual([{ target: { kind: 'mail-draft', messageId: 'd1' }, name: 'notes.txt' }]);
+  });
 });

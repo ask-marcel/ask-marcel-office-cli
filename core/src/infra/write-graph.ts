@@ -8,6 +8,7 @@ import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
 import { cancelUnsigned, uploadChunks } from './upload-chunks.ts';
+import { createAttachmentUpload } from './attachment-upload.ts';
 
 // Graph beta: reached only by a PATCH on the beta allow-list (domain/beta-patch.ts).
 const GRAPH_BETA_ROOT = 'https://graph.microsoft.com/beta';
@@ -107,6 +108,7 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
   const core = createGraphRequestCore(tokens, fetchFn);
   return {
     get: (path, extraHeaders) => core.json('basic', 'GET', path, { extraHeaders }),
+    uploadAttachment: createAttachmentUpload(core, fetchFn),
     getBinary: (path) => core.getBinary('basic', path),
     fetchUrl: core.fetchUrl,
     post: (path, body) => unlessSendsMail('POST', path, () => core.json('basic', 'POST', path, { body, readBody: readWriteAnswer })),

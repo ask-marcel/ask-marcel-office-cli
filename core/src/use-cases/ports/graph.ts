@@ -1,3 +1,4 @@
+import type { AttachmentFile, AttachmentTarget, UploadedAttachment } from '../../domain/attachment-upload.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { ReadOnlyPost } from '../../domain/read-only-post.ts';
 import type { Result } from '../../domain/result.ts';
@@ -155,6 +156,12 @@ type WriteGraph = {
    */
   put: (basePath: string, body: Uint8Array, contentType?: string) => Promise<Result<unknown, GraphError>>;
   delete: (path: string, options?: WriteOptions) => Promise<Result<unknown, GraphError>>;
+  /**
+   * Attach a file to an unsent mail draft or a To Do task: one POST under 3 MB,
+   * an upload session from 3 MB, up to the limit of the target
+   * (domain/attachment-upload.ts). Answers the attachment made.
+   */
+  uploadAttachment: (target: AttachmentTarget, file: AttachmentFile) => Promise<Result<UploadedAttachment, GraphError>>;
 };
 
 export type { PatchOptions, ReadGraph, WriteGraph, WriteOptions };
