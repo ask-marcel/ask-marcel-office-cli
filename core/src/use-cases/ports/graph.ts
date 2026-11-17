@@ -125,12 +125,19 @@ type ReadGraph = {
  * it (scripts/check-read-bundle.ts).
  */
 
+/**
+ * What a change can carry besides its body. `ifMatch` is the ETag of the item
+ * the caller read (its `@odata.etag`), sent as `If-Match`: Planner refuses a
+ * PATCH or a DELETE without it. A create (POST) needs none, so `post` takes none.
+ */
+type WriteOptions = { readonly ifMatch?: string };
+
 type WriteGraph = {
   get: (path: string, extraHeaders?: Record<string, string>) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   fetchUrl: (url: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
-  patch: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
+  patch: (path: string, body: unknown, options?: WriteOptions) => Promise<Result<unknown, GraphError>>;
   /**
    * Upload bytes to a drive item. `basePath` is the bare driveItem
    * path (e.g. `/me/drive/root:/.ask-marcel-temp/abc.rtf`) — `put()`
@@ -140,7 +147,7 @@ type WriteGraph = {
    * user's OneDrive quota.
    */
   put: (basePath: string, body: Uint8Array, contentType?: string) => Promise<Result<unknown, GraphError>>;
-  delete: (path: string) => Promise<Result<unknown, GraphError>>;
+  delete: (path: string, options?: WriteOptions) => Promise<Result<unknown, GraphError>>;
 };
 
-export type { ReadGraph, WriteGraph };
+export type { ReadGraph, WriteGraph, WriteOptions };
