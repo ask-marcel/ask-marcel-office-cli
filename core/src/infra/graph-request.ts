@@ -36,6 +36,8 @@ type JsonRequest = {
   readonly extraHeaders?: Readonly<Record<string, string>>;
   // How a success is read; JSON by default.
   readonly readBody?: (res: Response) => Promise<unknown>;
+  // The Graph root the path is under; v1.0 by default.
+  readonly root?: string;
 };
 
 type GraphRequestCore = {
@@ -271,7 +273,7 @@ const createGraphRequestCore = (tokens: TokenSource, fetchFn: FetchFn): GraphReq
   };
 
   const json = async (tier: GraphTier, method: HttpMethod, path: string, request: JsonRequest = {}): Promise<Result<unknown, GraphError>> => {
-    const url = `${GRAPH_ROOT}${path}`;
+    const url = `${request.root ?? GRAPH_ROOT}${path}`;
     try {
       const sent = await send(tier, url, {
         method,

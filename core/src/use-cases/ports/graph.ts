@@ -132,12 +132,19 @@ type ReadGraph = {
  */
 type WriteOptions = { readonly ifMatch?: string };
 
+/**
+ * A PATCH can also ask for Graph beta (`api: 'beta'`). Only the paths on the
+ * beta allow-list may (domain/beta-patch.ts: the details of a Planner task, for
+ * the HTML `notes`); any other path asked for beta is refused before any request.
+ */
+type PatchOptions = WriteOptions & { readonly api?: 'beta' };
+
 type WriteGraph = {
   get: (path: string, extraHeaders?: Record<string, string>) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   fetchUrl: (url: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
-  patch: (path: string, body: unknown, options?: WriteOptions) => Promise<Result<unknown, GraphError>>;
+  patch: (path: string, body: unknown, options?: PatchOptions) => Promise<Result<unknown, GraphError>>;
   /**
    * Upload bytes to a drive item. `basePath` is the bare driveItem
    * path (e.g. `/me/drive/root:/.ask-marcel-temp/abc.rtf`) — `put()`
@@ -150,4 +157,4 @@ type WriteGraph = {
   delete: (path: string, options?: WriteOptions) => Promise<Result<unknown, GraphError>>;
 };
 
-export type { ReadGraph, WriteGraph, WriteOptions };
+export type { PatchOptions, ReadGraph, WriteGraph, WriteOptions };
