@@ -61,17 +61,18 @@ const rejectUnknownParams = (schema: Command['schema'], params: Record<string, s
 };
 
 /**
- * Wraps a command so `execute` / `executeLocal` refuse unknown params before
+ * Wraps a command so `execute` / `executeLocal` / `plan` refuse unknown params before
  * running. Applied at registry assembly, which is the single choke point every
  * surface passes through — including a library caller that never touches
  * composition.
  */
 const withUnknownParamRejection = <G>(command: Command<G>): Command<G> => {
-  const { executeLocal } = command;
+  const { executeLocal, plan } = command;
   return {
     ...command,
     execute: async (graph, params) => rejectUnknownParams(command.schema, params) ?? (await command.execute(graph, params)),
     ...(executeLocal === undefined ? {} : { executeLocal: async (fs, params) => rejectUnknownParams(command.schema, params) ?? (await executeLocal(fs, params)) }),
+    ...(plan === undefined ? {} : { plan: async (graph: G, params: Record<string, string>) => rejectUnknownParams(command.schema, params) ?? (await plan(graph, params)) }),
   };
 };
 
