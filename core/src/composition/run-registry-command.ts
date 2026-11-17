@@ -28,6 +28,7 @@ import type { WriteGraph } from '../infra/write-graph.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { RenderContext, RenderSurface } from '../presenter/render-to-string.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
+import { isArchiveResult } from '../use-cases/commands/archive-result.ts';
 import type { Command } from '../use-cases/commands/command-types.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
 import { persistIfRequested, persistMediaIfRequested } from '../use-cases/commands/output-path.ts';
@@ -108,6 +109,15 @@ type ErrorWordingSource = Pick<CommandPackage<Command<never>>, 'registry' | 'bin
 /** The --output-path refusals that name nothing of the package: all of them but the no-body refusal. */
 type PackageFreeOutputPathError = Exclude<OutputPathError, { readonly type: 'no_inlined_bytes' }>;
 
+// Large-payload guard: refuse to dump a multi-MB base64 blob to stdout (context bomb). Point at the flag
+// that takes it: --output-dir for the entry images of an archive result, --output-path for a single body.
+const describeInlineTooLarge = (error: Extract<OutputPathError, { readonly type: 'inline_too_large' }>, commandName: string): string => {
+  const megabytes = (error.base64Length * 0.75e-6).toFixed(1);
+  return error.inImages === true
+    ? `--output-dir: ${commandName} returned ~${megabytes} MB of inline images — too large to print to stdout (it would flood the context). Re-run with \`--output-dir <dir>\` to write the images to disk; each image then carries \`savedTo\` instead of \`base64\`.`
+    : `--output-path: ${commandName} returned a ~${megabytes} MB inline payload — too large to print to stdout (it would flood the context). Re-run with \`--output-path <file>\` to write the bytes to disk; the envelope then carries \`savedTo\` instead of \`base64\`.`;
+};
+
 const formatOutputPathError = (error: PackageFreeOutputPathError, commandName: string): string => {
   if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
   // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
@@ -118,9 +128,7 @@ const formatOutputPathError = (error: PackageFreeOutputPathError, commandName: s
   // *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
   if (error.type === 'passthrough_extension_mismatch')
     return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
-  // Large-payload guard: refuse to dump a multi-MB base64 blob to stdout (context bomb). Point at --output-path.
-  if (error.type === 'inline_too_large')
-    return `--output-path: ${commandName} returned a ~${(error.base64Length * 0.75e-6).toFixed(1)} MB inline payload — too large to print to stdout (it would flood the context). Re-run with \`--output-path <file>\` to write the bytes to disk; the envelope then carries \`savedTo\` instead of \`base64\`.`;
+  if (error.type === 'inline_too_large') return describeInlineTooLarge(error, commandName);
   // humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
   const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
   if (enoent !== null) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
@@ -190,6 +198,15 @@ const toFailure = (command: Command<never>, error: GraphError): RunRegistryComma
   };
 };
 
+// --output-path, or with no path the size guard on what goes to stdout.
+const persistToPath = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>, value: unknown): Promise<Result<unknown, RunRegistryCommandFailure>> => {
+  const persisted = await persistIfRequested(deps.fs, request.outputPath, value, { sourceText: request.command.meta.returnsSourceText === true });
+  if (persisted.ok) return ok(persisted.value);
+  // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
+  // `passthrough_extension_mismatch`, `text_under_binary_extension`, `inline_too_large`, `empty_path`, `write_failed`.
+  return err({ message: describeOutputPathError(persisted.error, request.name, request.surface, deps.commandPackage), code: persisted.error.type });
+};
+
 export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, RunRegistryCommandFailure>> => {
   const { command, name } = request;
   // `convert-local-file-to-markdown` / `extract-local-file-images` are the commands whose
@@ -201,18 +218,15 @@ export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, req
   // --output-dir is checked BEFORE --output-path: a media-producing command
   // paired with both should land the media array, not fall into the
   // single-file writer. Order is behaviour, not style.
-  if (request.outputDir !== undefined) {
-    const persistedMedia = await persistMediaIfRequested(deps.fs, request.outputDir, result.value);
-    if (persistedMedia.ok) return ok(persistedMedia.value);
-    // The error's discriminant doubles as a machine-readable errorCode (`no_media`, `empty_path`,
-    // `write_failed`) so an agent routes on the code instead of substring-matching the message.
-    return err({ message: formatOutputDirError(persistedMedia.error, name, deps.commandPackage.registry), code: persistedMedia.error.type });
-  }
-  const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value, { sourceText: command.meta.returnsSourceText === true });
-  if (persisted.ok) return ok(persisted.value);
-  // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
-  // `passthrough_extension_mismatch`, `text_under_binary_extension`, `inline_too_large`, `empty_path`, `write_failed`.
-  return err({ message: describeOutputPathError(persisted.error, name, request.surface, deps.commandPackage), code: persisted.error.type });
+  if (request.outputDir === undefined) return persistToPath(deps, request, result.value);
+  const persistedMedia = await persistMediaIfRequested(deps.fs, request.outputDir, result.value);
+  // The error's discriminant doubles as a machine-readable errorCode (`no_media`, `empty_path`,
+  // `write_failed`) so an agent routes on the code instead of substring-matching the message.
+  if (!persistedMedia.ok) return err({ message: formatOutputDirError(persistedMedia.error, name, deps.commandPackage.registry), code: persistedMedia.error.type });
+  // An archive result is the one media result that also has text: its images
+  // went to the directory, and --output-path, when given, takes its markdown.
+  if (request.outputPath === undefined || !isArchiveResult(persistedMedia.value)) return ok(persistedMedia.value);
+  return persistToPath(deps, request, persistedMedia.value);
 };
 
 export { buildRenderContext, describeOutputPathError, formatOutputDirError };
