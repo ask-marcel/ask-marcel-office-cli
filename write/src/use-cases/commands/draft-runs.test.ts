@@ -221,7 +221,7 @@ describe('the run and the undo of each draft command', () => {
     const denied = await run({ ...seeded.graph, patch: refused.patch }, 'update-mail-draft', { messageId: 'draft-9', subject: 'New' }, { runs: recorder(journal) });
     expect(denied.ok ? '' : denied.error.message).toBe('Access is denied.');
     const create = await run(
-      { ...mailbox.graph, post: refused.patch as WriteGraph['post'] },
+      { ...mailbox.graph, post: refused.patch },
       'create-mail-draft',
       { subject: 'A', bodyContent: 'B', toRecipients: 'kim.lee@contoso.com' },
       { runs: recorder(journal) }
