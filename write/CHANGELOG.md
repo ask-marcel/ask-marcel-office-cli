@@ -48,7 +48,7 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
   `/planner/tasks/{task-id}/details` can use beta (the HTML `notes` of a
   Planner task). A beta PATCH of another path is refused before any request,
   with the code `beta_refused`.
-- No command can send mail. The write graph that each command gets refuses,
+- No command can send mail. The write graph, and the write view that each command gets, refuse,
   before any request, a POST, PATCH or DELETE to a path that ends in `send`,
   `sendMail`, `reply`, `replyAll` or `forward` (in any case), and a `$batch`.
   The code is `send_refused`. `createReply`, `createReplyAll` and

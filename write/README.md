@@ -123,8 +123,9 @@ The library exports:
 
 Each `execute` returns a `Result`: `{ ok: true, value }` or `{ ok: false, error }`.
 A command runs on a write view of the graph you give it. Before any request,
-that view refuses a change to a path that sends mail (`send_refused`) and a
-Graph beta PATCH of a path that is not on the beta allow-list (`beta_refused`).
+that view and `createWriteGraph` refuse a change to a path that sends mail
+(`send_refused`) and a Graph beta PATCH of a path that is not on the beta
+allow-list (`beta_refused`).
 `@ask-marcel/office-write/commands.json` is the command manifest. To give the
 library your own token, set a tier variable or `ASKMARCEL_TOKEN_COMMAND` (see
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#your-own-token)).
