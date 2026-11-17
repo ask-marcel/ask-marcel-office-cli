@@ -25,7 +25,7 @@ afterEach(() => {
 
 describe('the write client of a library caller', () => {
   it('is the write graph: it has the basic-tier members only', () => {
-    expect(Object.keys(createWriteClient()).toSorted((a, b) => a.localeCompare(b))).toEqual(['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put']);
+    expect(Object.keys(createWriteClient()).toSorted((a, b) => a.localeCompare(b))).toEqual(['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment']);
   });
 
   it('signs a Graph request with the token of the tier variable', async () => {

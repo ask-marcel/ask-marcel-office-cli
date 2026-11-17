@@ -48,7 +48,7 @@ describe('the deps of the write package', () => {
     const deps = buildWriteDeps({ home: HOME, env: {}, fs, logLevel: 'error' });
     expect(Object.keys(deps).toSorted((a, b) => a.localeCompare(b))).toEqual(['fs', 'graph', 'logger']);
     expect(deps.fs).toBe(fs);
-    expect(Object.keys(deps.graph).toSorted((a, b) => a.localeCompare(b))).toEqual(['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put']);
+    expect(Object.keys(deps.graph).toSorted((a, b) => a.localeCompare(b))).toEqual(['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put', 'uploadAttachment']);
   });
 
   it('signs a draft with the token that the helper at ASKMARCEL_TOKEN_COMMAND prints, and writes no file', async () => {
