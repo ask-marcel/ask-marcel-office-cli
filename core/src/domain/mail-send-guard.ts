@@ -12,19 +12,20 @@ import { err } from './result.ts';
 // The last path segment of each sending action, in lower case.
 const SENDING_ACTIONS: ReadonlySet<string> = new Set(['send', 'sendmail', 'reply', 'replyall', 'forward', '$batch']);
 
-// A segment with a percent-encoded letter (`%73end`) is compared decoded; a
-// malformed escape cannot name an action, so it is compared as it is.
-const decoded = (segment: string): string => {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-};
+// The path as the request sends it. The URL parser resolves dot segments
+// (`x/..`, `%2e%2e`) and drops the query, as fetch does with the Graph root in
+// front, so a path cannot reach a send through `..`. The root makes any path parse.
+const sentPath = (path: string): string => new URL(`https://graph.invalid/v1.0${path}`).pathname;
 
-// The action a path ends in: no query, no trailing slash, no `microsoft.graph.` namespace, lower case.
+// Each percent-encoded byte decoded on its own (`%73end` is `send`): a sending
+// action is ASCII, and a malformed escape stays as it is.
+const decoded = (segment: string): string => segment.replaceAll(/%([\da-f]{2})/gi, (_escape, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)));
+
+// The action a path ends in: no trailing slash, no `microsoft.graph.` namespace, lower case.
 const actionOf = (path: string): string => {
-  const segments = (path.split(/[?#]/, 1)[0] ?? '').split('/').filter((segment) => segment !== '');
+  const segments = sentPath(path)
+    .split('/')
+    .filter((segment) => segment !== '');
   return decoded(segments.at(-1) ?? '')
     .trim()
     .toLowerCase()
@@ -42,7 +43,7 @@ const sendRefused = (method: string, path: string): Result<never, GraphError> =>
   });
 
 /** Runs `change` only when `path` sends no mail; refuses it otherwise, before any request. */
-const unlessSendsMail = async (method: string, path: string, change: () => Promise<Result<unknown, GraphError>>): Promise<Result<unknown, GraphError>> =>
+const unlessSendsMail = async <T>(method: string, path: string, change: () => Promise<Result<T, GraphError>>): Promise<Result<T, GraphError>> =>
   sendsMail(path) ? sendRefused(method, path) : change();
 
 export { sendsMail, unlessSendsMail };

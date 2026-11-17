@@ -77,6 +77,20 @@ describe('a small file attached to a mail draft', () => {
   });
 });
 
+describe('a mail draft id that would turn the upload into a send', () => {
+  it('is refused before any request', async () => {
+    const sent: Sent[] = [];
+    const answer = await uploadWith(graph(sent, () => Response.json({ id: 'att-1' })))(
+      { kind: 'mail-draft', messageId: '../../me/sendMail?' },
+      { name: 'a.txt', bytes: new Uint8Array(1) }
+    );
+    expect(sent).toEqual([]);
+    expect(answer.ok).toBe(false);
+    if (answer.ok) return;
+    expect(answer.error.code).toBe('send_refused');
+  });
+});
+
 describe('a file of 3 MB or more attached to a mail draft', () => {
   it('opens an upload session and sends unsigned ranges under 4 MB, then answers the attachment the Location names', async () => {
     const sent: Sent[] = [];
