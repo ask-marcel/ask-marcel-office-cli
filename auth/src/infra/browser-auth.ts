@@ -82,6 +82,15 @@ type BothTokensResult = {
   readonly fromCache?: true;
 };
 
+/**
+ * How a full sign-in capture runs. `skipCacheProbe`: a fresh token that another
+ * process saved does not end the capture. `keepCookies`: when the profile is
+ * already signed in, only the page storage is cleared, so the token grant fires
+ * again with a silent sign-in. Without it the cookies are cleared too, which
+ * deletes the 90-day "Stay signed in" cookie (`login --force` only).
+ */
+type SignInCaptureOptions = { readonly skipCacheProbe?: boolean; readonly keepCookies?: boolean };
+
 type BrowserAuth = {
   /**
    * Capture an "elevated" Graph access token by navigating to a
@@ -150,7 +159,7 @@ type BrowserAuth = {
    * failed inside the same session — caller decides whether to surface
    * the partial success.
    */
-  acquireBothTokens: (teamsUrl: string, options?: { skipCacheProbe?: boolean }) => Promise<BothTokensResult>;
+  acquireBothTokens: (teamsUrl: string, options?: SignInCaptureOptions) => Promise<BothTokensResult>;
   close: () => Promise<void>;
 };
 
@@ -325,6 +334,10 @@ const createElevatedPicker = (graceMs: number): ElevatedPicker => {
 };
 
 const M365_CLOUD_URL = 'https://m365.cloud.microsoft/search';
+
+// What a capture that keeps the cookies says when it clears the page storage.
+const KEEP_COOKIES_PROGRESS =
+  'Clearing the stored Teams page data so the sign-in can be captured again. The browser cookies stay, so the sign-in is usually silent and asks for no password.';
 
 /**
  * The Microsoft Teams web client identity. The Phase A probe at
@@ -822,7 +835,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * prompt. With this method, the elevated step runs on the same
    * already-authenticated page.
    */
-  const acquireBothTokens = async (teamsUrl: string, options?: { skipCacheProbe?: boolean }): Promise<BothTokensResult> => {
+  const acquireBothTokens = async (teamsUrl: string, options?: SignInCaptureOptions): Promise<BothTokensResult> => {
     const elevatedUrl = M365_CLOUD_URL;
     trace('[DEBUG] acquireBothTokens: ENTER\n');
     await cleanupSingletonLocks(profileDir, fs);
@@ -951,6 +964,19 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     trace(`[DEBUG] acquireBothTokens: initial settle for ${initialSettleMs}ms\n`);
     await sleep(initialSettleMs);
 
+    // A capture that keeps the cookies clears only the page storage below: the
+    // token grant fires again from a silent sign-in on the kept cookies.
+    const clearCookiesUnlessKept = async (): Promise<void> => {
+      if (options?.keepCookies === true) {
+        onProgress(KEEP_COOKIES_PROGRESS);
+        return;
+      }
+      onProgress(
+        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office-auth login` refreshes the elevated token without clearing it.'
+      );
+      await activeCtx.clearCookies();
+    };
+
     // Force re-login if the persistent profile dropped us into an
     // already-signed-in session — the old token grant happened before
     // our listener was attached, so we need to redo the OAuth dance.
@@ -969,10 +995,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       // each time (2026-08-31). Emitted here rather than in the CLI flag
       // description so MCP and library callers hear it too, and so it can only
       // fire when a session is actually being destroyed.
-      onProgress(
-        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office-auth login` refreshes the elevated token without clearing it.'
-      );
-      await activeCtx.clearCookies();
+      await clearCookiesUnlessKept();
       try {
         await activePage.evaluate(() => {
           localStorage.clear();
@@ -1207,4 +1230,5 @@ export type {
   PlaywrightLoader,
   RequestLike,
   ResponseLike,
+  SignInCaptureOptions,
 };
