@@ -130,6 +130,7 @@ const draft = entries.filter(([, command]) => command.meta.effect === 'draft').l
 const transientUpload = entries.filter(([, command]) => command.meta.effect === 'transient-upload').length;
 const mailState = entries.filter(([, command]) => command.meta.effect === 'mail-state').length;
 const deletes = entries.filter(([, command]) => command.meta.effect === 'delete').length;
+const taskWrite = entries.filter(([, command]) => command.meta.effect === 'task-write').length;
 const categories = new Set(graphCommands.map((entry) => entry.category)).size;
 
 // The manifest carries the lifecycle stubs the registry does not; the
@@ -161,8 +162,8 @@ const CLAIMS: ReadonlyArray<Claim> = [
     role: 'write',
     file: DOCS.readme,
     label: 'write commands by effect',
-    pattern: /the (\d+) write commands: (\d+) mail-draft operations, (\d+) PDF conversions, (\d+) mail state changes and (\d+) draft delete/,
-    expected: [write, draft, transientUpload, mailState, deletes],
+    pattern: /the (\d+) write commands: (\d+) mail-draft operations, (\d+) PDF conversions, (\d+) mail state changes, (\d+) To Do changes and (\d+) deletes/,
+    expected: [write, draft, transientUpload, mailState, taskWrite, deletes],
   },
   { role: 'write', file: DOCS.usage, label: 'write command count', pattern: /\b[Tt]he (\d+) write commands\b/, expected: [write] },
   {
@@ -275,7 +276,7 @@ const run = async (): Promise<number> => {
   if (failures.length > 0) {
     console.error(`check-doc-numbers: the docs of ${commandPackage.packageName} disagree with the registry or hold a bin placeholder.\n`);
     for (const failure of failures) console.error(`  ${failure}`);
-    console.error(`\nRegistry now holds: ${total} commands (${read} read, ${write} write: ${draft} draft, ${transientUpload} transient-upload, ${mailState} mail-state, ${deletes} delete), ${readGet} GET reads, ${readOnlyPost} read-only POST, ${categories} categories, ${manifestTotal} in the help-json manifest.`);
+    console.error(`\nRegistry now holds: ${total} commands (${read} read, ${write} write: ${draft} draft, ${transientUpload} transient-upload, ${mailState} mail-state, ${taskWrite} task-write, ${deletes} delete), ${readGet} GET reads, ${readOnlyPost} read-only POST, ${categories} categories, ${manifestTotal} in the help-json manifest.`);
     return 1;
   }
 

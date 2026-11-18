@@ -6,6 +6,39 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the To Do commands
+
+- Tasks: `create-todo-task`, `update-todo-task` and `complete-todo-task` set the
+  title, the note, the status, the importance, the due and start days, the
+  reminder and the categories. A date is in the time zone of the mailbox, and
+  `none` removes it.
+- `move-todo-task` moves a task to another list. Graph has no move: the command
+  copies the task with its steps, linked resources and attachments, and deletes
+  the original only after the full copy. A copy that fails is deleted again,
+  and the original stays. The task gets a new id, which the output gives.
+- `delete-todo-task` deletes a task. The run journal keeps a full copy, the
+  bytes of its attachments too, so its undo creates the task again (with a new
+  id).
+- Steps: `add-todo-task-step`, `update-todo-task-step` and
+  `delete-todo-task-step`.
+- `add-todo-linked-resource` links a resource (a mail, a web page) to a task.
+- Attachments: `add-todo-task-attachment --file` attaches a local file of at
+  most 25 MB, and `remove-todo-task-attachment` removes one. The run journal
+  keeps the bytes of a removed file, so its undo attaches it again.
+- Lists: `create-todo-list` and `update-todo-list`. No command deletes a list,
+  so the undo of `create-todo-list` keeps the list and says so.
+- `apply-todo-ops --file` applies a batch of ops (add, update with new steps,
+  move, delete) from a local JSON file, the form of the edit script. One wrong
+  op refuses the whole file before any change, and a refusal never quotes the
+  file.
+- `--list` and `--to` take the name of a list or its id. Each id from a param or
+  a file is checked before it goes into a Graph path.
+- Each To Do command takes `--dry-run`, and each run has an undo. An undo that
+  makes an item again gives it a new id, and the dates of creation are not
+  kept. The undo passes over a task that changed after the run.
+- Over MCP, the commands that delete or move a task, a step or an attachment,
+  and `apply-todo-ops`, run on `run-destructive-command`.
+
 ### Added: the mail state commands
 
 - `move-mail-message` moves one or more messages to a folder: `--message-id`
