@@ -68,6 +68,8 @@ reference for a batch (`mail-batch.ts`, `mail-move-write.ts`,
 `mail-field-write.ts`). The To Do commands are the reference for a write of
 more than one change in one op, and for an undo that makes an item again
 (`todo-batch.ts`, `todo-copy.ts`, `todo-task-undo.ts`, `todo-item-undo.ts`).
+The attachment commands of a mail draft are the reference for a guard that
+reads the item before each write and in each undo check.
 
 ## The undo of the To Do commands
 
@@ -102,6 +104,37 @@ Graph limits that the To Do commands meet:
 - The journal of `delete-todo-task` and `remove-todo-task-attachment` holds the
   bytes of the attachments (base64), up to 25 MB for each file.
 
+## The undo of the attachment commands of a mail draft
+
+| Kind | Change | What the check compares | What the undo does |
+|:--|:--|:--|:--|
+| `delete-draft-attachment` | add an attachment to a draft | the message is an unsent draft out of the Outbox, and the attachment is there with its name | removes the attachment |
+| `reattach-draft-file` | remove an attachment of a draft | the message is an unsent draft out of the Outbox | attaches the bytes in the journal again (new id) |
+
+The ops of these commands run on the op engine of the To Do commands
+(`todo-batch.ts`, `mail-attachment-add.ts`, `mail-attachment-remove.ts`,
+`mail-attachment-undo.ts`). The guard (`mail-draft-reader.ts`) reads
+`isDraft` and `parentFolderId` of the message, and the id of the Outbox.
+
+Graph limits that these commands meet:
+
+- The list of the attachments gives a `size` that is about 170 bytes larger
+  than the file. The check of an added attachment compares the name only.
+- `GET .../attachments/{id}` gives `contentBytes`, in some answers wrapped in
+  `value`. The remove reads both forms.
+- An attached item (`itemAttachment`), a link (`referenceAttachment`) and an
+  inline picture of the body cannot be made again from the journal, so the
+  remove refuses them. The journal keeps a file of at most 25,000,000 bytes,
+  the same limit as for To Do.
+- An upload session can end with no `Location`, so with no id. The add then
+  finds the new attachment by its name among the attachments that were not
+  there before.
+- A removed attachment cannot come back with its id. The undo makes a new one.
+
+`--body-file` on the four draft commands changes no undo: the file is read
+before the checks of the command, and its text goes into `--body-content` or
+`--comment` (`write/src/use-cases/commands/draft-body-file.ts`).
+
 ## Local files
 
 A command that reads a local file that a param names (`--ids-file`, `--file`,
@@ -132,7 +165,8 @@ effect `delete`, and it is on that tool.
 | Time kept | 30 days (`RUN_RETENTION_DAYS`). Each recorded run removes the older runs by their file names |
 | Record | `{ version: 1, runId, command, startedAt, changes: [{ action, target, before, after, undo: { kind, data }, undoneAt? }] }` |
 
-The journal holds tenant data (ids, subjects, bodies). No code writes it to a
+The journal holds tenant data (ids, subjects, bodies, and the bytes of a
+removed attachment). No code writes it to a
 log.
 
 ## Error codes

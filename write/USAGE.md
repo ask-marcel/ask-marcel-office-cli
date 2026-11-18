@@ -1,7 +1,8 @@
 # Usage guide of @ask-marcel/office-write
 
 This guide tells how to use the `ask-marcel-office-write` bin: the draft flow,
-the rules of each draft command, the mail state commands, the To Do commands,
+the rules of each draft command, the draft attachments and body files, the
+mail state commands, the To Do commands,
 the dry-run and the undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
 The list of commands is in [COMMANDS.md](COMMANDS.md). The output formats, the
 errors and `--output-path` are the same as in the
@@ -75,6 +76,61 @@ field.
 ```sh
 ask-marcel-office-write update-mail-draft --message-id "AAMkAD..." --cc-recipients ""
 ```
+
+## Draft attachments and body files
+
+The four draft commands take `--body-file <path>` for a body that is too long
+for a command line. The file is a UTF-8 text file of at most 1,000,000 bytes.
+A byte order mark is removed. The text goes where the text option of the command
+goes:
+
+- `create-mail-draft` and `update-mail-draft`: in place of `--body-content`.
+  On `update-mail-draft` it replaces the full body, with the same rules as
+  `--body-content`, so it cannot go with `--comment`.
+- `create-reply-draft` and `create-forward-draft`: in place of `--comment`, above
+  the quote.
+
+```sh
+ask-marcel-office-write create-reply-draft --reply-to-message-id "AAMkAD..." --body-file ./reply.txt
+ask-marcel-office-write update-mail-draft --message-id "AAMkAD..." --body-file ./body.html --body-content-type HTML --replace-quoted-history true
+```
+
+The bin refuses `--body-file` together with the text option
+(`body_file_conflict`), a file that is not UTF-8 (`body_file_not_utf8`), a file
+with no text (`body_file_empty`) and a file above the limit
+(`local_file_too_large`). A command that needs a body and gets neither option
+gives `body_missing`. A refusal never shows the text of the file. The dry-run
+reads the file too.
+
+`add-mail-draft-attachment` attaches a local file to an unsent draft, and
+`remove-mail-draft-attachment` removes one file attachment of it:
+
+```sh
+ask-marcel-office-write add-mail-draft-attachment --message-id "AAMkAD..." --file ./report.pdf --dry-run
+ask-marcel-office-write add-mail-draft-attachment --message-id "AAMkAD..." --file ./report.pdf
+ask-marcel-office-write remove-mail-draft-attachment --message-id "AAMkAD..." --attachment-id "AAMkAD..."
+```
+
+- Both commands read the message first. They refuse a message that is not a
+  draft (`not_a_draft`) and a draft in the Outbox (`draft_in_outbox`), before
+  any write. Just before the write they read the draft again, and pass over a
+  draft that was sent in between.
+- A file of at most 150 MB can be attached. It must not be empty
+  (`attachment_file_empty`). A file of 3 MB or more goes through an upload
+  session. The attachment has the name of the file, and the content type of its
+  extension (`application/octet-stream` for an extension that the bin does not
+  know).
+- The dry-run of `add-mail-draft-attachment` gives a `warning` when the draft
+  has an attachment with the same name already, and when the mail with its
+  attachments is above 25 MB, which many mail servers refuse.
+- `remove-mail-draft-attachment` takes the attachment ids of
+  `ask-marcel-office-read list-mail-attachments`. It removes a file only. It
+  refuses an attached item or a link (`not_a_file_attachment`), a picture in
+  the body (`inline_attachment`), and a file above 25,000,000 bytes
+  (`attachment_too_large_for_undo`), because the undo cannot make them again.
+  Remove these in Outlook. The size that Graph gives for an attachment is about
+  170 bytes larger than the file.
+- Over MCP, `remove-mail-draft-attachment` runs on `run-destructive-command`.
 
 ## Mail state
 
@@ -194,7 +250,7 @@ the undo can reverse them.
 
 ## Dry-run and undo
 
-The draft commands, the mail state commands and the To Do commands take `--dry-run`, and each run
+The draft commands, the attachment commands of a draft, the mail state commands and the To Do commands take `--dry-run`, and each run
 that is not a dry-run can be undone. The PDF conversions have neither:
 they leave nothing in your tenant.
 
@@ -224,6 +280,12 @@ What the undo does:
   changed, as they were before the run.
 - The undo of a draft command reverses a change only if the message is still a
   draft and its `changeKey` did not change after the run.
+- The undo of `add-mail-draft-attachment` removes the attachment, only if the
+  message is still an unsent draft out of the Outbox and has the attachment
+  with its name.
+- The undo of `remove-mail-draft-attachment` attaches the file again from the
+  bytes in the run journal, only if the message is still an unsent draft out
+  of the Outbox. It is a new attachment with a new id (shown in `now`).
 - The undo of `move-mail-message` and `move-mail-thread` moves each message
   back to the folder of before, only if it is still in the folder that the run
   put it in. The message gets a new id again: the undo shows it in `now`. The
@@ -264,7 +326,7 @@ The run journal is in `~/.ask-marcel/runs/`, one file for each run. It keeps a
 run 30 days: each write removes the older runs. An older run gives
 `run_expired`, and an unknown run id gives `run_not_found`. The journal holds
 the ids, the subjects and the bodies that an undo writes back, and the bytes of
-a removed To Do attachment, so do not share it.
+a removed To Do attachment or draft attachment, so do not share it.
 
 ## The PDF conversions
 
@@ -307,7 +369,7 @@ undo { runId }                                                   → shows the u
 undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
-`run-write-command` runs 21 commands: the write commands that do not delete. It
+`run-write-command` runs 22 commands: the write commands that do not delete. It
 has `readOnlyHint: false` and `destructiveHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
@@ -317,14 +379,15 @@ the read server (`ask-marcel-office-read mcp`). Register this server only on
 hosts that may write drafts and change the state of your mail.
 
 `run-destructive-command` runs the commands that delete or move an item:
-`delete-mail-draft`, `delete-todo-task`, `move-todo-task` (it deletes the
-original after the copy), `delete-todo-task-step`,
+`delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
+`move-todo-task` (it deletes the original after the copy), `delete-todo-task-step`,
 `remove-todo-task-attachment` and `apply-todo-ops` (an op can move or delete a
 task). It has `destructiveHint: true`, so a host asks you before it runs it.
 Each tool refuses a command of another tool and names the right one.
 
 `undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,
-because it can move a draft to Deleted Items or delete a To Do item: a host asks
+because it can move a draft to Deleted Items or delete a To Do item or an
+attachment of a draft: a host asks
 you before it runs it.
 
 ## Library
@@ -343,7 +406,7 @@ if (draft?.ok) console.log(draft.value);
 
 | Export | What it is |
 |:--|:--|
-| `commands` | Each of the 27 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file` and `--file`. |
+| `commands` | Each of the 29 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file` and `--body-file`. |
 | `createWriteGraph(tokens)` | The write graph over a `TokenSource`: the basic token, with `get`, `post`, `patch`, `put` and `delete`. |
 | `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
 | `createWriteClient()` | `createWriteGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
