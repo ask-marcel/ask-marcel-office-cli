@@ -14,11 +14,14 @@ import {
   replacePlainTextCommentAboveQuote,
 } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { BODY_FILE_FIELD, bodyFileOption, createBodyFileExecute, createBodyFilePlan } from './draft-body-file.ts';
+import type { BodyFileSpec } from './draft-body-file.ts';
 import { DRAFT_UPDATE_UNDO, planDraftUpdate } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
-const schema = z.object({
+// The params after --body-file is read: the text of the file is in bodyContent.
+const textSchema = z.object({
   messageId: z.string().min(1),
   subject: z.string().optional(),
   bodyContent: z.string().optional(),
@@ -30,6 +33,11 @@ const schema = z.object({
   bccRecipients: z.string().optional(),
   importance: z.enum(['Low', 'Normal', 'High']).optional(),
 });
+
+const schema = textSchema.extend({ bodyFile: BODY_FILE_FIELD });
+
+// --body-file replaces the whole body, as --body-content does.
+const BODY: BodyFileSpec = { key: 'bodyContent', required: false, exclusive: ['bodyContent', 'comment'] };
 
 const draftSchema = z.object({ isDraft: z.boolean(), body: z.object({ contentType: z.string(), content: z.string() }) });
 
@@ -99,7 +107,7 @@ const guardQuotedHistory = async (graph: WriteGraph, messageId: string): Promise
   return err(quotedHistoryRefusal(messageId));
 };
 
-type UpdateParams = z.infer<typeof schema>;
+type UpdateParams = z.infer<typeof textSchema>;
 
 // The combinations refused before any Graph call.
 const refuseUpdate = ({ subject, bodyContent, comment, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance }: UpdateParams): GraphError | undefined => {
@@ -144,8 +152,8 @@ const patchFields = ({ subject, bodyContent, bodyContentType, toRecipients, ccRe
   return body;
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
+const textExecute: WriteCommand['execute'] = async (graph, params) => {
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, bodyContent, comment, replaceQuotedHistory, bodyContentType } = parsed.data;
 
@@ -182,13 +190,17 @@ const savedFieldNames = (params: UpdateParams): ReadonlyArray<string> => {
 };
 
 // The dry-run and the recorded run: the checks of `execute`, then one read of the fields it writes.
-const plan: PlanWrite = async (reads, params) => {
-  const parsed = schema.safeParse(params);
+const textPlan: PlanWrite = async (reads, params) => {
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const refusal = refuseUpdate(parsed.data);
   if (refusal) return err(refusal);
-  return planDraftUpdate(reads, parsed.data.messageId, savedFieldNames(parsed.data), async (graph) => execute(graph, params));
+  return planDraftUpdate(reads, parsed.data.messageId, savedFieldNames(parsed.data), async (graph) => textExecute(graph, params));
 };
+
+const execute = createBodyFileExecute(textExecute, BODY);
+
+const plan = createBodyFilePlan(textPlan, BODY);
 
 const meta: WriteCommandMeta = {
   summary:
@@ -218,6 +230,7 @@ const meta: WriteCommandMeta = {
       description:
         'New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft that is almost never what you want, so the command reads the draft first and REFUSES when it still carries a quote - use --comment to revise only your own text and keep the quote, or pass --replace-quoted-history true to drop it deliberately. Note the sibling commands: create-reply-draft / create-forward-draft name their above-the-quote text --comment; --body-content exists only here. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment.',
     },
+    bodyFileOption('--body-content'),
     {
       name: 'comment',
       key: 'comment',
@@ -238,7 +251,7 @@ const meta: WriteCommandMeta = {
       key: 'bodyContentType',
       required: false,
       description:
-        'Format of --body-content, or of --comment in comment mode: Text (default) or HTML. With --comment on an HTML draft, Text is escaped into the draft (markup shows as characters) and HTML is spliced in as markup; HTML is refused on a plain-text draft. The draft keeps its own body format either way - this flag describes what you are passing, not what the draft becomes.',
+        'Format of --body-content (or of the text of --body-file), or of --comment in comment mode: Text (default) or HTML. With --comment on an HTML draft, Text is escaped into the draft (markup shows as characters) and HTML is spliced in as markup; HTML is refused on a plain-text draft. The draft keeps its own body format either way - this flag describes what you are passing, not what the draft becomes.',
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
     {
@@ -272,7 +285,7 @@ const meta: WriteCommandMeta = {
   ],
   example: '{write-bin} update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
   bodyTemplate:
-    "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
+    "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' (or the text of {body-file}) }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
   effect: 'draft',
   undo: DRAFT_UPDATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
