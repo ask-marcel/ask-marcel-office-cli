@@ -6,17 +6,24 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { BODY_FILE_FIELD, bodyFileOption, createBodyFileExecute, createBodyFilePlan } from './draft-body-file.ts';
+import type { BodyFileSpec } from './draft-body-file.ts';
 import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
 import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
-const schema = z.object({
+// The params after --body-file is read: the reply text is in comment.
+const textSchema = z.object({
   replyToMessageId: z.string().min(1),
   comment: z.string().min(1),
   subject: z.string().optional(),
   replyAll: z.enum(['true', 'false']).optional(),
   bodyContentType: z.enum(['Text', 'HTML']).optional(),
 });
+
+const schema = textSchema.extend({ comment: textSchema.shape.comment.optional(), bodyFile: BODY_FILE_FIELD });
+
+const BODY: BodyFileSpec = { key: 'comment', required: true, exclusive: ['comment'] };
 
 const isUnsentDraft = (value: unknown): value is { id: string } =>
   typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' && 'isDraft' in value && value.isDraft === true;
@@ -83,11 +90,11 @@ const createUnsentDraft = async (graph: WriteGraph, replyToMessageId: string, ac
   return ok(created.value);
 };
 
-type CheckedReply = z.infer<typeof schema> & { readonly action: 'createReply' | 'createReplyAll' };
+type CheckedReply = z.infer<typeof textSchema> & { readonly action: 'createReply' | 'createReplyAll' };
 
 // The checks before any write, which the dry-run makes too.
 const checkReply = (params: Record<string, string>): Result<CheckedReply, GraphError> => {
-  const parsed = schema.safeParse(params);
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // A reply that carries a boundary marker of its own would be kept verbatim by
   // the splice, and the NEXT `update-mail-draft --comment` edit would cut the
@@ -101,7 +108,7 @@ const checkReply = (params: Record<string, string>): Result<CheckedReply, GraphE
   return ok({ ...parsed.data, action: parsed.data.replyAll === 'false' ? 'createReply' : 'createReplyAll' });
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
+const textExecute: WriteCommand['execute'] = async (graph, params) => {
   const checked = checkReply(params);
   if (!checked.ok) return checked;
   const { replyToMessageId, comment, subject, bodyContentType, action } = checked.value;
@@ -133,7 +140,9 @@ const target = (params: Record<string, string>): Result<DraftTarget, GraphError>
   return ok({ target: `/me/messages/${replyToMessageId}/${action}`, before: { messageId: replyToMessageId } });
 };
 
-const plan = createDraftPlan({ action: 'create-reply-draft', target, execute });
+const execute = createBodyFileExecute(textExecute, BODY);
+
+const plan = createBodyFilePlan(createDraftPlan({ action: 'create-reply-draft', target, execute: textExecute }), BODY);
 
 const meta: WriteCommandMeta = {
   summary:
@@ -153,16 +162,16 @@ const meta: WriteCommandMeta = {
     {
       name: 'comment',
       key: 'comment',
-      required: true,
+      required: false,
       description:
-        "The reply text, placed above the quoted history. Named for Graph's own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
+        "Give it or --body-file. The reply text, placed above the quoted history. Named for Graph's own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
     },
     {
       name: 'body-content-type',
       key: 'bodyContentType',
       required: false,
       description:
-        "Format of --comment: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
+        "Format of --comment (or of the text of --body-file): Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
     {
@@ -179,10 +188,11 @@ const meta: WriteCommandMeta = {
         'Who the draft replies to. Defaults to true (everyone on the thread: sender + To + Cc, via createReplyAll). Pass `false` to reply to the sender only, via createReply. Only an explicit `false` narrows the recipients - anything else keeps reply-all.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    bodyFileOption('--comment'),
   ],
   example: '{write-bin} create-reply-draft --reply-to-message-id "AAMkAD..." --comment "Confirmed for Contoso, aligned with the group choice."',
   bodyTemplate:
-    "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
+    "Text: POST { comment: '{comment}' (or the text of {body-file}) } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
   effect: 'draft',
   undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],

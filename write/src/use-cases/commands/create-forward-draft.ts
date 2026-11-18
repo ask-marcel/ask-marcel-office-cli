@@ -6,12 +6,15 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { BODY_FILE_FIELD, bodyFileOption, createBodyFileExecute, createBodyFilePlan } from './draft-body-file.ts';
+import type { BodyFileSpec } from './draft-body-file.ts';
 import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
 import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
-const schema = z.object({
+// The params after --body-file is read: the comment text is in comment.
+const textSchema = z.object({
   forwardMessageId: z.string().min(1),
   toRecipients: z.string().min(1),
   ccRecipients: z.string().optional(),
@@ -19,6 +22,10 @@ const schema = z.object({
   subject: z.string().optional(),
   bodyContentType: z.enum(['Text', 'HTML']).optional(),
 });
+
+const schema = textSchema.extend({ comment: textSchema.shape.comment.optional(), bodyFile: BODY_FILE_FIELD });
+
+const BODY: BodyFileSpec = { key: 'comment', required: true, exclusive: ['comment'] };
 
 const isUnsentDraft = (value: unknown): value is { id: string } =>
   typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' && 'isDraft' in value && value.isDraft === true;
@@ -78,8 +85,8 @@ const spliceHtmlComment = async (graph: WriteGraph, created: { id: string }, com
 };
 
 // The checks before any write, which the dry-run makes too.
-const checkForward = (params: Record<string, string>): Result<z.infer<typeof schema>, GraphError> => {
-  const parsed = schema.safeParse(params);
+const checkForward = (params: Record<string, string>): Result<z.infer<typeof textSchema>, GraphError> => {
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success)
     return err({
       type: 'validation_error',
@@ -95,7 +102,7 @@ const checkForward = (params: Record<string, string>): Result<z.infer<typeof sch
   return ok(parsed.data);
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
+const textExecute: WriteCommand['execute'] = async (graph, params) => {
   const checked = checkForward(params);
   if (!checked.ok) return checked;
   const { forwardMessageId, toRecipients, ccRecipients, comment, subject, bodyContentType } = checked.value;
@@ -143,7 +150,9 @@ const target = (params: Record<string, string>): Result<DraftTarget, GraphError>
   return ok({ target: `/me/messages/${forwardMessageId}/createForward`, before: { messageId: forwardMessageId } });
 };
 
-const plan = createDraftPlan({ action: 'create-forward-draft', target, execute });
+const execute = createBodyFileExecute(textExecute, BODY);
+
+const plan = createBodyFilePlan(createDraftPlan({ action: 'create-forward-draft', target, execute: textExecute }), BODY);
 
 const meta: WriteCommandMeta = {
   summary:
@@ -176,9 +185,9 @@ const meta: WriteCommandMeta = {
     {
       name: 'comment',
       key: 'comment',
-      required: true,
+      required: false,
       description:
-        "The comment text, placed above the quoted forwarded message. Named for Graph's own createForward payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
+        "Give it or --body-file. The comment text, placed above the quoted forwarded message. Named for Graph's own createForward payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
     },
     {
       name: 'subject',
@@ -191,13 +200,14 @@ const meta: WriteCommandMeta = {
       key: 'bodyContentType',
       required: false,
       description:
-        "Format of --comment: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's separator (the `<hr>` line) and the forwarded original, so your comment leads the body content — leaving the original and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
+        "Format of --comment (or of the text of --body-file): Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's separator (the `<hr>` line) and the forwarded original, so your comment leads the body content — leaving the original and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
+    bodyFileOption('--comment'),
   ],
   example: '{write-bin} create-forward-draft --forward-message-id "AAMkAD..." --to-recipients "bob@example.com" --comment "Bob owns this now, forwarding for your action."',
   bodyTemplate:
-    "Text: POST { comment: '{comment}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+    "Text: POST { comment: '{comment}' (or the text of {body-file}), toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
   effect: 'draft',
   undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],

@@ -4,12 +4,15 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { slimDraftResult } from './draft-response.ts';
+import { BODY_FILE_FIELD, bodyFileOption, createBodyFileExecute, createBodyFilePlan } from './draft-body-file.ts';
+import type { BodyFileSpec } from './draft-body-file.ts';
 import { createDraftPlan, DRAFT_CREATE_UNDO } from './draft-runs.ts';
 import type { DraftTarget } from './draft-runs.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
-const schema = z.object({
+// The params after --body-file is read: the body text is in bodyContent.
+const textSchema = z.object({
   subject: z.string().min(1),
   bodyContent: z.string().min(1),
   bodyContentType: z.enum(['Text', 'HTML']).optional(),
@@ -20,8 +23,12 @@ const schema = z.object({
   mailFolderId: z.string().optional(),
 });
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
+const schema = textSchema.extend({ bodyContent: textSchema.shape.bodyContent.optional(), bodyFile: BODY_FILE_FIELD });
+
+const BODY: BodyFileSpec = { key: 'bodyContent', required: true, exclusive: ['bodyContent'] };
+
+const textExecute: WriteCommand['execute'] = async (graph, params) => {
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { subject, bodyContent, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance, mailFolderId } = parsed.data;
 
@@ -45,12 +52,14 @@ const draftPath = (mailFolderId: string | undefined): string => (mailFolderId ? 
 
 // What the draft is made in: the dry-run shows it, and a run records it.
 const target = (params: Record<string, string>): Result<DraftTarget, GraphError> => {
-  const parsed = schema.safeParse(params);
+  const parsed = textSchema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return ok({ target: draftPath(parsed.data.mailFolderId), before: {} });
 };
 
-const plan = createDraftPlan({ action: 'create-draft', target, execute });
+const execute = createBodyFileExecute(textExecute, BODY);
+
+const plan = createBodyFilePlan(createDraftPlan({ action: 'create-draft', target, execute: textExecute }), BODY);
 
 const meta: WriteCommandMeta = {
   summary:
@@ -69,14 +78,15 @@ const meta: WriteCommandMeta = {
     {
       name: 'body-content',
       key: 'bodyContent',
-      required: true,
-      description: 'Email body content. Plain text by default; pass --body-content-type HTML for rich text.',
+      required: false,
+      description: 'Email body content. Plain text by default; pass --body-content-type HTML for rich text. Give it or --body-file.',
     },
+    bodyFileOption('--body-content'),
     {
       name: 'body-content-type',
       key: 'bodyContentType',
       required: false,
-      description: 'Body format: Text (default) or HTML.',
+      description: 'Format of the body text (--body-content or --body-file): Text (default) or HTML.',
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
     {
@@ -115,7 +125,7 @@ const meta: WriteCommandMeta = {
   example:
     '{write-bin} create-mail-draft --subject "Q3 Report" --body-content "Please review the attached report." --to-recipients "alice@example.com,bob@example.com" --importance High',
   bodyTemplate:
-    "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
+    "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' (or the text of {body-file}) }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
   effect: 'draft',
   undo: DRAFT_CREATE_UNDO,
   scopesRequired: ['Mail.ReadWrite'],
