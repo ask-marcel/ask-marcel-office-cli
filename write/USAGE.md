@@ -47,7 +47,8 @@ Recipients are email addresses, separated by commas.
 The draft is on the thread of the message. It has the `RE:` subject, the
 recipients and the quoted history. Your text goes above the quote. The draft
 answers all the recipients by default. To answer only the sender, add
-`--reply-all false`.
+`--reply-all false`. Graph refuses a reply to a draft
+(`ErrorInvalidReferenceItem`): reply to a message that was sent or received.
 
 ### create-forward-draft
 
@@ -128,8 +129,9 @@ ask-marcel-office-write remove-mail-draft-attachment --message-id "AAMkAD..." --
   refuses an attached item or a link (`not_a_file_attachment`), a picture in
   the body (`inline_attachment`), and a file above 25,000,000 bytes
   (`attachment_too_large_for_undo`), because the undo cannot make them again.
-  Remove these in Outlook. The size that Graph gives for an attachment is about
-  170 bytes larger than the file.
+  Remove these in Outlook. The size that Graph gives for an attachment is 170 to
+  200 bytes larger than the file (169 and 190 bytes in a live run), so the
+  limit applies to that size.
 - Over MCP, `remove-mail-draft-attachment` runs on `run-destructive-command`.
 
 ## Mail state

@@ -118,8 +118,8 @@ The ops of these commands run on the op engine of the To Do commands
 
 Graph limits that these commands meet:
 
-- The list of the attachments gives a `size` that is about 170 bytes larger
-  than the file. The check of an added attachment compares the name only.
+- The list of the attachments gives a `size` that is 170 to 200 bytes larger
+  than the file (169 and 190 bytes in the live run of 2026-11-19). The check of an added attachment compares the name only.
 - `GET .../attachments/{id}` gives `contentBytes`, in some answers wrapped in
   `value`. The remove reads both forms.
 - An attached item (`itemAttachment`), a link (`referenceAttachment`) and an
