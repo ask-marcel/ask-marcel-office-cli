@@ -32,7 +32,7 @@ export const WRITE_LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'help-json',
     summary:
-      'Print the machine-readable command manifest of the write package as JSON, with every option, example and response shape. `--terse` gives each entry as `{name, summary, category}` (the summary cut to its first sentence). Categories: lifecycle, mail, calendar.',
+      'Print the machine-readable command manifest of the write package as JSON, with every option, example and response shape. `--terse` gives each entry as `{name, summary, category}` (the summary cut to its first sentence). Categories: lifecycle, mail, calendar, tasks.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders the in-process command manifest',
