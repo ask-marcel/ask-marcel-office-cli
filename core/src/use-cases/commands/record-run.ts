@@ -42,9 +42,12 @@ export const noDryRun = (command: string): GraphError => ({
   message: `--dry-run: ${command} has no dry-run and no undo. Only the commands whose docs show "Dry-run and undo" have them.`,
 });
 
-/** The answer of a dry-run: the changes the command would make. */
-export const previewPlan = (command: string, planned: Result<BoundPlan, GraphError>): Result<unknown, GraphError> =>
-  planned.ok ? ok({ dryRun: true, command, changes: planned.value.changes }) : planned;
+/** The answer of a dry-run: the changes the command would make, and the items of a batch it passes over. */
+export const previewPlan = (command: string, planned: Result<BoundPlan, GraphError>): Result<unknown, GraphError> => {
+  if (!planned.ok) return planned;
+  const { changes, skipped } = planned.value;
+  return ok({ dryRun: true, command, changes, ...(skipped === undefined ? {} : { skipped }) });
+};
 
 const asObject = (value: unknown): object => (typeof value === 'object' && value !== null && !Array.isArray(value) ? value : { value });
 

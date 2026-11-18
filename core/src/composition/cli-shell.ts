@@ -12,6 +12,7 @@ import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import type { Command as RegistryCommand } from '../use-cases/commands/command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, dryRunAndUndo, paginationHintFor } from '../use-cases/commands/docs-render.ts';
+import type { LocalFileReader } from '../use-cases/commands/read-local-file.ts';
 import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
@@ -61,7 +62,12 @@ type LifecycleCliDeps<C extends RegistryCommand<never> = RegistryCommand> = {
  * `runs` is the run journal of the write package: with it, a write with a plan
  * gets a run id (run-registry-command.ts).
  */
-type CliShellDeps<G = ReadGraph & WriteGraph> = LifecycleCliDeps<RegistryCommand<G>> & { readonly graph: G; readonly runs?: RunRecorder };
+type CliShellDeps<G = ReadGraph & WriteGraph> = LifecycleCliDeps<RegistryCommand<G>> & {
+  readonly graph: G;
+  readonly runs?: RunRecorder;
+  /** The reader of a local file that a param of a write command names (run-registry-command.ts). */
+  readonly files?: LocalFileReader;
+};
 
 // What the registry commands share with the CLI that holds them.
 type ShellParts = {
@@ -471,7 +477,7 @@ const DRY_RUN_HELP = 'Show each change that the command would make (the target a
 // The Graph commands of the registry, one group per category.
 const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void => {
   const { program, fill, renderOut, fail, onCommanderError, globalFlags } = parts;
-  const { commandPackage, graph, fs, runs } = deps;
+  const { commandPackage, graph, fs, runs, files } = deps;
   const { registry } = commandPackage;
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(registry).filter(([, c]) => c.meta.category === category);
@@ -511,7 +517,7 @@ const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void 
         const { dryRun, ...params } = opts;
         const globals = program.opts<{ outputPath?: string; outputDir?: string }>();
         const result = await runRegistryCommand(
-          { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }) },
+          { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }), ...(files === undefined ? {} : { files }) },
           { name, command: cmd, params, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli', dryRun: dryRun === true }
         );
         if (result.ok) {

@@ -6,6 +6,7 @@ import { patchOnAllowedRoot } from '../../domain/beta-patch.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
+import type { LocalFileReader } from './read-local-file.ts';
 import type { BoundPlan, GraphReads, PlanWrite } from './write-plan.ts';
 
 /*
@@ -76,10 +77,11 @@ const readsOf = (graph: WriteGraph): GraphReads => ({
 });
 
 // The plan reads through the read members only; its writes run on the graph it was planned on.
-const bindPlan = async (plan: PlanWrite, graph: WriteGraph, params: Record<string, string>): Promise<Result<BoundPlan, GraphError>> => {
-  const planned = await plan(readsOf(graph), params);
+const bindPlan = async (plan: PlanWrite, graph: WriteGraph, params: Record<string, string>, files?: LocalFileReader): Promise<Result<BoundPlan, GraphError>> => {
+  const planned = await plan(readsOf(graph), params, files);
   if (!planned.ok) return planned;
-  return ok({ changes: planned.value.changes, apply: () => planned.value.apply(graph) });
+  const { changes, skipped } = planned.value;
+  return ok({ changes, ...(skipped === undefined ? {} : { skipped }), apply: () => planned.value.apply(graph) });
 };
 
 /** A write command that runs on the write view of any write graph it is given, its plan too. */
@@ -87,8 +89,10 @@ const writeCommandOf = (command: WriteCommand): Command<WriteGraph> => {
   const { plan, ...rest } = command;
   return {
     ...rest,
-    execute: async (graph, params) => command.execute(writeGraphOf(graph), params),
-    ...(plan === undefined ? {} : { plan: async (graph: WriteGraph, params: Record<string, string>) => bindPlan(plan, writeGraphOf(graph), params) }),
+    execute: async (graph, params, files) => command.execute(writeGraphOf(graph), params, files),
+    ...(plan === undefined
+      ? {}
+      : { plan: async (graph: WriteGraph, params: Record<string, string>, files?: LocalFileReader) => bindPlan(plan, writeGraphOf(graph), params, files) }),
   };
 };
 

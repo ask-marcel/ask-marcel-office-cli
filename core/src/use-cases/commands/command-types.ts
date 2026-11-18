@@ -3,11 +3,16 @@ import type { Result } from '../../domain/result.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
+import type { LocalFileReader } from './read-local-file.ts';
 import type { BoundPlanWrite, PlanWrite } from './write-plan.ts';
 
 type CommandSchema = z.ZodType;
-/** A command's run on the graph `G` it is given. */
-type GraphExecute<G> = (graph: G, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
+/**
+ * A command's run on the graph `G` it is given. `files` reads a local file that
+ * a param names (`--ids-file`): the CLI and the MCP shell give it to a write
+ * command, and a read command never uses it (read-local-file.ts).
+ */
+type GraphExecute<G> = (graph: G, params: Record<string, string>, files?: LocalFileReader) => Promise<Result<unknown, GraphError>>;
 /**
  * A command's run on the single package's full client, which holds both graphs
  * (`GraphClient` in graph-client.ts). Named here by its two halves, so the
@@ -91,7 +96,7 @@ type PaginationStrategy =
   | 'preferMaxPageSize';
 
 /** What a command does to the tenant; see `CommandMeta.effect`. Extended as the writes grow. */
-type CommandEffect = 'read' | 'draft' | 'transient-upload' | 'mail-state' | 'task-write';
+type CommandEffect = 'read' | 'draft' | 'transient-upload' | 'mail-state' | 'task-write' | 'delete';
 
 type CommandMeta = {
   readonly summary: string;
@@ -174,7 +179,9 @@ type CommandMeta = {
    * `draft` creates or updates an UNSENT mail draft; `transient-upload` puts a
    * temporary file in the user's OneDrive and tries to delete it; `mail-state`
    * changes the state of a mail message (read, flag, categories, folder);
-   * `task-write` creates or changes a To Do or Planner item. Required, so a new
+   * `task-write` creates or changes a To Do or Planner item; `delete` deletes an
+   * item (a mail draft goes to Deleted Items), the one destructive class, which
+   * MCP serves on a tool of its own. Required, so a new
    * command chooses its class instead of inheriting `read`. The MCP routing
    * (run-command takes only `read`), the MCP annotations, the top-level `--help`
    * narrative and the per-command docs derive from it, and the manifest /

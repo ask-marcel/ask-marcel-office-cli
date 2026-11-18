@@ -4,6 +4,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { Command } from './command-types.ts';
+import type { LocalFileReader } from './read-local-file.ts';
 
 /*
  * One rule for unknown parameters, applied once, for every surface.
@@ -70,9 +71,11 @@ const withUnknownParamRejection = <G>(command: Command<G>): Command<G> => {
   const { executeLocal, plan } = command;
   return {
     ...command,
-    execute: async (graph, params) => rejectUnknownParams(command.schema, params) ?? (await command.execute(graph, params)),
+    execute: async (graph, params, files) => rejectUnknownParams(command.schema, params) ?? (await command.execute(graph, params, files)),
     ...(executeLocal === undefined ? {} : { executeLocal: async (fs, params) => rejectUnknownParams(command.schema, params) ?? (await executeLocal(fs, params)) }),
-    ...(plan === undefined ? {} : { plan: async (graph: G, params: Record<string, string>) => rejectUnknownParams(command.schema, params) ?? (await plan(graph, params)) }),
+    ...(plan === undefined
+      ? {}
+      : { plan: async (graph: G, params: Record<string, string>, files?: LocalFileReader) => rejectUnknownParams(command.schema, params) ?? (await plan(graph, params, files)) }),
   };
 };
 

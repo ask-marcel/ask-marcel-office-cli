@@ -26,6 +26,8 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
     action:
       'create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove)',
   },
+  // The one destructive class: MCP serves it on run-destructive-command, so the host sees the mark on these commands only.
+  delete: { destructive: true, action: 'delete an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts' },
 };
 
 /** The registry's write commands, one group per effect (in the order the registry first names it), names sorted. */
