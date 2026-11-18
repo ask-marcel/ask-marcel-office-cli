@@ -2,7 +2,7 @@
 
 This page lists the commands of the `ask-marcel-office-write` bin of `@ask-marcel/office-write`.
 
-The 13 commands are in 2 categories. `help-json` lists 17 entries: the 13 commands and the 4 lifecycle commands below.
+The 27 commands are in 3 categories. `help-json` lists 31 entries: the 27 commands and the 4 lifecycle commands below.
 
 `help-json` adds `docs`, `help-json` and `mcp` to the commands. A mail draft is never sent: you send it from Outlook. The read commands are in the `ask-marcel-office-read` bin of `@ask-marcel/office-read`. The sign-in commands are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
 
@@ -30,6 +30,25 @@ The 13 commands are in 2 categories. `help-json` lists 17 entries: the 13 comman
 The table of each category gives the command name, a summary, the parameters and the Microsoft Graph endpoint.
 
 <!-- AUTO-GENERATED-COMMANDS:BEGIN -->
+
+### Tasks (To Do + Planner)
+
+| Command | Description | Required params | Graph endpoint |
+|---------|-------------|-----------------|----------------|
+| `add-todo-linked-resource` | Link a resource to a Microsoft To Do task, for example the mail or the web page that the task comes from. To Do shows it in the details of the task. | `--list`, `--task-id`, `--display-name`, `--application-name`, `--web-url`, `--external-id` | `POST /me/todo/lists/{list}/tasks/{task-id}/linkedResources` |
+| `add-todo-task-attachment` | Attach a local file to a Microsoft To Do task, up to 25 MB. A file of 3 MB or more goes through an upload session. | `--list`, `--task-id`, `--file` | `POST /me/todo/lists/{list}/tasks/{task-id}/attachments (or attachments/createUploadSession for 3 MB or more)` |
+| `add-todo-task-step` | Add a step to a Microsoft To Do task (a checklistItem in Graph), checked or not. | `--list`, `--task-id`, `--title`, `--checked` | `POST /me/todo/lists/{list}/tasks/{task-id}/checklistItems` |
+| `apply-todo-ops` | Apply a batch of To Do ops from a local JSON file: add, update, move and delete tasks, at most 100 ops. One wrong op refuses the whole file before any change. Over MCP it runs on run-destructive-command, because an op can move or delete a task. | `--file` | `POST /me/todo/lists/<list id>/tasks (and PATCH, DELETE on /me/todo/lists/<list id>/tasks/<task id>)` |
+| `complete-todo-task` | Mark a Microsoft To Do task completed. A task that is completed already is passed over. | `--list`, `--task-id` | `PATCH /me/todo/lists/{list}/tasks/{task-id}` |
+| `create-todo-list` | Create a Microsoft To Do list. No command of this CLI deletes a list, so its undo keeps the list: delete it in To Do. | `--name` | `POST /me/todo/lists` |
+| `create-todo-task` | Create a task in a Microsoft To Do list: the title, and the note, the status, the importance, the dates, the reminder and the categories that the options give. | `--list`, `--title`, `--body`, `--status`, `--importance`, `--due`, `--start`, `--reminder`, `--categories` | `POST /me/todo/lists/{list}/tasks` |
+| `delete-todo-task` | Delete a Microsoft To Do task. The run journal keeps a full copy of the task (fields, steps, linked resources and attachments), so its undo can create the task again. Over MCP it runs on run-destructive-command. | `--list`, `--task-id` | `DELETE /me/todo/lists/{list}/tasks/{task-id}` |
+| `delete-todo-task-step` | Delete a step of a Microsoft To Do task. Over MCP it runs on run-destructive-command. | `--list`, `--task-id`, `--step-id` | `DELETE /me/todo/lists/{list}/tasks/{task-id}/checklistItems/{step-id}` |
+| `move-todo-task` | Move a Microsoft To Do task to another list. Graph has no move of a task: the command copies the task with its steps, linked resources and attachments to the other list, then deletes the original. The task gets a new id, which the answer gives. If the copy fails, the original stays. Over MCP it runs on run-destructive-command. | `--list`, `--task-id`, `--to` | `POST /me/todo/lists/{to}/tasks, then DELETE /me/todo/lists/{list}/tasks/{task-id}` |
+| `remove-todo-task-attachment` | Remove a file attachment of a Microsoft To Do task. The run journal keeps the bytes of the file (in ~/.ask-marcel/runs, for 30 days), so its undo can attach the file again. Over MCP it runs on run-destructive-command. | `--list`, `--task-id`, `--attachment-id` | `DELETE /me/todo/lists/{list}/tasks/{task-id}/attachments/{attachment-id}` |
+| `update-todo-list` | Give a Microsoft To Do list a new name. A list that has the name already is passed over. | `--list`, `--name` | `PATCH /me/todo/lists/{list}` |
+| `update-todo-task` | Change the fields of a Microsoft To Do task that the options give: the title, the note, the status, the importance, the dates, the reminder or the categories. The other fields stay. | `--list`, `--task-id`, `--title`, `--body`, `--status`, `--importance`, `--due`, `--start`, `--reminder`, `--categories` | `PATCH /me/todo/lists/{list}/tasks/{task-id}` |
+| `update-todo-task-step` | Change the text or the check mark of a step of a Microsoft To Do task. A step that has them already is passed over. | `--list`, `--task-id`, `--step-id`, `--title`, `--checked` | `PATCH /me/todo/lists/{list}/tasks/{task-id}/checklistItems/{step-id}` |
 
 ### Mail
 
