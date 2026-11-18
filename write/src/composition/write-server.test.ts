@@ -5,6 +5,7 @@ import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeWriteGraph } from '@ask-marcel/office-core/test-helpers/write-graph-fake.ts';
+import { WRITE_EFFECTS } from '@ask-marcel/office-core/use-cases/commands/command-effect.ts';
 import { commands } from '../use-cases/commands/write-commands.ts';
 import { buildWriteMcpServer } from './write-server.ts';
 
@@ -81,7 +82,8 @@ describe('the MCP server of the write package', () => {
   it('advertises every write command of the registry on run-write-command', async () => {
     const description = await toolDescription(await connect(), 'run-write-command');
     expect(Object.keys(commands).filter((name) => !description.includes(name))).toEqual([]);
-    expect(description).toContain(`Run one of the ${Object.keys(commands).length} commands that WRITE to Microsoft 365.`);
+    const notDestructive = Object.values(commands).filter((command) => command.meta.effect !== 'read' && !WRITE_EFFECTS[command.meta.effect].destructive);
+    expect(description).toContain(`Run one of the ${notDestructive.length} commands that WRITE to Microsoft 365.`);
   });
 
   it('points get-command-docs at run-write-command and run-destructive-command only, with the write lifecycle commands and example', async () => {
