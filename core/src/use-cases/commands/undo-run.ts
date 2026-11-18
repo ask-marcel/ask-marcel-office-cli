@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
@@ -23,7 +24,11 @@ export type UndoCheck = 'ready' | 'changed' | 'missing';
 export type UndoHandler = {
   /** Reads the item that the undo data names. No write. */
   readonly check: (reads: GraphReads, data: Readonly<Record<string, unknown>>) => Promise<Result<UndoCheck, GraphError>>;
-  /** Reverses the change. Called only after `check` answered `ready`. */
+  /**
+   * Reverses the change. Called only after `check` answered `ready`. An undo
+   * that gives the item new ids (a mail message moved back) answers them as
+   * `{ now: { messageId: ... } }`, and the outcome shows them.
+   */
   readonly apply: (graph: WriteGraph, data: Readonly<Record<string, unknown>>) => Promise<Result<unknown, GraphError>>;
 };
 
@@ -47,6 +52,8 @@ export type UndoOutcome = {
   readonly undo: string;
   readonly status: UndoStatus;
   readonly reason?: string;
+  /** The ids of the item after the undo, when the undo gave it new ones. */
+  readonly now?: ItemIds;
 };
 
 export type UndoReport = {
@@ -74,6 +81,14 @@ const outcome = (change: Change, status: UndoStatus, reason?: string): UndoOutco
   ...(reason === undefined ? {} : { reason }),
 });
 
+const nowSchema = z.object({ now: z.record(z.string(), z.string()) });
+
+// The new ids that the handler of an undo answers, if any.
+const nowOf = (value: unknown): { readonly now?: ItemIds } => {
+  const parsed = nowSchema.safeParse(value);
+  return parsed.success ? { now: parsed.data.now } : {};
+};
+
 // Checks one change and, with `apply`, reverses it.
 const undoChange = async (deps: UndoDeps, change: Change, apply: boolean): Promise<UndoOutcome> => {
   if (change.undoneAt !== undefined) return outcome(change, 'already-undone');
@@ -85,7 +100,7 @@ const undoChange = async (deps: UndoDeps, change: Change, apply: boolean): Promi
   if (!apply) return outcome(change, 'will-undo');
   // The write view: the no-send guard stands in front of each undo too.
   const reversed = await handler.apply(writeGraphOf(deps.graph), change.undo.data);
-  return reversed.ok ? outcome(change, 'undone') : outcome(change, 'failed', reversed.error.message);
+  return reversed.ok ? { ...outcome(change, 'undone'), ...nowOf(reversed.value) } : outcome(change, 'failed', reversed.error.message);
 };
 
 // The changes of a run are reversed last first; the report keeps the order of the run.
