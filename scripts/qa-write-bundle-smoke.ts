@@ -9,8 +9,8 @@
  *      teamsChatIc3);
  *   2. `--version` answers the package version; `--help` lists the 7 write
  *      commands, `help-json`, `docs` and `undo` (not `mcp`: the bin serves it
- *      before commander); `help-json` gives the package and 10 entries, `mcp`
- *      among them; `docs create-mail-draft` prints its page;
+ *      before commander); `help-json` gives the package and 11 entries, `mcp`
+ *      and `undo` among them; `docs create-mail-draft` prints its page;
  *   3. a missing required flag and an unknown flag each exit 1 with the
  *      commander code and no crash line, before any token request (the run has
  *      a bad tier token, so a token request would answer env_token_invalid);
@@ -147,8 +147,8 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
       missingHelp.length === 0 ? exitNote(help.p) : `missing ${missingHelp.join(', ')}`,
     ],
     [
-      'help-json gives the package and 10 entries, mcp among them',
-      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 10 && names.includes('mcp'),
+      'help-json gives the package and 11 entries, mcp and undo among them',
+      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 11 && names.includes('mcp') && names.includes('undo'),
       `${manifest.package ?? 'no package'}, ${names.length} entries`,
     ],
     ['docs create-mail-draft prints its page', exited(docs.p, 0) && docs.out.startsWith('# `create-mail-draft`'), exitNote(docs.p)],

@@ -87,7 +87,7 @@ describe('the MCP server of the write package', () => {
   it('points get-command-docs at run-write-command only, with the write lifecycle commands and example', async () => {
     const description = await toolDescription(await connect(), 'get-command-docs');
     expect(description).toContain('before run-write-command —');
-    expect(description).toContain('Also covers the lifecycle commands (docs/help-json/mcp).');
+    expect(description).toContain('Also covers the lifecycle commands (docs/help-json/mcp/undo).');
     expect(description).not.toContain('run-command ');
   });
 });

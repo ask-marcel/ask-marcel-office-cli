@@ -35,7 +35,7 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 10 entries: the commands, and `docs`, `help-json` and `mcp`.
+`help-json` lists 11 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
