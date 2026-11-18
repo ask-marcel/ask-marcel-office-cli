@@ -47,7 +47,8 @@ and `mcp`. `token` is not a `help-json` entry. The full list is in
    a plain `login`. It clears the browser session, so you usually type your
    password again.
 
-The basic token refreshes itself from the refresh token. The elevated token
+The basic token refreshes itself while the token cache holds a good refresh
+token. The elevated token
 has no refresh token, and it lapses after about an hour. Only `login` can
 capture it again. `ask-marcel-office-auth status` shows each token and the
 time before it expires.
