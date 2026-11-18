@@ -74,7 +74,7 @@ describe('the CLI of the write package', () => {
   it('lists the seven commands and docs, help-json and mcp in help-json, under the write package', async () => {
     const manifest = JSON.parse(await run(['help-json'])) as Manifest;
     expect(manifest.package).toBe('@ask-marcel/office-write');
-    expect(manifest.commands).toHaveLength(10);
+    expect(manifest.commands).toHaveLength(11);
     expect(manifest.commands.map((command) => command.name).filter((name) => ['docs', 'help-json', 'mcp'].includes(name))).toEqual(['docs', 'help-json', 'mcp']);
   });
 

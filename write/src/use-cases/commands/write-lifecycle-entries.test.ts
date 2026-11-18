@@ -33,8 +33,8 @@ const textsOf = (lifecycle: CommandManifestEntry): ReadonlyArray<string> => [
 ];
 
 describe('the lifecycle entries of the write package', () => {
-  it('lists docs, help-json and mcp, and no sign-in command', () => {
-    expect(buildManifest(LIFECYCLE_ONLY, '1.0.0').commands.map((command) => command.name)).toEqual(LIFECYCLE_COMMANDS);
+  it('lists docs, help-json, mcp and undo, and no sign-in command', () => {
+    expect(buildManifest(LIFECYCLE_ONLY, '1.0.0').commands.map((command) => command.name)).toEqual([...LIFECYCLE_COMMANDS, 'undo']);
   });
 
   for (const name of LIFECYCLE_COMMANDS) {
@@ -55,7 +55,7 @@ describe('the lifecycle entries of the write package', () => {
 
   it('names only commands that the write package holds', () => {
     const named = WRITE_LIFECYCLE_ENTRIES.flatMap((lifecycle) => textsOf(lifecycle).flatMap(namedCommands));
-    expect(named.filter((name) => !LIFECYCLE_COMMANDS.includes(name) && !Object.hasOwn(commands, name))).toEqual([]);
+    expect(named.filter((name) => ![...LIFECYCLE_COMMANDS, 'undo'].includes(name) && !Object.hasOwn(commands, name))).toEqual([]);
     expect(named.length).toBeGreaterThan(0);
   });
 

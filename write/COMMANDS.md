@@ -2,7 +2,7 @@
 
 This page lists the commands of the `ask-marcel-office-write` bin of `@ask-marcel/office-write`.
 
-The 7 commands are in 2 categories. `help-json` lists 10 entries: the 7 commands and the 3 lifecycle commands below.
+The 7 commands are in 2 categories. `help-json` lists 11 entries: the 7 commands and the 4 lifecycle commands below.
 
 `help-json` adds `docs`, `help-json` and `mcp` to the commands. A mail draft is never sent: you send it from Outlook. The read commands are in the `ask-marcel-office-read` bin of `@ask-marcel/office-read`. The sign-in commands are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
 
@@ -21,6 +21,7 @@ The 7 commands are in 2 categories. `help-json` lists 10 entries: the 7 commands
 | `ask-marcel-office-write docs` | Print Markdown docs for one command of the write package. |
 | `ask-marcel-office-write help-json` | Print the machine-readable command manifest of the write package as JSON, with every option, example and response shape. |
 | `ask-marcel-office-write mcp` | Start the Model Context Protocol server of the write package over stdio. |
+| `ask-marcel-office-write undo` | Show the undo of a write run, or do it with --apply. |
 
 <!-- AUTO-GENERATED-LIFECYCLE:END -->
 
