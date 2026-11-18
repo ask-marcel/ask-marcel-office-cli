@@ -3,7 +3,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { ok } from '../domain/result.ts';
-import type { WriteGraph } from '../infra/write-graph.ts';
 import { writeCommandOf } from '../use-cases/commands/command-graph.ts';
 import type { LocalFileReader } from '../use-cases/commands/read-local-file.ts';
 import { readLocalFile } from '../use-cases/commands/read-local-file.ts';
@@ -85,7 +84,7 @@ describe('the local file read of a write command', () => {
   it('reaches the command on the CLI', async () => {
     const program = buildCliShell({
       commandPackage: PACKAGE as never,
-      graph: fakeWriteGraph() as WriteGraph,
+      graph: fakeWriteGraph(),
       logger: createLoggerFake(),
       fs: createFileSystemFake(),
       files: FILES,
@@ -105,7 +104,7 @@ describe('the local file read of a write command', () => {
   });
 
   it('reaches the command over MCP', async () => {
-    const server = buildMcpShell({ commandPackage: PACKAGE as never, graph: fakeWriteGraph() as WriteGraph, fs: createFileSystemFake(), files: FILES });
+    const server = buildMcpShell({ commandPackage: PACKAGE as never, graph: fakeWriteGraph(), fs: createFileSystemFake(), files: FILES });
     const client = new Client({ name: 'test client', version: '1.0' });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await Promise.all([client.connect(clientTransport), server.server.connect(serverTransport)]);

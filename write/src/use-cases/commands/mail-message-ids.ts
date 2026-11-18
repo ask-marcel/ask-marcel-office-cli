@@ -54,7 +54,7 @@ const fromFile = async (path: string | undefined, files: LocalFileReader | undef
 
 /** The ids of `--message-id` and `--ids-file`, in their order, each once. */
 export const messageIdsOf = async (
-  params: { readonly messageId?: string | undefined; readonly idsFile?: string | undefined },
+  params: { readonly messageId?: string; readonly idsFile?: string },
   files: LocalFileReader | undefined
 ): Promise<Result<ReadonlyArray<GraphId>, GraphError>> => {
   const listed = await fromFile(params.idsFile, files);
