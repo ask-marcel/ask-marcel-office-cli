@@ -180,7 +180,8 @@ type CommandMeta = {
    * temporary file in the user's OneDrive and tries to delete it; `mail-state`
    * changes the state of a mail message (read, flag, categories, folder);
    * `task-write` creates or changes a To Do or Planner item; `delete` deletes an
-   * item (a mail draft goes to Deleted Items), the one destructive class, which
+   * item (a mail draft goes to Deleted Items; a To Do task, step or attachment is
+   * deleted, and a To Do move deletes the original), the one destructive class, which
    * MCP serves on a tool of its own. Required, so a new
    * command chooses its class instead of inheriting `read`. The MCP routing
    * (run-command takes only `read`), the MCP annotations, the top-level `--help`
