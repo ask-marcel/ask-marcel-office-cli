@@ -1,9 +1,11 @@
 /*
  * The MCP gateway — `ask-marcel-office mcp`, for whichever package it is given.
  *
- * At most four gateway tools plus any tools the package adds (`addTools`), not
+ * At most five gateway tools plus any tools the package adds (`addTools`), not
  * one per command: `run-command` only when the package has a read command,
- * `run-write-command` only when it has a write command. The registry already
+ * `run-write-command` only when it has a write that does not delete, and
+ * `run-destructive-command` only when it has a command that deletes (the one
+ * tool with the destructive mark, mcp-run-tools.ts). The registry already
  * carries everything a tool manifest needs, but exposing one MCP tool per
  * command would inject hundreds of KB of schema into every client session — the
  * exact token bloat this CLI exists to avoid. So discovery is three hops (list
@@ -28,7 +30,6 @@ import type { WriteGraph } from '../infra/write-graph.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
 import type { NameSource } from '../use-cases/commands/bin-names.ts';
 import { fillNames } from '../use-cases/commands/bin-names.ts';
-import { describeWrites, WRITE_EFFECTS, writeGroups } from '../use-cases/commands/command-effect.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import type { Command } from '../use-cases/commands/command-types.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
@@ -38,9 +39,12 @@ import type { RawParamValue } from '../use-cases/commands/param-keys.ts';
 import { canonicalParams } from '../use-cases/commands/param-keys.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { LocalFileReader } from '../use-cases/commands/read-local-file.ts';
 import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { unknownCommandMessage } from '../use-cases/commands/unknown-command.ts';
+import type { RunTool } from './mcp-run-tools.ts';
+import { deleteToolDescription, runToolNames, runToolOf, runToolsPhrase, writesElsewhere, writeToolDescription, wrongToolMessage } from './mcp-run-tools.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
 
 const MCP_REMEDY = 'Call list-commands to see every command.';
@@ -60,6 +64,8 @@ type McpShellDeps<G = ReadGraph & WriteGraph> = {
   readonly addTools?: (server: McpServer) => void;
   /** The run journal of the write package: with it, a write with a plan gets a run id (run-registry-command.ts). */
   readonly runs?: RunRecorder;
+  /** The reader of a local file that a param of a write command names (run-registry-command.ts). */
+  readonly files?: LocalFileReader;
 };
 
 // The SDK's own result type rather than a hand-rolled one — it requires a
@@ -93,7 +99,7 @@ const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   // Same rule as the CLI: named days resolve in `ASKMARCEL_TZ`, else the machine's zone.
   setDateZone(resolveDateZone(undefined).zone);
-  const { commandPackage, graph, fs, runs } = deps;
+  const { commandPackage, graph, fs, runs, files } = deps;
   const { registry } = commandPackage;
   const version = deps.version ?? '0.0.0';
   const server = new McpServer({ name: commandPackage.binName, version });
@@ -111,20 +117,13 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   // prevent. Read the counts off the package's registry, never off a sentence.
   // The same holds for what a write does: each command's `effect` decides its tool,
   // and the wording and annotations come from the effect table in command-effect.ts.
-  const readCommandNames = Object.entries(registry)
-    .filter(([, c]) => c.meta.effect === 'read')
-    .map(([n]) => n);
-  const writeCommandNames = Object.entries(registry)
-    .filter(([, c]) => c.meta.effect !== 'read')
-    .map(([n]) => n)
-    .toSorted((a, b) => a.localeCompare(b));
-  const writesAreDestructive = writeGroups(registry).some((group) => WRITE_EFFECTS[group.effect].destructive);
+  const toolNames = runToolNames(registry);
+  const readCommandNames = toolNames['run-command'];
   // Each run tool exists only when the package has a command of its kind, so a
   // server never offers a tool that can only refuse. The other kind is on the
   // server of another package.
   const hasReads = readCommandNames.length > 0;
-  const hasWrites = writeCommandNames.length > 0;
-  const runTools = [...(hasReads ? ['run-command'] : []), ...(hasWrites ? ['run-write-command'] : [])].join(' or ');
+  const runTools = runToolsPhrase(toolNames);
   const lifecycleNames = commandPackage.lifecycle.map((entry) => entry.name).join('/');
   const otherServer = (role: 'read' | 'write'): string => `another MCP server (\`${commandPackage.bins[role]} mcp\`)`;
 
@@ -132,7 +131,7 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
     'list-commands',
     {
       title: 'List commands',
-      description: `Discover what this Microsoft 365 CLI can do. Returns the terse manifest — {name, summary, category} per command — for all ${readCommandNames.length + writeCommandNames.length} commands, or one category. START HERE, then use get-command-docs on the command you picked to learn its params. Categories: ${CATEGORY_LIST}.`,
+      description: `Discover what this Microsoft 365 CLI can do. Returns the terse manifest — {name, summary, category} per command — for all ${readCommandNames.length + toolNames.writes.length} commands, or one category. START HERE, then use get-command-docs on the command you picked to learn its params. Categories: ${CATEGORY_LIST}.`,
       inputSchema: {
         category: z.string().optional().describe(`Filter to one category (${CATEGORY_LIST}). Omit for every command — larger, but one round-trip.`),
       },
@@ -191,7 +190,7 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   };
 
   // What every run needs; the run journal only when the package has one.
-  const runDeps = { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }) };
+  const runDeps = { graph, fs, commandPackage, ...(runs === undefined ? {} : { runs }), ...(files === undefined ? {} : { files }) };
 
   // The write tool also takes `dryRun`: a write with a plan then shows its changes and makes none.
   const writeToolInput = {
@@ -209,20 +208,14 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
     rawParams: Readonly<Record<string, RawParamValue>> | undefined,
     outputPath: string | undefined,
     outputDir: string | undefined,
-    wantMutating: boolean,
+    called: RunTool,
     dryRun: boolean
   ): Promise<CallToolResult> => {
     const resolved = resolveCommand(registry, commandName);
     if (!resolved.ok) return unknownCommand(resolved.error.name, resolved.error.available);
-    const isMutating = resolved.value.command.meta.effect !== 'read';
-    // Gate BEFORE executing: a write routed through run-command would silently
-    // mutate under a `readOnlyHint: true` tool the client may have auto-approved.
-    if (isMutating && !wantMutating)
-      return failText(
-        `"${resolved.value.name}" writes to Microsoft 365, so it is not available through run-command (which is declared read-only). Use run-write-command instead. Write commands: ${writeCommandNames.join(', ')}.`
-      );
-    if (!isMutating && wantMutating)
-      return failText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
+    // Gate BEFORE executing: each command runs only on the tool whose marks fit its effect (mcp-run-tools.ts).
+    const wrongTool = wrongToolMessage(resolved.value.name, runToolOf(resolved.value.command.meta.effect), called, toolNames);
+    if (wrongTool !== undefined) return failText(wrongTool);
     // The keys arrive as the docs name them (`message-id`); a command reads `messageId` (param-keys.ts).
     const canonical = canonicalParams(rawParams ?? {});
     if (!canonical.ok)
@@ -235,37 +228,32 @@ const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
     return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params), commandPackage));
   };
 
-  const writesElsewhere = hasWrites
-    ? `the ${writeCommandNames.length} write commands are rejected here and live on run-write-command`
-    : `the write commands are on ${otherServer('write')}`;
   if (hasReads)
     server.registerTool(
       'run-command',
       {
         title: 'Run a read command',
-        description: `Run any of the ${readCommandNames.length} READ commands (mail, files, calendar, chats, search, document conversion). Cannot write: ${writesElsewhere}. Call get-command-docs first to learn the params.`,
+        description: `Run any of the ${readCommandNames.length} READ commands (mail, files, calendar, chats, search, document conversion). Cannot write: ${writesElsewhere(toolNames, otherServer('write'))}. Call get-command-docs first to learn the params.`,
         inputSchema: runToolInput,
         annotations: { readOnlyHint: true },
       },
-      async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, false, false)
+      async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, 'run-command', false)
     );
 
   const readsElsewhere = hasReads ? 'Read commands are rejected here; use run-command.' : `The read commands are on ${otherServer('read')}.`;
-  if (hasWrites)
-    server.registerTool(
-      'run-write-command',
-      {
-        title: 'Run a write command',
-        description: `Run one of the ${writeCommandNames.length} commands that WRITE to Microsoft 365. ${describeWrites(registry)}. This CLI has no other write surface. ${readsElsewhere}`,
-        inputSchema: writeToolInput,
-        // Not read-only. Destructive only when one of the write classes is (none
-        // today: a draft is unsent, and a temporary upload is a copy of the user's
-        // own attachment that the command tries to delete; nothing is overwritten
-        // or transmitted).
-        annotations: { readOnlyHint: false, destructiveHint: writesAreDestructive },
-      },
-      async ({ command, params, outputPath, outputDir, dryRun }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, true, dryRun === true)
+  // A write tool, registered only when the package has a command for it.
+  const writeTool = (tool: RunTool, title: string, description: string, destructive: boolean): void => {
+    if (toolNames[tool].length === 0) return;
+    server.registerTool(tool, { title, description, inputSchema: writeToolInput, annotations: { readOnlyHint: false, destructiveHint: destructive } }, async (input) =>
+      runResolved(input.command, input.params, input.outputPath, input.outputDir, tool, input.dryRun === true)
     );
+  };
+  // Not read-only, and not destructive: a draft is unsent, a temporary upload is
+  // a copy of the user's own attachment that the command tries to delete, and a
+  // state change has an undo. The commands that delete are on
+  // run-destructive-command, so this mark never covers a delete.
+  writeTool('run-write-command', 'Run a write command', writeToolDescription(registry, toolNames, readsElsewhere), false);
+  writeTool('run-destructive-command', 'Run a command that deletes', deleteToolDescription(registry, toolNames, hasReads ? 'run-command' : otherServer('read')), true);
 
   // The tools that the package adds, if any, sit beside the gateway tools.
   deps.addTools?.(server);

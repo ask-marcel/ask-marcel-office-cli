@@ -115,7 +115,7 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
 const CORE_FILES = [
-  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,token-source}.ts',
+  'src/composition/{cli-shell,mcp-shell,mcp-run-tools,run-registry-command,date-zone,token-source}.ts',
   'src/use-cases/commands/{command-types,command-graph}.ts',
   'src/presenter/*.ts',
   'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
@@ -125,7 +125,7 @@ const CORE_FILES = [
   'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
   'src/domain/utilities/{base64,format-error,spo-tenant}.ts',
   // The shared test fakes (the plan's core/src/test-helpers).
-  'src/test-helpers/{atomic-file-writes-contract,command-package-fake,fetch-mock,file-exists-contract,filesystem-fake,format-error,jwt,logger-fake}.ts',
+  'src/test-helpers/{atomic-file-writes-contract,command-package-fake,fetch-mock,file-exists-contract,filesystem-fake,format-error,jwt,local-files-fake,logger-fake}.ts',
   'src/test-helpers/{process-runner-contract,process-runner-fake,read-graph-fake,write-graph-fake,graph-client-fake}.ts',
 ];
 
