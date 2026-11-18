@@ -3,6 +3,7 @@ import { writeCommandOf } from '@ask-marcel/office-core/use-cases/commands/comma
 import type { Command, WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
 import type { UndoHandlers } from '@ask-marcel/office-core/use-cases/commands/undo-run.ts';
+import * as addMailDraftAttachment from './add-mail-draft-attachment.ts';
 import * as addTodoLinkedResource from './add-todo-linked-resource.ts';
 import * as addTodoTaskAttachment from './add-todo-task-attachment.ts';
 import * as addTodoTaskStep from './add-todo-task-step.ts';
@@ -13,6 +14,7 @@ import * as createTodoTask from './create-todo-task.ts';
 import * as deleteTodoTask from './delete-todo-task.ts';
 import * as deleteTodoTaskStep from './delete-todo-task-step.ts';
 import * as moveTodoTask from './move-todo-task.ts';
+import * as removeMailDraftAttachment from './remove-mail-draft-attachment.ts';
 import * as removeTodoTaskAttachment from './remove-todo-task-attachment.ts';
 import * as updateTodoList from './update-todo-list.ts';
 import * as updateTodoTask from './update-todo-task.ts';
@@ -25,6 +27,7 @@ import * as createMailDraft from './create-mail-draft.ts';
 import * as createReplyDraft from './create-reply-draft.ts';
 import * as deleteMailDraft from './delete-mail-draft.ts';
 import { DRAFT_UNDO_HANDLERS } from './draft-runs.ts';
+import { DRAFT_ATTACHMENT_UNDO_HANDLERS } from './mail-attachment-undo.ts';
 import { FIELD_UNDO_HANDLERS } from './mail-field-write.ts';
 import { MOVE_UNDO_HANDLERS } from './mail-move-write.ts';
 import { ITEM_UNDO_HANDLERS } from './todo-item-undo.ts';
@@ -57,6 +60,8 @@ const modules: Readonly<Record<string, WriteCommand>> = {
   'set-mail-flag': setMailFlag,
   'set-mail-categories': setMailCategories,
   'delete-mail-draft': deleteMailDraft,
+  'add-mail-draft-attachment': addMailDraftAttachment,
+  'remove-mail-draft-attachment': removeMailDraftAttachment,
   'create-todo-task': createTodoTask,
   'update-todo-task': updateTodoTask,
   'complete-todo-task': completeTodoTask,
@@ -81,6 +86,13 @@ const commands: Readonly<Record<string, Command<WriteGraph>>> = Object.fromEntri
  * The undo handler of each kind of change that a write of this package
  * records (write-plan.ts). A new command with an undo adds its kinds here.
  */
-const undoHandlers: UndoHandlers = { ...DRAFT_UNDO_HANDLERS, ...MOVE_UNDO_HANDLERS, ...FIELD_UNDO_HANDLERS, ...TASK_UNDO_HANDLERS, ...ITEM_UNDO_HANDLERS };
+const undoHandlers: UndoHandlers = {
+  ...DRAFT_UNDO_HANDLERS,
+  ...DRAFT_ATTACHMENT_UNDO_HANDLERS,
+  ...MOVE_UNDO_HANDLERS,
+  ...FIELD_UNDO_HANDLERS,
+  ...TASK_UNDO_HANDLERS,
+  ...ITEM_UNDO_HANDLERS,
+};
 
 export { commands, undoHandlers };

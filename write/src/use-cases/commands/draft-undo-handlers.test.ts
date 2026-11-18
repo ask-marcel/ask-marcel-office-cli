@@ -87,6 +87,7 @@ describe('the docs of the draft commands', () => {
   it('give a plan exactly to the commands whose docs say what the undo does, and to no PDF conversion', () => {
     const planned = Object.entries(commands).filter(([, command]) => command.plan !== undefined);
     expect(planned.map(([name]) => name).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'add-mail-draft-attachment',
       'add-todo-linked-resource',
       'add-todo-task-attachment',
       'add-todo-task-step',
@@ -104,6 +105,7 @@ describe('the docs of the draft commands', () => {
       'move-mail-message',
       'move-mail-thread',
       'move-todo-task',
+      'remove-mail-draft-attachment',
       'remove-todo-task-attachment',
       'set-mail-categories',
       'set-mail-flag',

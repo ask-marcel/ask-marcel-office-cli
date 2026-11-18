@@ -36,8 +36,14 @@ const sortedNames = (matches: (command: (typeof commands)[string]) => boolean): 
     .toSorted((a, b) => a.localeCompare(b));
 
 describe('command meta: invariants on every command of the write package', () => {
-  it('classifies EXACTLY the four mail-draft commands as `draft` writes and the three PDF converters as `transient-upload` writes, and holds no `read` (F-03)', () => {
-    expect(sortedNames((command) => command.meta.effect === 'draft')).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+  it('classifies EXACTLY the four mail-draft commands and add-mail-draft-attachment as `draft` writes and the three PDF converters as `transient-upload` writes, and holds no `read` (F-03)', () => {
+    expect(sortedNames((command) => command.meta.effect === 'draft')).toEqual([
+      'add-mail-draft-attachment',
+      'create-forward-draft',
+      'create-mail-draft',
+      'create-reply-draft',
+      'update-mail-draft',
+    ]);
     expect(sortedNames((command) => command.meta.effect === 'transient-upload')).toEqual([
       'convert-calendar-event-attachment-to-pdf',
       'convert-group-post-attachment-to-pdf',
