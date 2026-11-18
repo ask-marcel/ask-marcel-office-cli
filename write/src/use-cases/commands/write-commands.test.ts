@@ -5,10 +5,11 @@ import { fakeWriteGraph } from '@ask-marcel/office-core/test-helpers/write-graph
 import { commands } from './write-commands.ts';
 
 // The registry of the write package `@ask-marcel/office-write` (package split,
-// phase 5): its 27 commands, each wrapped once so that an unknown parameter
+// phase 5): its 29 commands, each wrapped once so that an unknown parameter
 // is refused and the command runs on the write graph alone.
 
 const WRITE_COMMANDS = [
+  'add-mail-draft-attachment',
   'add-todo-linked-resource',
   'add-todo-task-attachment',
   'add-todo-task-step',
@@ -29,6 +30,7 @@ const WRITE_COMMANDS = [
   'move-mail-message',
   'move-mail-thread',
   'move-todo-task',
+  'remove-mail-draft-attachment',
   'remove-todo-task-attachment',
   'set-mail-categories',
   'set-mail-flag',
@@ -51,7 +53,7 @@ const recordingWriteGraph = (called: string[]): WriteGraph => {
 };
 
 describe('the registry of the write package', () => {
-  it('holds the 27 write commands, and no read command', () => {
+  it('holds the 29 write commands, and no read command', () => {
     expect(Object.keys(commands).toSorted((a, b) => a.localeCompare(b))).toEqual(WRITE_COMMANDS);
     expect(Object.values(commands).filter((command) => command.meta.effect === 'read')).toEqual([]);
   });

@@ -21,12 +21,20 @@ const SEED: ReadonlyArray<StoredMessage> = [
 const writes = (calls: ReadonlyArray<string>): ReadonlyArray<string> => calls.filter((call) => !call.startsWith('GET'));
 
 describe('delete-mail-draft', () => {
-  it('is in the destructive class, with the To Do commands that delete or move', () => {
+  it('is in the destructive class, with remove-mail-draft-attachment and the To Do commands that delete or move', () => {
     expect(
       Object.entries(commands)
         .filter(([, command]) => command.meta.effect === 'delete')
         .map(([name]) => name)
-    ).toEqual(['delete-mail-draft', 'move-todo-task', 'delete-todo-task', 'apply-todo-ops', 'delete-todo-task-step', 'remove-todo-task-attachment']);
+    ).toEqual([
+      'delete-mail-draft',
+      'remove-mail-draft-attachment',
+      'move-todo-task',
+      'delete-todo-task',
+      'apply-todo-ops',
+      'delete-todo-task-step',
+      'remove-todo-task-attachment',
+    ]);
   });
 
   it('shows the draft and its folder on a dry-run, and moves nothing', async () => {

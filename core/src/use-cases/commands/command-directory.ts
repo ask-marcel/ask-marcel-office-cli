@@ -32,6 +32,7 @@ const AUTH_COMMANDS: ReadonlyArray<string> = ['login', 'logout', 'status', 'toke
 
 // Every command whose effect is not `read` (command-effect.ts).
 const WRITE_COMMANDS: ReadonlyArray<string> = [
+  'add-mail-draft-attachment',
   'add-todo-linked-resource',
   'add-todo-task-attachment',
   'add-todo-task-step',
@@ -52,6 +53,7 @@ const WRITE_COMMANDS: ReadonlyArray<string> = [
   'move-mail-message',
   'move-mail-thread',
   'move-todo-task',
+  'remove-mail-draft-attachment',
   'remove-todo-task-attachment',
   'set-mail-categories',
   'set-mail-flag',
