@@ -5,10 +5,10 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
-import type { AuthError, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder } from './auth.ts';
+import type { AuthError, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, SignInMode, TokenCacheAccess, TokenLadder } from './auth.ts';
 import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
 import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
-import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
+import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult, SignInCaptureOptions } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
@@ -24,6 +24,16 @@ import type { TokenCacheLock } from './token-cache-lock.ts';
 // capture, and keeps the whole session on the host the substrate calls use
 // (probed live 2026-08-31).
 const TEAMS_URL = 'https://teams.cloud.microsoft/';
+
+// How each sign-in drives the browser capture. Only `login --force` clears the
+// browser cookies (and with them the 90-day "Stay signed in" cookie). `force`
+// and `renew` want a full capture, so a fresh token that another process saved
+// does not end them.
+const CAPTURE_OPTIONS: Readonly<Record<SignInMode, SignInCaptureOptions>> = {
+  cached: { skipCacheProbe: false, keepCookies: true },
+  renew: { skipCacheProbe: true, keepCookies: true },
+  force: { skipCacheProbe: true },
+};
 
 type BrowserRungsDeps = {
   readonly browserAuth: BrowserAuth;
@@ -72,7 +82,7 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   // The browser leg, run while holding the lock: Chromium's own Singleton lock
   // files are cleared at every launch, so only the lock keeps a second browser
   // off the profile.
-  const signInViaBrowser = async (force: boolean): Promise<Result<SignedIn, AuthError>> => {
+  const signInViaBrowser = async (mode: SignInMode): Promise<Result<SignedIn, AuthError>> => {
     try {
       // Single-session capture: one Playwright-driven browser window does
       // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
@@ -89,7 +99,7 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, { skipCacheProbe: force });
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, CAPTURE_OPTIONS[mode]);
       if (!result) return err({ type: 'auth_cancelled' });
       // The poll short-circuited because a concurrent process landed a
       // fresh token in the cache. Do NOT persist (refreshToken is null here —
@@ -119,13 +129,13 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
     }
   };
 
-  // A forced login redeems the substrate tokens the browser missed AFTER the
-  // sign-in released the lock: the redemptions take the lock themselves.
-  const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
-    const signedIn = await underLock('browser', async () => signInViaBrowser(force));
+  // A forced or renewed login redeems the substrate tokens the browser missed
+  // AFTER the sign-in released the lock: the redemptions take the lock themselves.
+  const acquireViaBrowser = async (mode: SignInMode): Promise<Result<AccessToken, AuthError>> => {
+    const signedIn = await underLock('browser', async () => signInViaBrowser(mode));
     if (!signedIn.ok) return signedIn;
     const captured = signedIn.value.substrateCaptured;
-    if (force && captured !== null) await redeemMissedSubstrateAtLogin(captured.chatsvcagg, captured.ic3);
+    if (mode !== 'cached' && captured !== null) await redeemMissedSubstrateAtLogin(captured.chatsvcagg, captured.ic3);
     return ok(signedIn.value.token);
   };
 
@@ -136,12 +146,12 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   // login attempt. Cleared on settle (success or failure) so the next call
   // re-checks the cache instead of returning a stale failure.
   let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
-  const acquireViaBrowserShared = (force = false): Promise<Result<AccessToken, AuthError>> => {
+  const acquireViaBrowserShared = (mode: SignInMode): Promise<Result<AccessToken, AuthError>> => {
     if (inFlightBrowserAcquire !== null) {
       logger.info('auth.ladder.rung', { rung: 'browser_shared_in_flight' });
       return inFlightBrowserAcquire;
     }
-    const launched = acquireViaBrowser(force);
+    const launched = acquireViaBrowser(mode);
     inFlightBrowserAcquire = launched.finally(() => {
       inFlightBrowserAcquire = null;
     });

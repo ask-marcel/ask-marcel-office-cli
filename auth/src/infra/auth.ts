@@ -92,8 +92,19 @@ type CachedToken = {
  */
 type ElevatedOutcome = { captured: true } | { captured: false; reason: ElevatedFailureReason | 'unknown_error' };
 
+/**
+ * The three browser sign-ins. `cached`: a session with no usable basic token; a
+ * fresh token that another process saved ends it. `renew`: the full capture of
+ * a plain `login` whose session cannot renew itself. `force`: `login --force`,
+ * the one sign-in that clears the browser cookies.
+ */
+type SignInMode = 'cached' | 'renew' | 'force';
+
+/** `force` and `renew` skip the cached token and its refresh, and open the browser. */
+type SignInOptions = { readonly force?: boolean; readonly renew?: boolean };
+
 type AuthManager = {
-  getAccessToken: (options?: { force?: boolean }) => Promise<Result<AccessToken, AuthError>>;
+  getAccessToken: (options?: SignInOptions) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Returns a Graph token issued for an app on Microsoft's ODSP
    * `logicalPermissions` allow-list. Falls through cache → re-capture
@@ -173,6 +184,8 @@ type AuthManager = {
    * bring-your-own-token manager has no cache, so it omits it.
    */
   getCachedBasicToken?: () => Promise<AccessToken | undefined>;
+  /** Decode-only: does the token cache hold a refresh token? Never shows the token. */
+  hasRefreshToken?: () => Promise<boolean>;
   getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
   /**
    * Same decode-only preflight as `getCachedElevatedInfo`, for the chatsvcagg /
@@ -342,6 +355,11 @@ const HOLDER_ACTIVITY: Readonly<Record<LockPurpose | 'unknown', string>> = {
   unknown: 'using the token cache',
 };
 
+const signInMode = (options: SignInOptions | undefined): SignInMode => {
+  if (options?.force === true) return 'force';
+  return options?.renew === true ? 'renew' : 'cached';
+};
+
 // Two Graph tokens of the same account: the same object id in the same tenant.
 // A token without these claims never matches, so the caller replaces rather
 // than merges.
@@ -414,7 +432,7 @@ const substrateTierOf = (resource: string): RedemptionTier => (resource === IC3_
 // a session allowed to open one; a rung left out fails fast with the "run login"
 // message instead.
 type BrowserRungs = {
-  readonly signIn?: (force: boolean) => Promise<Result<AccessToken, AuthError>>;
+  readonly signIn?: (mode: SignInMode) => Promise<Result<AccessToken, AuthError>>;
   readonly recaptureElevated?: (options?: { readonly awaitSignIn?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   readonly recaptureChatsvcagg?: () => Promise<Result<AccessToken, AuthError>>;
   readonly recaptureIc3?: () => Promise<Result<AccessToken, AuthError>>;
@@ -769,11 +787,13 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
   };
 
-  const getAccessToken = async (options?: { force?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+  const getAccessToken = async (options?: SignInOptions): Promise<Result<AccessToken, AuthError>> => {
     // `login --force` skips the cache + refresh rungs so a warm session still
     // re-captures every token via the browser (elevated carries no refresh_token,
-    // so a cache-hit login would otherwise never refresh it).
-    if (!options?.force) {
+    // so a cache-hit login would otherwise never refresh it). The full capture
+    // of a plain `login` (`renew`) skips them for the same reason.
+    const mode = signInMode(options);
+    if (mode === 'cached') {
       const settled = await cachedOrRefreshedBasic();
       if (settled !== undefined) return settled;
     }
@@ -782,12 +802,15 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // headless-hang poll. The `login` command's manager has this rung.
     const signIn = browser?.signIn;
     if (!signIn) return err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
-    // Under --force, tell the browser layer to skip its concurrent-refresh probe
+    // Under --force or renew, the browser layer skips its concurrent-refresh probe
     // so the still-valid cached token cannot short-circuit the full re-capture.
-    return signIn(options?.force ?? false);
+    return signIn(mode);
   };
 
   const ELEVATED_BUFFER_SECONDS = 300;
+
+  // Decode-only, as the readers below: `login` asks it, and it never shows the token.
+  const hasRefreshToken = async (): Promise<boolean> => Boolean((await readCache())?.refresh_token);
 
   const freshGuestToken = (cached: CachedToken | null, tenant: TenantId): string | undefined => {
     const slot = cached?.guest_tokens;
@@ -1174,6 +1197,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,
     getCachedBasicToken,
+    hasRefreshToken,
     getCachedElevatedInfo,
     getCachedChatsvcaggInfo,
     getCachedIc3Info,
@@ -1184,4 +1208,17 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
 };
 
 export { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS };
-export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, LoginAuthFactory, SecondaryTokenCommands, TokenCacheAccess, TokenLadder };
+export type {
+  AuthError,
+  AuthLadder,
+  AuthManager,
+  BrowserRungs,
+  CachedTierInfo,
+  ElevatedOutcome,
+  FetchFn,
+  LoginAuthFactory,
+  SecondaryTokenCommands,
+  SignInMode,
+  TokenCacheAccess,
+  TokenLadder,
+};
