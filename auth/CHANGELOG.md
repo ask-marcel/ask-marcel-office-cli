@@ -6,6 +6,30 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Fixed: a session with no refresh token
+
+On 2026-11-18 the token cache held no refresh token after a sign-in. No tier
+could renew itself, no log event told why, a plain `login` reported a good
+session, and `status` promised a self-heal.
+
+- A sign-in that captures no refresh token keeps the refresh token of the same
+  account that the cache holds. The warn event `auth.refresh.not_captured` tells
+  if it kept one.
+- A self-heal that has no refresh token to redeem writes the warn event
+  `auth.refresh.redeem_skipped` with the tier. No event holds a token or a
+  tenant id.
+- A plain `login` captures every tier and a new refresh token in the browser
+  when the cache holds no refresh token, or when the headless refresh of
+  `chatsvcagg` or `ic3` failed. It keeps the browser cookies. Only
+  `login --force` clears them, also for the sign-in of a session with no usable
+  token.
+- `login` fails with the error code `session_cannot_renew` when the cache holds
+  no refresh token after the sign-in. The message tells you to run
+  `login --force`.
+- `status` shows `refreshToken: cached` or `refreshToken: missing`. With
+  `missing`, the `basic`, `chatsvcagg` and `ic3` tiers show
+  `refresh: interactive`, and the hint promises no self-heal.
+
 ### Changed since ask-marcel-office-cli 2.8.0
 
 If you used the sign-in of `ask-marcel-office-cli` 2.8.0, these changes apply

@@ -12,16 +12,39 @@ different service.
 
 | Tier | What it reads | How it refreshes |
 |:--|:--|:--|
-| `basic` | Mail, files, calendar, people, tasks and notes (most commands) | Automatically, from the refresh token |
+| `basic` | Mail, files, calendar, people, tasks and notes (most commands) | Automatically, while the token cache holds a good refresh token |
 | `elevated` | The file version history and the Teams chat list | Only `login` captures it again (a browser) |
-| `chatsvcagg` | The content of Teams chat messages | Automatically, from the refresh token |
-| `ic3` | The history of Teams chats | Automatically, from the refresh token |
-| `guest` | Files in a partner tenant where you are a guest (`--tenant <guid>`) | Automatically, from the refresh token |
+| `chatsvcagg` | The content of Teams chat messages | Automatically, while the token cache holds a good refresh token |
+| `ic3` | The history of Teams chats | Automatically, while the token cache holds a good refresh token |
+| `guest` | Files in a partner tenant where you are a guest (`--tenant <guid>`) | Automatically, while the token cache holds a good refresh token |
 
 `ask-marcel-office-auth status` shows the first four tiers. For each tier, it
 shows if the token is available, the seconds before it expires, its scopes and
 how it refreshes. It reads only the token cache. It makes no Graph call and
 opens no browser.
+
+## The refresh token
+
+The `basic`, `chatsvcagg`, `ic3` and `guest` tiers renew themselves from one
+shared refresh token in the token cache. When the cache holds no refresh token,
+or Microsoft refuses it, no tier renews itself. Each token then stops at its
+expiry.
+
+- `status` shows `refreshToken: cached` or `refreshToken: missing`. It never
+  shows the token. With `missing`, the tiers show `refresh: interactive`, and
+  the hint tells you to run `login`.
+- A plain `ask-marcel-office-auth login` looks at the session after its
+  headless refresh. If the cache holds no refresh token, or the refresh of
+  `chatsvcagg` or `ic3` failed, it captures every tier and a new refresh token
+  in the browser. It keeps the browser cookies, so the sign-in is usually
+  silent.
+- If the cache still holds no refresh token after the sign-in, `login` fails
+  with the error code `session_cannot_renew`. Then run
+  `ask-marcel-office-auth login --force`.
+- A self-heal that has no refresh token writes the warn event
+  `auth.refresh.redeem_skipped` with the tier. A sign-in that captures no
+  refresh token writes the warn event `auth.refresh.not_captured`. Set
+  `ASKMARCEL_LOG_LEVEL=warn` to see them.
 
 ## The elevated token
 
@@ -150,5 +173,6 @@ The read and write packages also read `ASKMARCEL_TOKEN_COMMAND` and the
 | `auth_cancelled` | The sign-in stopped. If you closed the window, run `login` again. If the browser stayed on a blank page, security software can block it. Try the Node install, and set `ASKMARCEL_TRACE=1` to see the cause. |
 | `sign_in_in_progress` | Another process signs in or refreshes. Wait, then ask again. `ask-marcel-office-auth status` shows the tokens when it is done. |
 | `token_cache_unwritable` | Make `~/.ask-marcel` writable by this user, then run `ask-marcel-office-auth login`. |
+| `session_cannot_renew` | `login` signed you in, but the token cache holds no refresh token, so no token renews itself. Run `ask-marcel-office-auth login --force`. |
 | `invalid_arguments` | The token helper refused the call. The remedy gives the correct call. |
 | `token_helper_unavailable` | The read or write package found no token helper (see [The npx cache](#the-npx-cache)). Run `ask-marcel-office-auth status` one time to record it. |
