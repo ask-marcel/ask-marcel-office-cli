@@ -71,10 +71,10 @@ describe('the lifecycle entries of the write package', () => {
     expect(mcp.summary).not.toMatch(/run-command|login|token/);
   });
 
-  it('gives help-json the two categories of the write commands', () => {
-    expect(entry('help-json').summary).toContain('Categories: lifecycle, mail, calendar.');
+  it('gives help-json the three categories of the write commands', () => {
+    expect(entry('help-json').summary).toContain('Categories: lifecycle, mail, calendar, tasks.');
     const categories = new Set(Object.values(commands).map((command) => command.meta.category));
-    expect([...categories].toSorted((a, b) => a.localeCompare(b))).toEqual(['calendar', 'mail']);
+    expect([...categories].toSorted((a, b) => a.localeCompare(b))).toEqual(['calendar', 'mail', 'tasks']);
   });
 
   it('renders the docs page of `docs` with the example of a write command', () => {
