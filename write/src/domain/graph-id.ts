@@ -14,10 +14,13 @@ export type GraphId = string & { readonly __brand: 'GraphId' };
 
 const GRAPH_ID = /^[\w=-]{1,512}$/;
 
+/** Whether `raw` has the form of a Graph id: for an id of a Graph answer, where a refusal would go nowhere. */
+export const isGraphId = (raw: string): raw is GraphId => GRAPH_ID.test(raw);
+
 /** Checks an id from a param, a file or the run journal. `what` names it in the refusal, for example `--message-id`. */
 export const parseGraphId = (raw: string, what: string): Result<GraphId, GraphError> =>
-  GRAPH_ID.test(raw)
-    ? ok(raw as GraphId)
+  isGraphId(raw)
+    ? ok(raw)
     : err({
         type: 'validation_error',
         code: 'invalid_id',
