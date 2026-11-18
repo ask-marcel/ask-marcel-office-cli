@@ -4,7 +4,7 @@ import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fa
 import { fakeWriteGraph } from '@ask-marcel/office-core/test-helpers/write-graph-fake.ts';
 import { buildWriteCli } from './write-program.ts';
 
-// The CLI of the write package `@ask-marcel/office-write`: its seven commands
+// The CLI of the write package `@ask-marcel/office-write`: its 13 commands
 // and its lifecycle commands under the bin `ask-marcel-office-write`, on the
 // write graph alone. The help cases call the bare command: commander ends the
 // process on `--help`, and the test runner then stops with no report.
@@ -46,7 +46,7 @@ describe('the CLI of the write package', () => {
     expect(await run(['--version'])).toBe('1.0.0\n');
   });
 
-  it('lists the seven write commands, help-json and docs in its help, and not mcp, which the bin serves before commander', async () => {
+  it('lists the 13 write commands, help-json and docs in its help, and not mcp, which the bin serves before commander', async () => {
     const help = await run([]);
     expect(help).toContain('Usage: ask-marcel-office-write');
     expect([...listedUnder(help, 'Mail:'), ...listedUnder(help, 'Calendar:')].toSorted((a, b) => a.localeCompare(b))).toEqual([
@@ -56,6 +56,12 @@ describe('the CLI of the write package', () => {
       'create-forward-draft',
       'create-mail-draft',
       'create-reply-draft',
+      'delete-mail-draft',
+      'mark-mail-message',
+      'move-mail-message',
+      'move-mail-thread',
+      'set-mail-categories',
+      'set-mail-flag',
       'update-mail-draft',
     ]);
     expect(listedUnder(help, 'Commands:')).toEqual(['help-json']);
@@ -63,18 +69,18 @@ describe('the CLI of the write package', () => {
     expect(help).not.toMatch(/^ {2}mcp\b/m);
   });
 
-  it('says that all seven commands write, and gives no sentence on GET endpoints', async () => {
+  it('says that all 13 commands write, and gives no sentence on GET endpoints', async () => {
     const help = (await run([])).replaceAll(/\s+/g, ' ');
     expect(help).toContain('Microsoft Graph write commands for agents');
-    expect(help).toContain('All 7 commands write.');
+    expect(help).toContain('All 13 commands write.');
     expect(help).not.toContain('GET endpoints');
     expect(help).not.toContain('ONLY writes');
   });
 
-  it('lists the seven commands and docs, help-json and mcp in help-json, under the write package', async () => {
+  it('lists the 13 commands and docs, help-json and mcp in help-json, under the write package', async () => {
     const manifest = JSON.parse(await run(['help-json'])) as Manifest;
     expect(manifest.package).toBe('@ask-marcel/office-write');
-    expect(manifest.commands).toHaveLength(11);
+    expect(manifest.commands).toHaveLength(17);
     expect(manifest.commands.map((command) => command.name).filter((name) => ['docs', 'help-json', 'mcp'].includes(name))).toEqual(['docs', 'help-json', 'mcp']);
   });
 

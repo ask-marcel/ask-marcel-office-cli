@@ -31,6 +31,12 @@ describe('the command-to-package directory', () => {
       'create-forward-draft',
       'create-mail-draft',
       'create-reply-draft',
+      'delete-mail-draft',
+      'mark-mail-message',
+      'move-mail-message',
+      'move-mail-thread',
+      'set-mail-categories',
+      'set-mail-flag',
       'update-mail-draft',
     ]);
     expect([...COMMAND_DIRECTORY.keys()].filter((name) => !shipped.has(name))).toEqual([]);

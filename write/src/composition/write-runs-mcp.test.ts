@@ -42,6 +42,7 @@ describe('the dry-run and the undo over MCP', () => {
       'list-commands': [true, undefined],
       'get-command-docs': [true, undefined],
       'run-write-command': [false, false],
+      'run-destructive-command': [false, true],
       undo: [true, undefined],
       'undo-apply': [false, true],
     });

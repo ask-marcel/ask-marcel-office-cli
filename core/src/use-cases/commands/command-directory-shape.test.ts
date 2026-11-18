@@ -14,18 +14,18 @@ const COMMAND_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const namesOf = (role: PackageRole): ReadonlyArray<string> => [...COMMAND_DIRECTORY].filter(([, placed]) => placed === role).map(([name]) => name);
 
 describe('the command-to-package directory', () => {
-  it('holds 4 auth commands, 204 read commands and 7 write commands', () => {
+  it('holds 4 auth commands, 204 read commands and 13 write commands', () => {
     expect(PACKAGE_ROLES.map((role) => [role, namesOf(role).length])).toEqual([
       ['auth', 4],
       ['read', 204],
-      ['write', 7],
+      ['write', 13],
     ]);
   });
 
   it('names each command in kebab case, once', () => {
     const names = [...COMMAND_DIRECTORY.keys()];
     expect(names.filter((name) => !COMMAND_NAME.test(name))).toEqual([]);
-    expect(names).toHaveLength(215);
+    expect(names).toHaveLength(221);
   });
 
   it('lists the commands of each package in alphabetical order, so an entry has one place to go', () => {
