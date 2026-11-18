@@ -44,11 +44,15 @@ describe('the mail state commands over MCP', () => {
     const tools = (await (await connect()).listTools()).tools;
     const destructive = tools.find((tool) => tool.name === 'run-destructive-command');
     expect([destructive?.annotations?.readOnlyHint, destructive?.annotations?.destructiveHint]).toEqual([false, true]);
-    expect(destructive?.description).toStartWith('Run one of the 1 commands that DELETE in Microsoft 365. delete-mail-draft: delete an item');
+    expect(destructive?.description).toStartWith(
+      'Run one of the 6 commands that DELETE in Microsoft 365. apply-todo-ops, delete-mail-draft, delete-todo-task, delete-todo-task-step, move-todo-task, remove-todo-task-attachment: delete an item'
+    );
     const write = tools.find((tool) => tool.name === 'run-write-command');
     expect(write?.annotations?.destructiveHint).toBe(false);
     expect(write?.description).toContain('mark-mail-message, move-mail-message, move-mail-thread, set-mail-categories, set-mail-flag: change the state of a mail message');
-    expect(write?.description).toContain('The commands that delete are on run-destructive-command: delete-mail-draft.');
+    expect(write?.description).toContain(
+      'The commands that delete are on run-destructive-command: apply-todo-ops, delete-mail-draft, delete-todo-task, delete-todo-task-step, move-todo-task, remove-todo-task-attachment.'
+    );
   });
 
   it('delete a draft on run-destructive-command, and refuse it on run-write-command', async () => {
