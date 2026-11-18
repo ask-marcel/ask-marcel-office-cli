@@ -45,7 +45,7 @@ describe('the mail state commands over MCP', () => {
     const destructive = tools.find((tool) => tool.name === 'run-destructive-command');
     expect([destructive?.annotations?.readOnlyHint, destructive?.annotations?.destructiveHint]).toEqual([false, true]);
     expect(destructive?.description).toStartWith(
-      'Run one of the 6 commands that DELETE in Microsoft 365. apply-todo-ops, delete-mail-draft, delete-todo-task, delete-todo-task-step, move-todo-task, remove-todo-task-attachment: delete an item'
+      'Run one of the 6 commands that DELETE in Microsoft 365. apply-todo-ops, delete-mail-draft, delete-todo-task, delete-todo-task-step, move-todo-task, remove-todo-task-attachment: delete or move an item'
     );
     const write = tools.find((tool) => tool.name === 'run-write-command');
     expect(write?.annotations?.destructiveHint).toBe(false);
