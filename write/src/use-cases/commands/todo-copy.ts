@@ -5,7 +5,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphReads } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
-import { isGraphId } from '../../domain/graph-id.ts';
+import { graphIdSchema, isGraphId } from '../../domain/graph-id.ts';
 import type { TodoTask } from './todo-reader.ts';
 import { readTask, taskPath, unreadable } from './todo-reader.ts';
 
@@ -117,7 +117,7 @@ export const readCopy = async (reads: GraphReads, task: TodoTask): Promise<Resul
   return ok({ ...children.value.copy, files });
 };
 
-const createdSchema = z.object({ id: z.string() });
+const createdSchema = z.object({ id: graphIdSchema });
 
 // The items of the copy under the new task, one write each. The first error stops it.
 const addChildren = async (graph: WriteGraph, listId: GraphId, taskId: GraphId, copy: TaskCopy): Promise<Result<unknown, GraphError>> => {
@@ -152,8 +152,9 @@ const partCopy = async (graph: WriteGraph, listId: GraphId, taskId: GraphId, cau
 export const createFromCopy = async (graph: WriteGraph, listId: GraphId, copy: TaskCopy): Promise<Result<TodoTask, GraphError>> => {
   const created = await graph.post(`/me/todo/lists/${listId}/tasks`, copy.fields);
   if (!created.ok) return created;
-  const id = createdSchema.safeParse(created.value).data?.id ?? '';
-  if (!isGraphId(id)) return err(unreadable('the task it created'));
+  const made = createdSchema.safeParse(created.value);
+  if (!made.success) return err(unreadable('the task it created'));
+  const id = made.data.id;
   const children = await addChildren(graph, listId, id, copy);
   if (!children.ok) return err(await partCopy(graph, listId, id, children.error));
   return readTask(graph, listId, id);
