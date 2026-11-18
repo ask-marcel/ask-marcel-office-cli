@@ -7,9 +7,9 @@
  *      (unpdf, mammoth, jszip, turndown), no playwright, no read graph
  *      (createReadGraph) and no member of the read tiers (getElevated,
  *      teamsChatIc3);
- *   2. `--version` answers the package version; `--help` lists the 7 write
+ *   2. `--version` answers the package version; `--help` lists the 13 write
  *      commands, `help-json`, `docs` and `undo` (not `mcp`: the bin serves it
- *      before commander); `help-json` gives the package and 11 entries, `mcp`
+ *      before commander); `help-json` gives the package and 17 entries, `mcp`
  *      and `undo` among them; `docs create-mail-draft` prints its page;
  *   3. a missing required flag and an unknown flag each exit 1 with the
  *      commander code and no crash line, before any token request (the run has
@@ -21,8 +21,8 @@
  *   5. `list-drives` names @ask-marcel/office-read, exit 1;
  *   6. `dist/cli.js mcp` writes only JSON-RPC frames to stdout (a tolerant SDK
  *      client skips a stray line, so this reads the raw stdout) and has exactly
- *      the tools list-commands, get-command-docs, run-write-command, undo and
- *      undo-apply;
+ *      the tools list-commands, get-command-docs, run-write-command,
+ *      run-destructive-command, undo and undo-apply;
  *   7. no probe leaves a file under its HOME except the update-notifier
  *      configstore of this package and bun's own cache (the bin writes no token
  *      cache and no locator);
@@ -59,6 +59,12 @@ const WRITE_COMMANDS = [
   'create-forward-draft',
   'create-mail-draft',
   'create-reply-draft',
+  'delete-mail-draft',
+  'mark-mail-message',
+  'move-mail-message',
+  'move-mail-thread',
+  'set-mail-categories',
+  'set-mail-flag',
   'update-mail-draft',
 ];
 const READ_MARKERS = ['unpdf', 'mammoth', 'jszip', 'turndown', 'playwright', 'createReadGraph', 'getElevated', 'teamsChatIc3'];
@@ -142,13 +148,13 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
   return [
     ['--version answers the package version', exited(version.p, 0) && version.out.trim() === PACKAGE.version, `${exitNote(version.p)}, ${version.out.trim()}`],
     [
-      '--help lists the 7 write commands, help-json, docs and undo, and not mcp',
+      '--help lists the 13 write commands, help-json, docs and undo, and not mcp',
       exited(help.p, 0) && missingHelp.length === 0 && !helpListed('mcp'),
       missingHelp.length === 0 ? exitNote(help.p) : `missing ${missingHelp.join(', ')}`,
     ],
     [
-      'help-json gives the package and 11 entries, mcp and undo among them',
-      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 11 && names.includes('mcp') && names.includes('undo'),
+      'help-json gives the package and 17 entries, mcp and undo among them',
+      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 17 && names.includes('mcp') && names.includes('undo'),
       `${manifest.package ?? 'no package'}, ${names.length} entries`,
     ],
     ['docs create-mail-draft prints its page', exited(docs.p, 0) && docs.out.startsWith('# `create-mail-draft`'), exitNote(docs.p)],
@@ -212,8 +218,8 @@ const probeMcp = (rt: string): ReadonlyArray<Check> => {
     ['stdout holds only JSON-RPC frames', ok, ok ? `${read.length} line(s)` : read],
     ['the server is ask-marcel-office-write', server === 'ask-marcel-office-write', server],
     [
-      'the tools are exactly list-commands, get-command-docs, run-write-command, undo and undo-apply',
-      JSON.stringify(tools) === JSON.stringify(['get-command-docs', 'list-commands', 'run-write-command', 'undo', 'undo-apply']),
+      'the tools are exactly list-commands, get-command-docs, run-write-command, run-destructive-command, undo and undo-apply',
+      JSON.stringify(tools) === JSON.stringify(['get-command-docs', 'list-commands', 'run-destructive-command', 'run-write-command', 'undo', 'undo-apply']),
       tools.join(', '),
     ],
     ['get-command-docs answers the create-mail-draft page', docsText.startsWith('# `create-mail-draft`'), docsText.split('\n')[0] ?? ''],
@@ -233,8 +239,8 @@ const probeLibrary = (rt: string): ReadonlyArray<Check> => {
   const out = p.stdout?.toString() ?? '';
   return [
     [
-      'the library loads by name with its exports and the 7 commands',
-      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 7',
+      'the library loads by name with its exports and the 13 commands',
+      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 13',
       out || (p.stderr?.toString().slice(0, 200) ?? exitNote(p)),
     ],
   ];

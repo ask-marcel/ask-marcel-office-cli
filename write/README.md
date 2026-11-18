@@ -1,10 +1,10 @@
 # @ask-marcel/office-write
 
-`@ask-marcel/office-write` holds the 7 write commands: 4 mail-draft operations
-and 3 PDF conversions. These Microsoft Graph commands change the state of your
-tenant. Its bin is `ask-marcel-office-write`. It sends no mail: a draft
-stays unsent until you send it from Outlook. It cannot create or change calendar
-items.
+`@ask-marcel/office-write` holds the 13 write commands: 4 mail-draft operations,
+3 PDF conversions, 5 mail state changes and 1 draft delete. These Microsoft
+Graph commands change the state of your tenant. Its bin is
+`ask-marcel-office-write`. It sends no mail: a draft stays unsent until you send
+it from Outlook. It cannot create or change calendar items.
 
 Install it next to `@ask-marcel/office-read` and `@ask-marcel/office-auth`. The
 write commands take ids that the read commands give, for example the message id
@@ -29,24 +29,38 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write convert-mail-attachment-to-pdf` | Converts an Outlook mail attachment to PDF. |
 | `ask-marcel-office-write convert-calendar-event-attachment-to-pdf` | Converts an attachment of a calendar event to PDF. |
 | `ask-marcel-office-write convert-group-post-attachment-to-pdf` | Converts an attachment of a group post to PDF. |
+| `ask-marcel-office-write move-mail-message` | Moves one or more messages to a folder (`--ids-file` for a batch). |
+| `ask-marcel-office-write move-mail-thread` | Moves the messages of one conversation in a folder to another folder. |
+| `ask-marcel-office-write mark-mail-message` | Marks one or more messages read or unread. |
+| `ask-marcel-office-write set-mail-flag` | Sets the follow-up flag of a message, with an optional due day. |
+| `ask-marcel-office-write set-mail-categories` | Replaces the categories of a message. |
+| `ask-marcel-office-write delete-mail-draft` | Moves an unsent draft to Deleted Items. |
 | `ask-marcel-office-write undo <runId> [--apply]` | Shows the undo of a write run, or does it with `--apply`. |
 | `ask-marcel-office-write mcp` | Serves the MCP server over stdio (see below). |
 | `ask-marcel-office-write docs <command>` | Prints the Markdown page of one command. |
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 11 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
+`help-json` lists 17 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md).
 
-Each draft command takes `--dry-run`: it shows the changes and makes none. A
-run that is not a dry-run gives a `runId`, and `undo <runId> --apply` reverses
-it: a new draft goes to Deleted Items, and an update gets its old fields back.
-The undo passes over a draft that changed after the run. The run journal is in
-`~/.ask-marcel/runs/` and keeps a run 30 days. The details are in
+Each draft command and each mail state command takes `--dry-run`: it shows the
+changes and makes none. A run that is not a dry-run gives a `runId`, and
+`undo <runId> --apply` reverses it: a new draft goes to Deleted Items, an update
+gets its old fields back, a moved message goes back to its folder, and a read
+state, a flag or categories get their old value. The undo passes over an item
+that changed after the run. The run journal is in `~/.ask-marcel/runs/` and
+keeps a run 30 days. The details are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#dry-run-and-undo).
+
+A move never puts mail in Deleted Items, Recoverable Items, Junk Email or
+Outbox, or in a folder in one of them. `delete-mail-draft` is the one command
+that puts a message in Deleted Items, and it takes only an unsent draft. The
+mail state commands are in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#mail-state).
 
 A PDF conversion of a file attachment uploads it to a temporary file in the
 `.ask-marcel-temp` folder of your OneDrive. Then it tries to delete that file. A
@@ -99,11 +113,12 @@ Other MCP clients (Claude Desktop, Cursor, Cline) take an `mcpServers` block:
 }
 ```
 
-The server has five tools: `list-commands`, `get-command-docs`,
-`run-write-command`, `undo` and `undo-apply`. `run-write-command` runs only the
-7 write commands, and takes `dryRun`. `undo` shows the undo of a run and is
-read-only. `undo-apply` does it and has the destructive mark, so a host asks you
-first. A read
+The server has six tools: `list-commands`, `get-command-docs`,
+`run-write-command`, `run-destructive-command`, `undo` and `undo-apply`.
+`run-write-command` runs the writes that do not delete, and takes `dryRun`.
+`run-destructive-command` runs `delete-mail-draft`, takes `dryRun`, and has the
+destructive mark, so a host asks you first. `undo` shows the undo of a run and
+is read-only. `undo-apply` does it and has the destructive mark too. A read
 command gets a pointer to the read server (`ask-marcel-office-read mcp`). Register
 this server only on hosts that may write drafts. Read the npx note in the
 [auth usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/auth/USAGE.md#the-npx-cache)
@@ -124,7 +139,7 @@ const draft = await commands['create-mail-draft']?.execute(graph, {
 
 The library exports:
 
-- `commands`: the 7 write commands, each on the write graph alone;
+- `commands`: the 13 write commands, each on the write graph alone;
 - `createWriteGraph(tokens)`: the write graph over a token source;
 - `createEnvThenHelperTokenSource()`: the tier variables of the process, else the
   token helper of `@ask-marcel/office-auth`;
@@ -133,6 +148,8 @@ The library exports:
 - the types `Command`, `WriteGraph`, `TokenSource` and `Result`.
 
 Each `execute` returns a `Result`: `{ ok: true, value }` or `{ ok: false, error }`.
+A command that reads a local file (`--ids-file`) takes a file reader as the third
+argument of `execute`; without it, the read is refused (`local_files_unavailable`).
 A command runs on a write view of the graph you give it. Before any request,
 that view and `createWriteGraph` refuse a change to a path that sends mail
 (`send_refused`) and a Graph beta PATCH of a path that is not on the beta
