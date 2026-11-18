@@ -65,7 +65,42 @@ plan and the undo handlers of its kinds.
 The four mail draft commands are the reference
 (`write/src/use-cases/commands/draft-runs.ts`). The mail state commands are the
 reference for a batch (`mail-batch.ts`, `mail-move-write.ts`,
-`mail-field-write.ts`).
+`mail-field-write.ts`). The To Do commands are the reference for a write of
+more than one change in one op, and for an undo that makes an item again
+(`todo-batch.ts`, `todo-copy.ts`, `todo-task-undo.ts`, `todo-item-undo.ts`).
+
+## The undo of the To Do commands
+
+| Kind | Change | What the check compares | What the undo does |
+|:--|:--|:--|:--|
+| `delete-created-todo-task` | create a task | `lastModifiedDateTime` | deletes the task |
+| `restore-todo-task-fields` | update, complete | the fields that the run set | writes the fields of before back |
+| `move-todo-task-back` | move a task | `lastModifiedDateTime`, and the list of before is there | copies the task back, then deletes the copy (new id) |
+| `recreate-todo-task` | delete a task | the list is there | creates the task again from the copy in the journal (new id) |
+| `delete-created-todo-step` | add a step | the text and the check mark | deletes the step |
+| `restore-todo-step` | update a step | the text and the check mark | writes them back |
+| `recreate-todo-step` | delete a step | the task is there | adds the step again, at the end (new id) |
+| `delete-created-todo-link` | add a linked resource | the fields that the run set | deletes the linked resource |
+| `delete-created-todo-attachment` | add an attachment | the name (Graph lists another size than the size of the file) | removes the attachment |
+| `reattach-todo-file` | remove an attachment | the task is there | attaches the bytes in the journal again (new id) |
+| `restore-todo-list-name` | rename a list | the name that the run gave | gives the name of before back |
+| `todo-list-created` | create a list | none | refuses: no command deletes a list |
+
+A To Do step and a linked resource have no date of change, so their check
+compares their fields. The undo of an update compares only the fields that the
+run set, so a later change of a step (which changes the
+`lastModifiedDateTime` of its task) does not stop it.
+
+Graph limits that the To Do commands meet:
+
+- Graph has no move of a task. A move is a copy, then the delete of the
+  original. The copy gets new ids for the task, its steps and its attachments,
+  and the dates of creation and the date a step was checked are lost.
+- The steps, the linked resources and the attachments of a task are read in one
+  page. A task with a next page is not copied (`todo_copy_too_large`).
+- A deleted item cannot come back with its id. The undo makes a new item.
+- The journal of `delete-todo-task` and `remove-todo-task-attachment` holds the
+  bytes of the attachments (base64), up to 25 MB for each file.
 
 ## Local files
 
