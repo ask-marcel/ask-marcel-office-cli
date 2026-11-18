@@ -13,7 +13,7 @@ import { renderToString } from '@ask-marcel/office-core/presenter/render-to-stri
 import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import { fillNames, fillNamesIn } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import * as login from '../use-cases/commands/login.ts';
-import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
+import { buildLoginSummary, SESSION_CANNOT_RENEW_CODE, SESSION_CANNOT_RENEW_MESSAGE } from '../use-cases/commands/login-status.ts';
 import * as status from '../use-cases/commands/status.ts';
 import { errText, okText } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 
@@ -56,6 +56,7 @@ const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
       if (!result.ok) return failText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
       const info = await loginAuth.getTokenInfo();
       if (!info.ok) return failText(info.error.message);
+      if (!info.value.refreshTokenCached) return failText(SESSION_CANNOT_RENEW_MESSAGE, SESSION_CANNOT_RENEW_CODE);
       const summary = buildLoginSummary({
         elevatedAvailable: info.value.elevated.available,
         chatsvcaggAvailable: info.value.chatsvcagg.available,
