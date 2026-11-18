@@ -1,6 +1,7 @@
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { Result } from '../../domain/result.ts';
 import type { WriteGraph } from '../ports/graph.ts';
+import type { LocalFileReader } from './read-local-file.ts';
 
 /*
  * The contract of a write that can run as a dry-run and be undone (step 2 of
@@ -37,23 +38,33 @@ export type AppliedWrite = { readonly value: unknown; readonly changes: Readonly
 /** The read members of the write graph: all a plan may call before the writes. */
 export type GraphReads = Pick<WriteGraph, 'get' | 'getBinary' | 'fetchUrl'>;
 
+/**
+ * An item of a batch that the plan passes over: it needs no change, or it is
+ * no longer there. The dry-run shows it with the reason.
+ */
+export type SkippedItem = { readonly target: string; readonly before: ItemIds; readonly reason: string };
+
 /** The changes a command will make, and the writes that make them. */
 export type WritePlan = {
   readonly changes: ReadonlyArray<PlannedChange>;
+  /** The items of a batch that the plan passes over. The apply reports them again in its own answer. */
+  readonly skipped?: ReadonlyArray<SkippedItem>;
   readonly apply: (graph: WriteGraph) => Promise<Result<AppliedWrite, GraphError>>;
 };
 
 /**
  * What a command exports as `plan`: it reads what it needs and says each
- * change. It gets the read members only, so a dry-run cannot write.
+ * change. It gets the read members only, so a dry-run cannot write. `files`
+ * reads a local file that a param names (read-local-file.ts).
  */
-export type PlanWrite = (reads: GraphReads, params: Record<string, string>) => Promise<Result<WritePlan, GraphError>>;
+export type PlanWrite = (reads: GraphReads, params: Record<string, string>, files?: LocalFileReader) => Promise<Result<WritePlan, GraphError>>;
 
 /** A plan bound to the graph of the run (command-graph.ts): its writes need no graph. */
 export type BoundPlan = {
   readonly changes: ReadonlyArray<PlannedChange>;
+  readonly skipped?: ReadonlyArray<SkippedItem>;
   readonly apply: () => Promise<Result<AppliedWrite, GraphError>>;
 };
 
 /** The plan as the shells see it, on the graph `G` they hold. */
-export type BoundPlanWrite<G> = (graph: G, params: Record<string, string>) => Promise<Result<BoundPlan, GraphError>>;
+export type BoundPlanWrite<G> = (graph: G, params: Record<string, string>, files?: LocalFileReader) => Promise<Result<BoundPlan, GraphError>>;

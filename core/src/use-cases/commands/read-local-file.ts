@@ -35,8 +35,19 @@ const refusalFor = (path: string, kind: 'file' | 'folder' | 'other', size: numbe
   return size > maxBytes ? tooLarge(path, size, maxBytes) : undefined;
 };
 
-/** Reads the file at `path` for an upload of at most `maxBytes` bytes. */
-const readLocalFile = async (disk: LocalFileReader, path: string, maxBytes: number): Promise<Result<LocalFile, GraphError>> => {
+const noAccess = (path: string): Result<never, GraphError> =>
+  refused(
+    'local_files_unavailable',
+    `${path} cannot be read: the caller of this command gives it no access to local files. A library caller gives a file reader as the third argument of execute.`
+  );
+
+/**
+ * Reads the file at `path` for an upload of at most `maxBytes` bytes. `disk` is
+ * the reader that the shell gives the command, or undefined when its caller
+ * gives none (a library caller): the read is then refused.
+ */
+const readLocalFile = async (disk: LocalFileReader | undefined, path: string, maxBytes: number): Promise<Result<LocalFile, GraphError>> => {
+  if (disk === undefined) return noAccess(path);
   const info = await disk.stat(path);
   if (!info.ok) return failed(path, info.error);
   const refusal = refusalFor(path, info.value.kind, info.value.size, maxBytes);

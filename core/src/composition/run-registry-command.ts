@@ -35,6 +35,7 @@ import { persistIfRequested, persistMediaIfRequested } from '../use-cases/comman
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { LocalFileReader } from '../use-cases/commands/read-local-file.ts';
 import type { RunRecorder } from '../use-cases/commands/record-run.ts';
 import { noDryRun, previewPlan, recordRun } from '../use-cases/commands/record-run.ts';
 
@@ -161,6 +162,11 @@ export type RunRegistryCommandDeps<G = ReadGraph & WriteGraph> = {
    * library caller, the read package), each command runs as it is.
    */
   readonly runs?: RunRecorder;
+  /**
+   * The reader of a local file that a param of a write command names
+   * (`--ids-file`). Without it, such a read is refused (read-local-file.ts).
+   */
+  readonly files?: LocalFileReader;
 };
 
 export type RunRegistryCommandRequest<G = ReadGraph & WriteGraph> = {
@@ -220,12 +226,12 @@ const persistToPath = async <G>(deps: RunRegistryCommandDeps<G>, request: RunReg
 // A dry-run shows the plan; a write with a plan and a journal is recorded; any other runs as it is.
 const runCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, GraphError>> => {
   const { command, name, params } = request;
-  if (request.dryRun === true) return command.plan === undefined ? err(noDryRun(name)) : previewPlan(name, await command.plan(deps.graph, params));
-  if (command.plan !== undefined && deps.runs !== undefined) return recordRun(deps.runs, name, await command.plan(deps.graph, params));
+  if (request.dryRun === true) return command.plan === undefined ? err(noDryRun(name)) : previewPlan(name, await command.plan(deps.graph, params, deps.files));
+  if (command.plan !== undefined && deps.runs !== undefined) return recordRun(deps.runs, name, await command.plan(deps.graph, params, deps.files));
   // `convert-local-file-to-markdown` / `extract-local-file-images` are the commands whose
   // input is the local filesystem, not Graph — route them to executeLocal with the
   // composition-selected FileSystem (the same instance --output-path uses).
-  return command.executeLocal !== undefined ? command.executeLocal(deps.fs, params) : command.execute(deps.graph, params);
+  return command.executeLocal !== undefined ? command.executeLocal(deps.fs, params) : command.execute(deps.graph, params, deps.files);
 };
 
 export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, RunRegistryCommandFailure>> => {
