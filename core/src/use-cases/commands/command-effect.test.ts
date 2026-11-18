@@ -33,7 +33,7 @@ describe('the writes of a registry', () => {
     expect(describeWrites({ 'list-widgets': fakeCommand() })).toBe('');
   });
 
-  it('change nothing destructively today', () => {
-    expect(Object.values(WRITE_EFFECTS).map((effect) => effect.destructive)).toEqual([false, false, false, false]);
+  it('change nothing destructively, except the delete class', () => {
+    expect(Object.values(WRITE_EFFECTS).map((effect) => effect.destructive)).toEqual([false, false, false, false, true]);
   });
 });

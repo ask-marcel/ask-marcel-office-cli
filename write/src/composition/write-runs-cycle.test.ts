@@ -116,9 +116,20 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
     expect(await cli('undo', RUN_1)).toMatchObject({ ok: false, errorCode: 'run_not_found' });
   });
 
-  it('gives --dry-run to the four draft commands only', () => {
+  it('gives --dry-run to the four draft commands and the six mail state commands only', () => {
     const program = buildWriteCli({ graph: createMailboxFake().graph, logger: createLoggerFake(), fs: createFileSystemFake() });
     const withDryRun = program.commands.filter((command) => command.options.some((option) => option.long === '--dry-run')).map((command) => command.name());
-    expect(withDryRun.toSorted((a, b) => a.localeCompare(b))).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+    expect(withDryRun.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'create-forward-draft',
+      'create-mail-draft',
+      'create-reply-draft',
+      'delete-mail-draft',
+      'mark-mail-message',
+      'move-mail-message',
+      'move-mail-thread',
+      'set-mail-categories',
+      'set-mail-flag',
+      'update-mail-draft',
+    ]);
   });
 });

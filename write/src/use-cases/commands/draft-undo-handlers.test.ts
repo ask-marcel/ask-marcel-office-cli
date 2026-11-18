@@ -86,7 +86,18 @@ describe('the docs of the draft commands', () => {
 
   it('give a plan exactly to the commands whose docs say what the undo does, and to no PDF conversion', () => {
     const planned = Object.entries(commands).filter(([, command]) => command.plan !== undefined);
-    expect(planned.map(([name]) => name).toSorted((a, b) => a.localeCompare(b))).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+    expect(planned.map(([name]) => name).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'create-forward-draft',
+      'create-mail-draft',
+      'create-reply-draft',
+      'delete-mail-draft',
+      'mark-mail-message',
+      'move-mail-message',
+      'move-mail-thread',
+      'set-mail-categories',
+      'set-mail-flag',
+      'update-mail-draft',
+    ]);
     expect(Object.values(commands).filter((command) => (command.plan === undefined) === (command.meta.undo !== undefined))).toEqual([]);
   });
 });

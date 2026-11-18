@@ -31,9 +31,9 @@ const isError = (result: unknown): boolean => (result as { isError?: boolean }).
 const toolDescription = async (client: Client, name: string): Promise<string> => (await client.listTools()).tools.find((tool) => tool.name === name)?.description ?? '';
 
 describe('the MCP server of the write package', () => {
-  it('offers exactly the three gateway tools of a package of writes', async () => {
+  it('offers exactly the four gateway tools of a package of writes and deletes', async () => {
     const { tools } = await (await connect()).listTools();
-    expect(tools.map((tool) => tool.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'run-write-command']);
+    expect(tools.map((tool) => tool.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'run-destructive-command', 'run-write-command']);
   });
 
   it('names itself with the write bin and the version it is given', async () => {
@@ -84,9 +84,9 @@ describe('the MCP server of the write package', () => {
     expect(description).toContain(`Run one of the ${Object.keys(commands).length} commands that WRITE to Microsoft 365.`);
   });
 
-  it('points get-command-docs at run-write-command only, with the write lifecycle commands and example', async () => {
+  it('points get-command-docs at run-write-command and run-destructive-command only, with the write lifecycle commands and example', async () => {
     const description = await toolDescription(await connect(), 'get-command-docs');
-    expect(description).toContain('before run-write-command —');
+    expect(description).toContain('before run-write-command or run-destructive-command —');
     expect(description).toContain('Also covers the lifecycle commands (docs/help-json/mcp/undo).');
     expect(description).not.toContain('run-command ');
   });
