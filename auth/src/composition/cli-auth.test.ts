@@ -46,6 +46,7 @@ const sampleTokenInfo = (over: Partial<TokenInfo> = {}): TokenInfo => ({
   audience: 'https://graph.microsoft.com',
   expiresAt: '2026-12-31T00:00:00.000Z',
   expiresInSeconds: 8938,
+  refreshTokenCached: true,
   elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
   chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' },
   ic3: { available: true, expiresInSeconds: 5400, scopes: ['Teams.AccessAsUser.All'], refresh: 'automatic' },
@@ -132,7 +133,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'status']));
     const parsed = JSON.parse(out) as { ok: boolean; data: Record<string, { available?: boolean }> };
     expect(parsed.ok).toBe(true);
-    expect(Object.keys(parsed.data)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'hint']);
+    expect(Object.keys(parsed.data)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'hint']);
     expect(parsed.data['basic']?.available).toBe(true);
     expect(parsed.data['elevated']?.available).toBe(false);
   });

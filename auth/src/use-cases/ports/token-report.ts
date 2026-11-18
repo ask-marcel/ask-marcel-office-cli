@@ -3,7 +3,9 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 /**
  * Decode-only status for one non-basic token tier: availability, remaining runway,
  * the scopes granted to that token (decoded from its `scp`), and how it refreshes
- * (`automatic` = rides the shared refresh token; `interactive` = elevated, needs a login).
+ * (`automatic` = rides the shared refresh token that the cache holds; `interactive`
+ * = needs a login: always for elevated, and for every tier when the cache holds no
+ * refresh token).
  */
 type TokenTierInfo = {
   readonly available: boolean;
@@ -30,6 +32,12 @@ type TokenInfo = {
    * worth doing under ~5 minutes) without parsing the ISO string itself.
    */
   readonly expiresInSeconds: number | undefined;
+  /**
+   * Does the token cache hold the shared refresh token? Without it, no tier
+   * renews itself: basic, chatsvcagg and ic3 stop at their expiry until a
+   * sign-in. It never carries the refresh token itself.
+   */
+  readonly refreshTokenCached: boolean;
   /**
    * Whether the *persisted* elevated (M365ChatClient) token — the one the
    * historical-version download / convert commands need — is present and still

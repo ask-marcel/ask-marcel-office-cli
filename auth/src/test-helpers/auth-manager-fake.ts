@@ -27,7 +27,7 @@ export const fakeAuthManager = (overrides: Partial<AuthLadder> = {}): AuthLadder
   logout: async () => ({ ok: true, value: undefined }),
   getLastElevatedOutcome: () => null,
   getLastChatsvcaggOutcome: () => null,
-  // The report of a usable basic token. The cache has none of the other three tokens.
+  // The report of a usable basic token and a cached refresh token. The cache has none of the other three tokens.
   getTokenInfo: async () => ({
     ok: true,
     value: {
@@ -35,6 +35,7 @@ export const fakeAuthManager = (overrides: Partial<AuthLadder> = {}): AuthLadder
       audience: undefined,
       expiresAt: undefined,
       expiresInSeconds: 3600,
+      refreshTokenCached: true,
       elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
       chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
       ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
