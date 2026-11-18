@@ -23,24 +23,26 @@ const ONE_WEEK_MS = 1000 * 60 * 60 * 24 * 7;
 const isMcpInvocation = (argv: ReadonlyArray<string>): boolean => argv[2] === 'mcp';
 
 const serveMcp = async (): Promise<void> => {
-  const [{ buildWriteDeps }, { buildWriteRuns }, { buildWriteMcpServer }, { StdioServerTransport }] = await Promise.all([
+  const [{ buildWriteDeps }, { buildWriteRuns }, { buildWriteFiles }, { buildWriteMcpServer }, { StdioServerTransport }] = await Promise.all([
     import('./composition/build-write-deps.ts'),
     import('./composition/write-runs.ts'),
+    import('./composition/write-files.ts'),
     import('./composition/write-server.ts'),
     import('@modelcontextprotocol/sdk/server/stdio.js'),
   ]);
   const deps = buildWriteDeps();
-  const server = buildWriteMcpServer({ graph: deps.graph, fs: deps.fs, runs: buildWriteRuns(), version: pkg.version });
+  const server = buildWriteMcpServer({ graph: deps.graph, fs: deps.fs, runs: buildWriteRuns(), files: buildWriteFiles(), version: pkg.version });
   await server.connect(new StdioServerTransport());
   // Deliberately no resolve: the transport owns the process lifetime now and
   // exits when the client closes stdin.
 };
 
 const runCli = async (): Promise<void> => {
-  const [{ default: updateNotifier }, { buildWriteDeps }, { buildWriteRuns }, { buildWriteCli }] = await Promise.all([
+  const [{ default: updateNotifier }, { buildWriteDeps }, { buildWriteRuns }, { buildWriteFiles }, { buildWriteCli }] = await Promise.all([
     import('update-notifier'),
     import('./composition/build-write-deps.ts'),
     import('./composition/write-runs.ts'),
+    import('./composition/write-files.ts'),
     import('./composition/write-program.ts'),
   ]);
   updateNotifier({ pkg: { name: pkg.name, version: pkg.version }, updateCheckInterval: ONE_WEEK_MS }).notify({ defer: false });
@@ -50,6 +52,7 @@ const runCli = async (): Promise<void> => {
     logger: deps.logger,
     fs: deps.fs,
     runs: buildWriteRuns(),
+    files: buildWriteFiles(),
     version: pkg.version,
     onCommandError: () => {
       process.exitCode = 1;
