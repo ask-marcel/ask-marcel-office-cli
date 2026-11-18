@@ -79,12 +79,12 @@ const messageOf = (issue: z.core.$ZodIssue): string => {
 export const readOpsFile = async (files: LocalFileReader | undefined, path: string): Promise<Result<ReadonlyArray<TodoOpInput>, GraphError>> => {
   const read = await readLocalFile(files, path, OPS_FILE_MAX_BYTES);
   if (!read.ok) return read;
-  const json = parseJson(new TextDecoder().decode(read.value.bytes).replace(/^\uFEFF/, ''));
+  // TextDecoder drops a byte order mark at the start of the file.
+  const json = parseJson(new TextDecoder().decode(read.value.bytes));
   if (!json.ok) return refused('the file is not valid JSON. Write it as UTF-8, for example with a file tool or Out-File -Encoding utf8.');
   const parsed = fileSchema.safeParse(json.value);
   if (parsed.success) return ok(parsed.data.ops);
-  const issue = parsed.error.issues[0];
-  return refused(issue === undefined ? 'the file is not an ops file.' : `${placeOf(issue.path)} ${messageOf(issue)}.`);
+  return refused(parsed.error.issues.map((issue) => `${placeOf(issue.path)} ${messageOf(issue)}.`).join(' '));
 };
 
 /** The input of the fields of an add op or of the `set` of an update op. */

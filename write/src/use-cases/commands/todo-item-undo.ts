@@ -9,7 +9,7 @@ import { attachmentsPath, readAttachments } from './todo-item-ops.ts';
 import { readListName } from './todo-list-ops.ts';
 import { readTask, taskPath } from './todo-reader.ts';
 import { readStep, stepsPath, stepStateSchema } from './todo-step-ops.ts';
-import { canonical, checkRead, checkTask, createTodoUndoHandler, listThere, notThere } from './todo-undo-handler.ts';
+import { canonical, checkRead, checkTask, createTodoUndoHandler, notThere } from './todo-undo-handler.ts';
 
 /*
  * The undo of the changes of the items of a task (steps, linked resources,
@@ -59,8 +59,8 @@ export const ITEM_UNDO_HANDLERS: UndoHandlers = {
     async (graph, data) => {
       const added = await graph.post(stepsPath(data.listId, data.taskId), data.step);
       if (!added.ok) return added;
-      const id = z.object({ id: z.string() }).safeParse(added.value).data?.id;
-      return ok(id === undefined ? {} : { now: { listId: data.listId, taskId: data.taskId, stepId: id } });
+      const step = z.object({ id: z.string() }).safeParse(added.value);
+      return ok(step.success ? { now: { listId: data.listId, taskId: data.taskId, stepId: step.data.id } } : {});
     }
   ),
   'delete-created-todo-link': createTodoUndoHandler(
@@ -106,11 +106,7 @@ export const ITEM_UNDO_HANDLERS: UndoHandlers = {
   ),
   'restore-todo-list-name': createTodoUndoHandler(
     listNameSchema,
-    async (reads, data) => {
-      const there = await listThere(reads, data.listId);
-      if (!there.ok || there.value !== 'ready') return there;
-      return checkRead(await readListName(reads, data.listId), (name) => name === data.set);
-    },
+    async (reads, data) => checkRead(await readListName(reads, data.listId), (name) => name === data.set),
     async (graph, data) => graph.patch(`/me/todo/lists/${data.listId}`, { displayName: data.before })
   ),
 };

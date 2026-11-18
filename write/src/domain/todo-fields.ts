@@ -26,18 +26,16 @@ export type TaskInput = {
 /** The fields that Graph takes in the body of a create or an update of a task. */
 export type TaskFields = Readonly<Record<string, unknown>>;
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const MINUTE = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d$/;
+const MINUTE = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Whether `value` is a day of the calendar in the form YYYY-MM-DD (2026-02-30 and 2026-13-01 are not). */
 export const isDay = (value: string): boolean => {
-  if (!DAY.test(value)) return false;
   const time = Date.parse(`${value}T00:00:00Z`);
-  return !Number.isNaN(time) && new Date(time).toISOString().startsWith(value);
+  return value.length === 10 && !Number.isNaN(time) && new Date(time).toISOString().startsWith(value);
 };
 
 /** Whether `value` is a day and a time in the form YYYY-MM-DDTHH:mm. */
-export const isMinute = (value: string): boolean => isDay(MINUTE.exec(value)?.[1] ?? '');
+export const isMinute = (value: string): boolean => MINUTE.test(value) && isDay(value.slice(0, 10));
 
 /** Whether the input has a date or a reminder, so the plan must read the time zone of the mailbox. */
 export const needsTimeZone = (input: TaskInput): boolean => [input.due, input.start, input.reminder].some((value) => typeof value === 'string');

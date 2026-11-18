@@ -5,7 +5,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { LocalFile } from '@ask-marcel/office-core/use-cases/commands/read-local-file.ts';
 import type { GraphReads, PlannedChange } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
-import { graphIdSchema, isGraphId, parseGraphId } from '../../domain/graph-id.ts';
+import { graphIdSchema, parseGraphId } from '../../domain/graph-id.ts';
 import type { TodoOp } from './todo-batch.ts';
 import { outcomeOf } from './todo-batch.ts';
 import type { TodoList, TodoTask } from './todo-reader.ts';
@@ -26,7 +26,7 @@ export type TodoAttachment = { readonly id: GraphId; readonly name: string; read
 
 export const attachmentsPath = (listId: string, taskId: string): string => `${taskPath(listId, taskId)}/attachments`;
 
-const linkSchema = z.object({ id: z.string() }).loose();
+const linkSchema = z.object({ id: graphIdSchema });
 const attachmentSchema = z.object({ id: graphIdSchema, name: z.string(), size: z.number() });
 const attachmentsSchema = z.object({ value: z.array(attachmentSchema) });
 const contentSchema = z.object({ contentBytes: z.string(), contentType: z.string().optional() });
@@ -42,9 +42,9 @@ export const addLinkOp = (list: TodoList, task: TodoTask, link: LinkFields): Tod
     write: async (graph) => {
       const added = await graph.post(change.target, link);
       if (!added.ok) return outcomeOf(added);
-      const id = linkSchema.safeParse(added.value).data?.id ?? '';
-      if (!isGraphId(id)) return outcomeOf(err(unreadable('the linked resource it created')));
-      const ids = { listId: list.id, taskId: task.id, linkedResourceId: id };
+      const made = linkSchema.safeParse(added.value);
+      if (!made.success) return outcomeOf(err(unreadable('the linked resource it created')));
+      const ids = { listId: list.id, taskId: task.id, linkedResourceId: made.data.id };
       return outcomeOf(ok({ ...change, after: ids, undo: { kind: 'delete-created-todo-link', data: { ...ids, set: { ...link } } } }));
     },
   };
