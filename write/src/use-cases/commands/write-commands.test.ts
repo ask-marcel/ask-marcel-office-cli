@@ -5,23 +5,37 @@ import { fakeWriteGraph } from '@ask-marcel/office-core/test-helpers/write-graph
 import { commands } from './write-commands.ts';
 
 // The registry of the write package `@ask-marcel/office-write` (package split,
-// phase 5): its 13 commands, each wrapped once so that an unknown parameter
+// phase 5): its 27 commands, each wrapped once so that an unknown parameter
 // is refused and the command runs on the write graph alone.
 
 const WRITE_COMMANDS = [
+  'add-todo-linked-resource',
+  'add-todo-task-attachment',
+  'add-todo-task-step',
+  'apply-todo-ops',
+  'complete-todo-task',
   'convert-calendar-event-attachment-to-pdf',
   'convert-group-post-attachment-to-pdf',
   'convert-mail-attachment-to-pdf',
   'create-forward-draft',
   'create-mail-draft',
   'create-reply-draft',
+  'create-todo-list',
+  'create-todo-task',
   'delete-mail-draft',
+  'delete-todo-task',
+  'delete-todo-task-step',
   'mark-mail-message',
   'move-mail-message',
   'move-mail-thread',
+  'move-todo-task',
+  'remove-todo-task-attachment',
   'set-mail-categories',
   'set-mail-flag',
   'update-mail-draft',
+  'update-todo-list',
+  'update-todo-task',
+  'update-todo-task-step',
 ];
 
 // A write graph that records each member that a command calls.
@@ -37,7 +51,7 @@ const recordingWriteGraph = (called: string[]): WriteGraph => {
 };
 
 describe('the registry of the write package', () => {
-  it('holds the 13 write commands, and no read command', () => {
+  it('holds the 27 write commands, and no read command', () => {
     expect(Object.keys(commands).toSorted((a, b) => a.localeCompare(b))).toEqual(WRITE_COMMANDS);
     expect(Object.values(commands).filter((command) => command.meta.effect === 'read')).toEqual([]);
   });

@@ -116,20 +116,34 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
     expect(await cli('undo', RUN_1)).toMatchObject({ ok: false, errorCode: 'run_not_found' });
   });
 
-  it('gives --dry-run to the four draft commands and the six mail state commands only', () => {
+  it('gives --dry-run to the four draft commands, the six mail state commands and the 14 To Do commands only', () => {
     const program = buildWriteCli({ graph: createMailboxFake().graph, logger: createLoggerFake(), fs: createFileSystemFake() });
     const withDryRun = program.commands.filter((command) => command.options.some((option) => option.long === '--dry-run')).map((command) => command.name());
     expect(withDryRun.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'add-todo-linked-resource',
+      'add-todo-task-attachment',
+      'add-todo-task-step',
+      'apply-todo-ops',
+      'complete-todo-task',
       'create-forward-draft',
       'create-mail-draft',
       'create-reply-draft',
+      'create-todo-list',
+      'create-todo-task',
       'delete-mail-draft',
+      'delete-todo-task',
+      'delete-todo-task-step',
       'mark-mail-message',
       'move-mail-message',
       'move-mail-thread',
+      'move-todo-task',
+      'remove-todo-task-attachment',
       'set-mail-categories',
       'set-mail-flag',
       'update-mail-draft',
+      'update-todo-list',
+      'update-todo-task',
+      'update-todo-task-step',
     ]);
   });
 });
