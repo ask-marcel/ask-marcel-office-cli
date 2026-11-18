@@ -6,6 +6,33 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the attachments and the body files of a mail draft
+
+- `add-mail-draft-attachment --message-id --file` attaches a local file of at
+  most 150 MB to an unsent draft. A file of 3 MB or more goes through an upload
+  session. The attachment gets the content type of its extension. The dry-run
+  warns of a name that the draft has already and of a mail above 25 MB. The undo
+  removes the attachment.
+- `remove-mail-draft-attachment --message-id --attachment-id` removes one file
+  attachment of an unsent draft. The run journal keeps the bytes of the file
+  (at most 25,000,000 bytes), so its undo attaches the file again, with a new
+  id. An attached item, a link and an inline picture of the body are refused,
+  because the undo cannot make them again. Over MCP it runs on
+  `run-destructive-command`.
+- Both attachment commands read the message first, and refuse a message that is
+  not a draft and a draft in the Outbox before any write. They read the draft
+  again just before the write.
+- `--body-file <path>` on `create-mail-draft`, `create-reply-draft`,
+  `create-forward-draft` and `update-mail-draft`: the body text comes from a
+  local UTF-8 file of at most 1,000,000 bytes (a byte order mark is removed),
+  in place of `--body-content` or `--comment`. The file and the text option
+  together are refused. The undo of each command stays as it is.
+
+### Fixed
+
+- `set-mail-flag --due 2026-13-01` refuses the day with the words of the option.
+  Before, the command stopped on a `RangeError`.
+
 ### Added: the To Do commands
 
 - Tasks: `create-todo-task`, `update-todo-task` and `complete-todo-task` set the

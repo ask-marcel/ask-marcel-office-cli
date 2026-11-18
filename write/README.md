@@ -1,7 +1,7 @@
 # @ask-marcel/office-write
 
-`@ask-marcel/office-write` holds the 27 write commands: 4 mail-draft operations,
-3 PDF conversions, 5 mail state changes, 9 To Do changes and 6 deletes. These
+`@ask-marcel/office-write` holds the 29 write commands: 5 mail-draft operations,
+3 PDF conversions, 5 mail state changes, 9 To Do changes and 7 deletes. These
 Microsoft Graph commands change the state of your tenant. Its bin is
 `ask-marcel-office-write`. It sends no mail: a draft stays unsent until you send
 it from Outlook. It cannot create or change calendar items.
@@ -35,6 +35,8 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write set-mail-flag` | Sets the follow-up flag of a message, with an optional due day. |
 | `ask-marcel-office-write set-mail-categories` | Replaces the categories of a message. |
 | `ask-marcel-office-write delete-mail-draft` | Moves an unsent draft to Deleted Items. |
+| `ask-marcel-office-write add-mail-draft-attachment` | Attaches a local file to an unsent draft, up to 150 MB. |
+| `ask-marcel-office-write remove-mail-draft-attachment` | Removes a file attachment of an unsent draft. |
 | `ask-marcel-office-write create-todo-task` | Creates a To Do task. |
 | `ask-marcel-office-write update-todo-task` | Changes the fields of a To Do task. |
 | `ask-marcel-office-write complete-todo-task` | Marks a To Do task completed. |
@@ -55,18 +57,27 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 31 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
+`help-json` lists 33 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md).
 
-Each draft, mail state and To Do command takes `--dry-run`: it shows the
+The four draft commands take `--body-file <path>` for a long body: a UTF-8 text
+file of at most 1,000,000 bytes, in place of `--body-content` (or `--comment` for
+a reply and a forward). The two attachment commands change an unsent draft only:
+they refuse a sent or received message and a draft in the Outbox. The details
+are in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#draft-attachments-and-body-files).
+
+Each draft, attachment, mail state and To Do command takes `--dry-run`: it shows the
 changes and makes none. A run that is not a dry-run gives a `runId`, and
 `undo <runId> --apply` reverses it: a new draft goes to Deleted Items, an update
 gets its old fields back, a moved message goes back to its folder, a read
 state, a flag or categories get their old value, a new To Do task or step is
 deleted, and a deleted To Do task, step or attachment comes back with a new id.
+An attachment added to a draft is removed, and a removed one comes back from
+the run journal with a new id.
 The undo passes over an item that changed after the run. No command deletes a
 To Do list, so the undo of `create-todo-list` keeps the list. The run journal is in `~/.ask-marcel/runs/` and
 keeps a run 30 days. The details are in
@@ -135,8 +146,9 @@ The server has six tools: `list-commands`, `get-command-docs`,
 `run-write-command`, `run-destructive-command`, `undo` and `undo-apply`.
 `run-write-command` runs the writes that do not delete, and takes `dryRun`.
 `run-destructive-command` runs the commands that delete or move an item
-(`delete-mail-draft`, `delete-todo-task`, `move-todo-task`,
-`delete-todo-task-step`, `remove-todo-task-attachment`, `apply-todo-ops`), takes
+(`delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
+`move-todo-task`, `delete-todo-task-step`, `remove-todo-task-attachment`,
+`apply-todo-ops`), takes
 `dryRun`, and has the destructive mark, so a host asks you first. `undo` shows the undo of a run and
 is read-only. `undo-apply` does it and has the destructive mark too. A read
 command gets a pointer to the read server (`ask-marcel-office-read mcp`). Register
@@ -159,7 +171,7 @@ const draft = await commands['create-mail-draft']?.execute(graph, {
 
 The library exports:
 
-- `commands`: the 27 write commands, each on the write graph alone;
+- `commands`: the 29 write commands, each on the write graph alone;
 - `createWriteGraph(tokens)`: the write graph over a token source;
 - `createEnvThenHelperTokenSource()`: the tier variables of the process, else the
   token helper of `@ask-marcel/office-auth`;
