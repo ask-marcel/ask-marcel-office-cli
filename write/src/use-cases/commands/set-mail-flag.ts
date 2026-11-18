@@ -5,6 +5,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { parseGraphId } from '../../domain/graph-id.ts';
+import { isDay } from '../../domain/todo-fields.ts';
 import { planMailBatch } from './mail-batch.ts';
 import { fieldForm, writeField } from './mail-field-write.ts';
 import { createFolderReader } from './mail-folder-reader.ts';
@@ -17,11 +18,6 @@ import { FIELD_UNDO } from './mark-mail-message.ts';
  * start date, so the start date is the due date. The undo gives the message
  * its flag of before.
  */
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-// A date such as 2026-02-30 has the form but is not a day.
-const isDay = (value: string): boolean => DATE.test(value) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
 
 const schema = z.object({
   messageId: z.string().min(1),
