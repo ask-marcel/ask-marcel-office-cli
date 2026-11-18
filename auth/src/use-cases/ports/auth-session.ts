@@ -13,10 +13,17 @@ type CachedTierInfo = { readonly available: boolean; readonly expiresInSeconds: 
  * AuthManager (src/infra/auth.ts) supplies it, with every other tier besides.
  */
 type AuthSession = {
-  readonly getAccessToken: (options?: { force?: boolean }) => Promise<Result<AccessToken, AuthError>>;
+  // `force`: `login --force`, the capture that clears the browser cookies.
+  // `renew`: the full capture of every tier and the refresh token, with the cookies kept.
+  readonly getAccessToken: (options?: { readonly force?: boolean; readonly renew?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   readonly getElevatedAccessToken: (options?: { readonly awaitSignIn?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   readonly warmSubstrateTokens?: () => Promise<void>;
   readonly getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
+  // Decode-only reads that tell `login` if the session can renew itself. A
+  // manager with no token cache omits them, and `login` then leaves it alone.
+  readonly hasRefreshToken?: () => Promise<boolean>;
+  readonly getCachedChatsvcaggInfo?: () => Promise<CachedTierInfo>;
+  readonly getCachedIc3Info?: () => Promise<CachedTierInfo>;
   readonly logout: () => Promise<Result<void, AuthError>>;
 };
 

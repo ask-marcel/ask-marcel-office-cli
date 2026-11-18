@@ -4,6 +4,15 @@ import type { AuthError, AuthSession } from '../ports/auth-session.ts';
 
 const schema = z.object({}).strict();
 
+// A session that cannot renew itself: the cache holds no refresh token, or the
+// headless refresh of a substrate tier failed. A read the manager does not
+// supply is no evidence, so it does not count.
+const cannotRenewItself = async (auth: AuthSession): Promise<boolean> => {
+  if ((await auth.hasRefreshToken?.()) === false) return true;
+  if ((await auth.getCachedChatsvcaggInfo?.())?.available === false) return true;
+  return (await auth.getCachedIc3Info?.())?.available === false;
+};
+
 /**
  * Sign in, and guarantee the browser-only tier is actually there afterwards.
  *
@@ -47,6 +56,12 @@ const execute = async (auth: AuthSession, options?: { force?: boolean }): Promis
   // at `--force`, whose cookie wipe destroys the 90-day KMSI session. Under
   // `--force` we never get here: the dance redeems whatever it missed itself.
   await auth.warmSubstrateTokens?.();
+  // A session that cannot renew itself gets the full capture of every tier and
+  // a new refresh token, with the cookies kept, so the sign-in is silent. On
+  // 2026-11-18 a plain `login` in this state captured only the elevated token
+  // and reported a good session. Like `--force`, the capture has just tried the
+  // elevated token, so no second browser opens for it.
+  if (await cannotRenewItself(auth)) return auth.getAccessToken({ renew: true });
   // `getCachedElevatedInfo` is an optional capability; when a manager does not
   // expose it we cannot know, so we leave the result alone rather than guess.
   const elevated = await auth.getCachedElevatedInfo?.();
