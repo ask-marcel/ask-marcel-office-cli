@@ -64,5 +64,14 @@ const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => {
   };
 };
 
-export { buildLoginSummary };
+// A sign-in that leaves no refresh token in the cache is not a good session: its
+// tokens stop at their expiry, and no self-heal can run. `login` fails with this
+// code (exit 1), so a caller that reads only the exit code does not take the
+// session as good. `--force` clears the browser session, and with it the state
+// that gave a capture with no refresh token.
+const SESSION_CANNOT_RENEW_CODE = 'session_cannot_renew';
+const SESSION_CANNOT_RENEW_MESSAGE =
+  'The sign-in is complete, but the token cache holds no refresh token. Thus the session cannot renew itself: the basic, chatsvcagg and ic3 tokens stop at their expiry. Run `{auth-bin} login --force` to capture a new refresh token. It clears the browser session, so you can be asked for your password.';
+
+export { buildLoginSummary, SESSION_CANNOT_RENEW_CODE, SESSION_CANNOT_RENEW_MESSAGE };
 export type { LoginSummary, LoginSummaryInput };

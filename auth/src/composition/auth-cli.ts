@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 import type { AuthLadder, LoginAuthFactory } from '../infra/auth.ts';
 import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import { fillNames, fillNamesIn } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
-import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
+import { buildLoginSummary, SESSION_CANNOT_RENEW_CODE, SESSION_CANNOT_RENEW_MESSAGE } from '../use-cases/commands/login-status.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import * as status from '../use-cases/commands/status.ts';
@@ -72,6 +72,10 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
       const info = await loginAuth.getTokenInfo();
       if (!info.ok) {
         output.fail(info.error.message);
+        return;
+      }
+      if (!info.value.refreshTokenCached) {
+        output.fail(SESSION_CANNOT_RENEW_MESSAGE, SESSION_CANNOT_RENEW_CODE);
         return;
       }
       const summary = buildLoginSummary({
