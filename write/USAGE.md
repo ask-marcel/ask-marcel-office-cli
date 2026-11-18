@@ -1,8 +1,8 @@
 # Usage guide of @ask-marcel/office-write
 
 This guide tells how to use the `ask-marcel-office-write` bin: the draft flow,
-the rules of each draft command, the mail state commands, the dry-run and the
-undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
+the rules of each draft command, the mail state commands, the To Do commands,
+the dry-run and the undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
 The list of commands is in [COMMANDS.md](COMMANDS.md). The output formats, the
 errors and `--output-path` are the same as in the
 [read usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/read/USAGE.md).
@@ -123,9 +123,78 @@ that moved or changed after the plan is in `skipped`, with the reason. A write
 that Graph refuses is in `failed`, and the other messages still change. The
 changes made stay in the run, so the undo can reverse them.
 
+## To Do
+
+The To Do commands create and change the tasks, the steps, the linked
+resources, the attachments and the lists of Microsoft To Do. Each one takes
+`--dry-run`, and each run has an undo. No command deletes a list.
+
+```sh
+ask-marcel-office-write create-todo-task --list "Tasks" --title "Send the report" --due 2026-11-20 --reminder 2026-11-19T09:00 --dry-run
+ask-marcel-office-write update-todo-task --list "Tasks" --task-id "AAMkAD..." --due none --importance high
+ask-marcel-office-write complete-todo-task --list "Tasks" --task-id "AAMkAD..."
+ask-marcel-office-write move-todo-task --list "Tasks" --task-id "AAMkAD..." --to "Later" --dry-run
+ask-marcel-office-write delete-todo-task --list "Tasks" --task-id "AAMkAD..." --dry-run
+ask-marcel-office-write add-todo-linked-resource --list "Tasks" --task-id "AAMkAD..." --display-name "Spec" --application-name "Browser" --web-url "https://example.com/spec"
+ask-marcel-office-write add-todo-task-step --list "Tasks" --task-id "AAMkAD..." --title "Read the draft"
+ask-marcel-office-write update-todo-task-step --list "Tasks" --task-id "AAMkAD..." --step-id "51d8..." --checked true
+ask-marcel-office-write delete-todo-task-step --list "Tasks" --task-id "AAMkAD..." --step-id "51d8..."
+ask-marcel-office-write add-todo-task-attachment --list "Tasks" --task-id "AAMkAD..." --file ./report.pdf
+ask-marcel-office-write remove-todo-task-attachment --list "Tasks" --task-id "AAMkAD..." --attachment-id "AAMkAD..."
+ask-marcel-office-write create-todo-list --name "Errands"
+ask-marcel-office-write update-todo-list --list "Errands" --name "Errands 2026"
+ask-marcel-office-write apply-todo-ops --file ./ops.json --dry-run
+```
+
+- `--list` and `--to` are the name of a list (compared with no case) or its id.
+  Give the id when two lists have the same name (`todo_list_ambiguous`). The
+  ids come from `list-todo-task-lists`, `list-todo-tasks` and `get-todo-task`
+  (with `--expand checklistItems` or `--expand attachments`) of the read bin.
+- `--due` and `--start` are a day (`YYYY-MM-DD`), and `--reminder` a day and a
+  time (`YYYY-MM-DDTHH:mm`), in the time zone of your mailbox. The command reads
+  that time zone only when you give a date. `none` removes a date or turns the
+  reminder off.
+- `--status` is `notStarted`, `inProgress`, `completed`, `waitingOnOthers` or
+  `deferred`. `--importance` is `low`, `normal` or `high`. `--categories`
+  replaces all the categories, and `--categories ""` removes them.
+- Graph has no move of a task. `move-todo-task` copies the task to the other
+  list (its fields, steps, linked resources and attachments), and deletes the
+  original only after the full copy is made. If a part of the copy fails, the
+  command deletes the copy and the original stays (`todo_copy_failed`). If the
+  delete of the original fails, it deletes the copy too (`todo_move_failed`).
+  The task gets a new id: the output shows it in `after.taskId`. The dates of
+  creation and the date a step was checked are not kept.
+- A task with more steps, linked resources or attachments than Graph gives in
+  one page is not moved or deleted (`todo_copy_too_large`): the copy would not
+  be complete.
+- `add-todo-task-attachment --file` attaches a local file of at most 25 MB. A
+  file of 3 MB or more goes through an upload session.
+- `delete-todo-task` and `remove-todo-task-attachment` keep a copy in the run
+  journal, the bytes of the attachments too, so that the undo can make the
+  item again.
+- `apply-todo-ops --file` applies the ops of a local JSON file, UTF-8, at most
+  1 MB and 100 ops. One wrong op refuses the whole file before any change
+  (`invalid_ops_file`), and the refusal names the op and the field but never
+  quotes the file. A task can be in one op only.
+
+```json
+{ "ops": [
+  { "op": "add", "list": "Tasks", "title": "...", "due": "2026-11-20", "importance": "high", "body": "...",
+    "reminder": "2026-11-19T09:00", "categories": ["x"], "status": "notStarted" },
+  { "op": "update", "list": "Tasks", "id": "<task id>", "set": { "title": "...", "status": "completed", "due": null },
+    "addChecklist": ["a new step"] },
+  { "op": "move", "list": "Tasks", "id": "<task id>", "to": "Later" },
+  { "op": "delete", "list": "Tasks", "id": "<task id>" } ] }
+```
+
+The run reads each task again before its write: a task that changed or is gone
+after the plan is in `skipped`, with the reason. A write that Graph refuses is
+in `failed`, and the next ops still run. The changes made stay in the run, so
+the undo can reverse them.
+
 ## Dry-run and undo
 
-The draft commands and the mail state commands take `--dry-run`, and each run
+The draft commands, the mail state commands and the To Do commands take `--dry-run`, and each run
 that is not a dry-run can be undone. The PDF conversions have neither:
 they leave nothing in your tenant.
 
@@ -164,6 +233,24 @@ What the undo does:
   that the run set. To open the message does not stop this undo.
 - The undo of `delete-mail-draft` moves the draft back to Drafts (with a new
   id), only if it is still a draft in Deleted Items.
+- The undo of `create-todo-task`, `add-todo-task-step`,
+  `add-todo-linked-resource` and `add-todo-task-attachment` deletes the new
+  item, only if it did not change after the run. For a task, the undo compares
+  its `lastModifiedDateTime`.
+- The undo of `update-todo-task`, `complete-todo-task`, `update-todo-task-step`
+  and `update-todo-list` writes the values of before back, only if each value
+  still has the value that the run set.
+- The undo of `move-todo-task` moves the task back with a new copy, only if it
+  did not change after the run. The task gets a new id again: the undo shows it
+  in `now`.
+- The undo of `delete-todo-task`, `delete-todo-task-step` and
+  `remove-todo-task-attachment` makes the item again from the copy in the run
+  journal. It is a new item with a new id (shown in `now`), and the dates of
+  creation and the date a step was checked are not kept. A step comes back at
+  the end of the steps.
+- The undo of `create-todo-list` keeps the list, because no command deletes a
+  list: its status is `failed`, with the reason. Delete the list in To Do.
+- The undo of `apply-todo-ops` reverses each change of the run in the same way.
 - An undo that cannot reverse a change passes over it and gives the status
   `changed` (or `missing` when the item is gone).
 - A run that is fully undone cannot be undone again (`run_already_undone`).
@@ -176,8 +263,8 @@ Each change of an undo has a status: `will-undo`, `undone`, `already-undone`,
 The run journal is in `~/.ask-marcel/runs/`, one file for each run. It keeps a
 run 30 days: each write removes the older runs. An older run gives
 `run_expired`, and an unknown run id gives `run_not_found`. The journal holds
-the ids, the subjects and the bodies that an undo writes back, so do not share
-it.
+the ids, the subjects and the bodies that an undo writes back, and the bytes of
+a removed To Do attachment, so do not share it.
 
 ## The PDF conversions
 
@@ -220,7 +307,7 @@ undo { runId }                                                   → shows the u
 undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
-`run-write-command` runs 12 commands: the write commands that do not delete. It
+`run-write-command` runs 21 commands: the write commands that do not delete. It
 has `readOnlyHint: false` and `destructiveHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
@@ -229,12 +316,16 @@ shows the changes of a command and makes none. A read command gets a pointer to
 the read server (`ask-marcel-office-read mcp`). Register this server only on
 hosts that may write drafts and change the state of your mail.
 
-`run-destructive-command` runs `delete-mail-draft`, the one command that
-deletes. It has `destructiveHint: true`, so a host asks you before it runs it.
+`run-destructive-command` runs the commands that delete or move an item:
+`delete-mail-draft`, `delete-todo-task`, `move-todo-task` (it deletes the
+original after the copy), `delete-todo-task-step`,
+`remove-todo-task-attachment` and `apply-todo-ops` (an op can move or delete a
+task). It has `destructiveHint: true`, so a host asks you before it runs it.
 Each tool refuses a command of another tool and names the right one.
 
 `undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,
-because it can move a draft to Deleted Items: a host asks you before it runs it.
+because it can move a draft to Deleted Items or delete a To Do item: a host asks
+you before it runs it.
 
 ## Library
 
@@ -252,15 +343,16 @@ if (draft?.ok) console.log(draft.value);
 
 | Export | What it is |
 |:--|:--|
-| `commands` | Each of the 13 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`. |
+| `commands` | Each of the 27 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file` and `--file`. |
 | `createWriteGraph(tokens)` | The write graph over a `TokenSource`: the basic token, with `get`, `post`, `patch`, `put` and `delete`. |
 | `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
 | `createWriteClient()` | `createWriteGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
 | `Command`, `WriteGraph`, `TokenSource`, `Result` | The types of the values above. |
 
 `meta.effect` is `draft` for the mail-draft operations, `transient-upload` for
-the PDF conversions, `mail-state` for the mail state changes and `delete` for
-`delete-mail-draft`.
+the PDF conversions, `mail-state` for the mail state changes, `task-write` for
+the To Do changes that delete nothing, and `delete` for the commands that delete
+or move an item.
 
 ## Your own token
 
