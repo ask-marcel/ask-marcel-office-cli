@@ -408,6 +408,7 @@ const refusalCodes = async (res: Response): Promise<RefusalCodes> => {
 // The tier a redemption is for, named in its failure event. A guest call is
 // named `guest`, never by its tenant.
 type RedemptionTier = 'basic' | 'chatsvcagg' | 'ic3' | 'guest';
+const substrateTierOf = (resource: string): RedemptionTier => (resource === IC3_RESOURCE ? 'ic3' : 'chatsvcagg');
 
 // The rungs of the ladder that need a browser. auth-browser.ts supplies them to
 // a session allowed to open one; a rung left out fails fast with the "run login"
@@ -477,6 +478,24 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return r.ok ? r.value : null;
   };
 
+  // The refresh token a sign-in keeps when its capture has none. The warn event
+  // says if one was kept, and holds no token and no tenant id.
+  const keptRefreshToken = (kept: Partial<CachedToken>): string => {
+    const refreshToken = kept.refresh_token ?? '';
+    logger.warn('auth.refresh.not_captured', { kept: refreshToken !== '' });
+    return refreshToken;
+  };
+
+  // A self-heal needs the shared refresh token. When a session has none, the
+  // redemption is skipped, and this warn event tells it: without it, the skip
+  // was silent at every log level (2026-11-18). No cache at all is no session,
+  // so it has no event.
+  const holdsRefreshToken = (cached: CachedToken | null, tier: RedemptionTier): cached is CachedToken => {
+    if (cached?.refresh_token) return true;
+    if (cached !== null) logger.warn('auth.refresh.redeem_skipped', { tier, reason: 'no_refresh_token' });
+    return false;
+  };
+
   // The cache holds access and refresh tokens: replaced in one atomic step, so
   // a concurrent reader never sees half a file, and owner-only from the first
   // byte. A failed save is an error the caller reports (see CACHE_UNWRITABLE_CODE).
@@ -502,12 +521,15 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // A sign-in keeps the other tokens of the SAME account (its chat, guest and
   // elevated tokens are still good) and drops everything of another account, so
   // one account's Graph token never sits next to another's chat token.
+  // A capture can give a Graph token with no refresh token. Then the refresh
+  // token of the same account stays, because an empty one stops every self-heal.
   const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<Result<void, AuthError>> => {
     const existing = await readCache();
     const kept: Partial<CachedToken> = existing !== null && sameAccount(existing.access_token, access) ? existing : {};
     const claims = decodeJwtPayload(access);
     const exp = claims.exp as number | undefined;
-    const cached: CachedToken = { ...kept, access_token: access, expires_on: exp ?? 0, refresh_token: refresh ?? '' };
+    const refreshToken = refresh !== null && refresh !== '' ? refresh : keptRefreshToken(kept);
+    const cached: CachedToken = { ...kept, access_token: access, expires_on: exp ?? 0, refresh_token: refreshToken };
     if (elevated) {
       const elevatedClaims = decodeJwtPayload(elevated);
       const elevatedExp = elevatedClaims.exp as number | undefined;
@@ -669,8 +691,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     persist: (token: AccessToken, region: string) => Promise<Result<void, AuthError>>,
     rung: string
   ): Promise<Result<AccessToken, AuthError>> => {
-    const tier = resource === IC3_RESOURCE ? 'ic3' : 'chatsvcagg';
-    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`, tier);
+    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`, substrateTierOf(resource));
     if (!redeemed.ok) return err({ type: 'auth_failed', message: `${rung}: ${redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled'}` });
     const json = { access_token: redeemed.value.accessToken, refresh_token: redeemed.value.refreshToken };
     const raw = json.access_token ?? '';
@@ -713,13 +734,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // the same path the on-demand getters use, so no second browser is needed.
   // One missed substrate token, redeemed in its turn and under the lock, from
   // the refresh token as it is then (`fresh` only if the cache vanished).
-  const redeemMissedTier = async (resource: string, persist: SubstrateTier['persist'], rung: string, fresh: CachedToken): Promise<unknown> =>
-    oneRedemptionAtATime(async () => underLock('refresh', async () => refreshSubstrateToken((await readCache()) ?? fresh, resource, persist, rung)));
+  const redeemMissedTier = async (resource: string, persist: SubstrateTier['persist'], rung: string, fresh: CachedToken | null): Promise<unknown> => {
+    if (!holdsRefreshToken(fresh, substrateTierOf(resource))) return undefined;
+    return oneRedemptionAtATime(async () => underLock('refresh', async () => refreshSubstrateToken((await readCache()) ?? fresh, resource, persist, rung)));
+  };
 
   const redeemMissedSubstrateAtLogin = async (chatsvcaggCaptured: boolean, ic3Captured: boolean): Promise<void> => {
     if (chatsvcaggCaptured && ic3Captured) return;
     const fresh = await readCache();
-    if (!fresh?.refresh_token) return;
     if (!chatsvcaggCaptured) await redeemMissedTier(CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem', fresh);
     if (!ic3Captured) await redeemMissedTier(IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem', fresh);
   };
@@ -742,7 +764,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       logger.info('auth.ladder.rung', { rung: 'cache' });
       return ok(validated.value);
     }
-    if (!cached?.refresh_token) return undefined;
+    if (!holdsRefreshToken(cached, 'basic')) return undefined;
     const refreshed = await refreshBasicInTurn();
     return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
   };
@@ -803,7 +825,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       logger.info('auth.guest.cache_hit', { tenant });
       return ok(accessTokenUnsafe(fresh));
     }
-    if (!cached?.refresh_token) return noGuestCredentials(tenant);
+    if (!holdsRefreshToken(cached, 'guest')) return noGuestCredentials(tenant);
     return oneRedemptionAtATime(async () => underLock('refresh', async () => redeemGuestToken(tenant)));
   };
 
@@ -930,7 +952,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // token, past the dead token when the caller found one. Undefined when it does
   // not settle the call, so the browser rung is next.
   const redeemSubstrate = async (tier: SubstrateTier, cached: CachedToken | null, dead: string | undefined): Promise<Result<AccessToken, AuthError> | undefined> => {
-    if (!cached?.refresh_token) return undefined;
+    if (!holdsRefreshToken(cached, substrateTierOf(tier.resource))) return undefined;
     const refreshed = await refreshSubstrateInTurn(tier, dead);
     return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
   };
@@ -1046,7 +1068,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const cached = await readCache();
     const current = accessToken(cached?.access_token ?? '');
     if (current.ok && (await notRefused(current.value, refused))) return ok(current.value);
-    if (!cached?.refresh_token) return notAuthenticated();
+    if (!holdsRefreshToken(cached, 'basic')) return notAuthenticated();
     return orFailFast(await refreshBasicInTurn(cached.access_token), notAuthenticated);
   };
 
@@ -1062,7 +1084,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const cached = await readCache();
     const current = tier.fresh(cached);
     if (current?.startsWith('eyJ') === true && (await notRefused(current, refused))) return ok(accessTokenUnsafe(current));
-    if (!cached?.refresh_token) return failFast();
+    if (!holdsRefreshToken(cached, substrateTierOf(tier.resource))) return failFast();
     return orFailFast(await refreshSubstrateInTurn(tier, current), failFast);
   };
 
@@ -1070,7 +1092,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const cached = await readCache();
     const current = freshGuestToken(cached, tenant);
     if (current !== undefined && (await notRefused(current, refused))) return ok(accessTokenUnsafe(current));
-    if (!cached?.refresh_token) return noGuestCredentials(tenant);
+    if (!holdsRefreshToken(cached, 'guest')) return noGuestCredentials(tenant);
     return oneRedemptionAtATime(async () => underLock('refresh', async () => redeemGuestToken(tenant, current)));
   };
 
