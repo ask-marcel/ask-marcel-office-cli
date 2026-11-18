@@ -6,6 +6,35 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the mail state commands
+
+- `move-mail-message` moves one or more messages to a folder: `--message-id`
+  (ids separated by commas) or `--ids-file` (a local text file, one id on each
+  line), at most 1000 messages in one run. `move-mail-thread` moves the
+  messages of one conversation that are in a folder to another folder.
+- `mark-mail-message --read true|false` marks messages read or unread.
+- `set-mail-flag` sets the follow-up flag (`flagged`, `complete`,
+  `notFlagged`), with an optional due day for a flag.
+- `set-mail-categories` replaces the categories of a message.
+- `delete-mail-draft` moves an unsent draft to Deleted Items. It refuses a
+  message that is not a draft. It is the one command that puts a message in
+  Deleted Items.
+- A folder is a well-known name, a path of folder names, a name at the top, or
+  an id. A move into Deleted Items, Recoverable Items, Junk Email or Outbox, or
+  into a folder in one of them, is refused (`folder_refused`).
+- Each of these commands takes `--dry-run`, which shows the current folder of
+  each message, and each run has an undo. A moved message gets a new id: the
+  output shows the id before and after, and the undo of a move shows the new id
+  in `now`.
+- A message that is not there, that moved or changed between the plan and the
+  write, or that needs no change, is in `skipped`, with the reason. A write that
+  Graph refuses is in `failed`, and the other messages still change.
+- Each id from a param or a file is checked before it goes into a Graph path
+  (`invalid_id`).
+- The MCP server gets `run-destructive-command`, the one run tool with the
+  destructive mark. It runs `delete-mail-draft`. `run-write-command` refuses it,
+  and stays not destructive.
+
 ### Added: dry-run, run id and undo of the draft commands
 
 - The four draft commands take `--dry-run` (MCP: `dryRun: true` on

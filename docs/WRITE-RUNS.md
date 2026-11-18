@@ -50,14 +50,42 @@ plan and the undo handlers of its kinds.
      zod: the journal is a file that a person can edit. Refuse an id that is
      not an id before it goes into a Graph path.
 5. A batch command (for example with `--ids-file`) returns one change for each
-   item. The undo reverses them last first.
-6. Write the tests with fakes: the dry-run makes no write, the run gives a run
+   item. The undo reverses them last first. The plan can return `skipped`: the
+   items that need no change or that are gone, each with its `target`, its ids
+   `before` and a `reason`. The dry-run shows them. The writes of a batch go on
+   after a failed item and return the changes made, so that the run journal
+   keeps them for the undo (`write/src/use-cases/commands/mail-batch.ts`).
+6. An undo that gives the item new ids (a mail message that moves back) answers
+   `{ now: { ... } }` from `apply`, and the undo outcome shows `now`.
+7. Write the tests with fakes: the dry-run makes no write, the run gives a run
    id, the undo reverses the change, and the undo passes over an item that
    changed. `write/src/test-helpers/mailbox-fake.ts` and
    `core/src/test-helpers/run-journal-fake.ts` help.
 
 The four mail draft commands are the reference
-(`write/src/use-cases/commands/draft-runs.ts`).
+(`write/src/use-cases/commands/draft-runs.ts`). The mail state commands are the
+reference for a batch (`mail-batch.ts`, `mail-move-write.ts`,
+`mail-field-write.ts`).
+
+## Local files
+
+A command that reads a local file that a param names (`--ids-file`, `--file`,
+`--body-file`) gets a file reader as the third argument of `execute` and of
+`plan` (`LocalFileReader`). It reads with
+`readLocalFile(files, path, maxBytes)`
+(`core/src/use-cases/commands/read-local-file.ts`), which refuses a folder, a
+file above the limit and a missing reader (`local_files_unavailable`). The CLI
+and the MCP server of the write bin give the reader of this runtime
+(`write/src/composition/write-files.ts`). A library caller gives one or none.
+
+## The destructive mark
+
+A command whose effect is destructive (`delete` in `WRITE_EFFECTS`,
+`core/src/use-cases/commands/command-effect.ts`) runs over MCP on
+`run-destructive-command`, the one run tool with `destructiveHint: true`.
+`run-write-command` refuses it, and the other way round
+(`core/src/composition/mcp-run-tools.ts`). A new delete command takes the
+effect `delete`, and it is on that tool.
 
 ## The run journal
 
