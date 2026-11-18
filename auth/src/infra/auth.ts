@@ -262,10 +262,18 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
 const TIER_REASON_INTERACTIVE =
   'not cached (absent or expired) — run `{auth-bin} login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
 const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `{auth-bin} login --force`';
+const TIER_REASON_NO_REFRESH_TOKEN =
+  'not cached (absent or expired), and the token cache holds no refresh token, so this token cannot renew itself. Run `{auth-bin} login`: it captures every token and a new refresh token.';
 
-const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {
-  if (info.available) return { ...info, refresh };
-  return { ...info, refresh, reason: refresh === 'interactive' ? TIER_REASON_INTERACTIVE : TIER_REASON_AUTOMATIC };
+// How a tier renews, and the reason that a missing one gives.
+type TierRoute = { readonly refresh: TokenTierInfo['refresh']; readonly reason: string };
+const ELEVATED_ROUTE: TierRoute = { refresh: 'interactive', reason: TIER_REASON_INTERACTIVE };
+const SELF_HEAL_ROUTE: TierRoute = { refresh: 'automatic', reason: TIER_REASON_AUTOMATIC };
+const NO_REFRESH_TOKEN_ROUTE: TierRoute = { refresh: 'interactive', reason: TIER_REASON_NO_REFRESH_TOKEN };
+
+const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, route: TierRoute): TokenTierInfo => {
+  if (info.available) return { ...info, refresh: route.refresh };
+  return { ...info, refresh: route.refresh, reason: route.reason };
 };
 
 // Fail-fast (no browser) message for the secondary-token getters, used on the
@@ -1035,21 +1043,25 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
 
   // Decode-only, like the readers above. The elevated token has no refresh token
   // of its own, so its refresh is `interactive`. The two substrate tokens heal
-  // from the shared refresh token, so their refresh is `automatic`.
+  // from the shared refresh token, so their refresh is `automatic`, but only
+  // while the cache holds one: with none, only a sign-in renews them.
   const getTokenInfo = async (): Promise<Result<TokenInfo, TokenReportError>> => {
     const basic = await getCachedBasicToken();
     if (basic === undefined) return err({ type: 'auth_failed', message: NO_CACHED_SESSION_MESSAGE, code: NOT_AUTHENTICATED_CODE });
     const claims = decodeJwtPayload(basic);
     const aud = claims['aud'];
     const exp = claims['exp'];
+    const refreshTokenCached = await hasRefreshToken();
+    const substrateRoute = refreshTokenCached ? SELF_HEAL_ROUTE : NO_REFRESH_TOKEN_ROUTE;
     return ok({
       scopes: decodeScopes(basic),
       audience: typeof aud === 'string' ? aud : undefined,
       expiresAt: typeof exp === 'number' ? new Date(exp * 1000).toISOString() : undefined,
       expiresInSeconds: typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined,
-      elevated: buildTier(await getCachedElevatedInfo(), 'interactive'),
-      chatsvcagg: buildTier(await getCachedChatsvcaggInfo(), 'automatic'),
-      ic3: buildTier(await getCachedIc3Info(), 'automatic'),
+      refreshTokenCached,
+      elevated: buildTier(await getCachedElevatedInfo(), ELEVATED_ROUTE),
+      chatsvcagg: buildTier(await getCachedChatsvcaggInfo(), substrateRoute),
+      ic3: buildTier(await getCachedIc3Info(), substrateRoute),
     });
   };
 

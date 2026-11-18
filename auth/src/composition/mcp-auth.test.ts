@@ -125,6 +125,7 @@ describe('authenticating from an MCP client', () => {
               audience: undefined,
               expiresAt: undefined,
               expiresInSeconds: 3600,
+              refreshTokenCached: true,
               elevated: { ...everyTier, refresh: 'interactive' as const },
               chatsvcagg: { ...everyTier, refresh: 'automatic' as const },
               ic3: { ...everyTier, refresh: 'automatic' as const },

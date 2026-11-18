@@ -10,6 +10,7 @@ const tokenInfo = (over: Partial<TokenInfo> = {}): TokenInfo => ({
   audience: 'https://graph.microsoft.com',
   expiresAt: '2026-12-31T00:00:00.000Z',
   expiresInSeconds: 3600,
+  refreshTokenCached: true,
   elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive' },
   chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' },
   ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic', reason: 'not cached' },
@@ -27,15 +28,16 @@ describe('status', () => {
         elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive', reads: 'file version history, Teams chat list' },
         chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic', reads: 'Teams chat message content' },
         ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic', reason: 'not cached', reads: 'Teams chat history' },
+        refreshToken: 'cached',
         hint: expect.stringContaining('{auth-bin} login'),
       })
     );
   });
 
-  it('has only the keys basic, elevated, chatsvcagg, ic3 and hint, with no loose fields of the basic token', async () => {
+  it('has only the keys basic, elevated, chatsvcagg, ic3, refreshToken and hint, with no loose fields of the basic token', async () => {
     const result = await statusOf(tokenInfo());
     expect(result.ok).toBe(true);
-    if (result.ok) expect(Object.keys(result.value)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'hint']);
+    if (result.ok) expect(Object.keys(result.value)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'hint']);
   });
 
   it('reports the basic token as available, with no reason, when more than 5 minutes remain before its expiry', async () => {

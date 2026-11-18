@@ -42,6 +42,7 @@ const signedInAuth = (): AuthLadder =>
         audience: 'https://graph.microsoft.com',
         expiresAt: undefined,
         expiresInSeconds: 3600,
+        refreshTokenCached: true,
         elevated: available,
         chatsvcagg: available,
         ic3: available,
