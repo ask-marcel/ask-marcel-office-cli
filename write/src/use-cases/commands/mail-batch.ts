@@ -5,7 +5,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { AppliedChange, GraphReads, ItemIds, PlannedChange, SkippedItem, UndoStep, WritePlan } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
-import { parseGraphId } from '../../domain/graph-id.ts';
+import { isGraphId } from '../../domain/graph-id.ts';
 import type { FolderReader } from './mail-folder-reader.ts';
 import { isNotThere } from './mail-folder-reader.ts';
 
@@ -62,8 +62,8 @@ const readMessage = async (reads: GraphReads, id: GraphId, spec: MailBatchSpec):
 
 // The name of the folder of the message, empty when it cannot be read: the dry-run then shows the folder id only.
 const folderName = async (folders: FolderReader, folderId: string): Promise<string> => {
-  const id = parseGraphId(folderId, 'mail folder');
-  const folder = id.ok ? await folders.folder(id.value) : id;
+  if (!isGraphId(folderId)) return '';
+  const folder = await folders.folder(folderId);
   return folder.ok ? folder.value.displayName : '';
 };
 
@@ -78,21 +78,21 @@ type Planned = { readonly message: MailMessage; readonly change: PlannedChange }
 
 type Batch = { readonly planned: Planned[]; readonly skipped: SkippedItem[] };
 
-// Reads one message of the plan and puts it in the batch; a refusal or a read error stops the plan.
-const planOne = async (reads: GraphReads, folders: FolderReader, id: GraphId, spec: MailBatchSpec, batch: Batch): Promise<Result<true, GraphError>> => {
+// Reads one message of the plan and puts it in the batch. A refusal or a read error stops the plan: the answer is that error.
+const planOne = async (reads: GraphReads, folders: FolderReader, id: GraphId, spec: MailBatchSpec, batch: Batch): Promise<GraphError | undefined> => {
   const target = spec.target(id);
   const read = await readMessage(reads, id, spec);
-  if (!read.ok) return isNotThere(read.error) ? skip(batch, { target, before: { messageId: id }, reason: GONE }) : read;
+  if (!read.ok) return isNotThere(read.error) ? skip(batch, { target, before: { messageId: id }, reason: GONE }) : read.error;
   const shown = await before(folders, read.value, spec);
   const decision = spec.decide(read.value);
-  if (decision !== 'change') return 'refuse' in decision ? err(decision.refuse) : skip(batch, { target, before: shown, reason: decision.skip });
+  if (decision !== 'change') return 'refuse' in decision ? decision.refuse : skip(batch, { target, before: shown, reason: decision.skip });
   batch.planned.push({ message: read.value, change: { action: spec.action, target, before: shown } });
-  return ok(true);
+  return undefined;
 };
 
-const skip = (batch: Batch, item: SkippedItem): Result<true, GraphError> => {
+const skip = (batch: Batch, item: SkippedItem): undefined => {
   batch.skipped.push(item);
-  return ok(true);
+  return undefined;
 };
 
 type Outcome = { readonly changes: AppliedChange[]; readonly skipped: SkippedItem[]; readonly failed: SkippedItem[]; firstError?: GraphError };
@@ -133,8 +133,8 @@ const applyBatch = async (graph: WriteGraph, batch: Batch, spec: MailBatchSpec):
 export const planMailBatch = async (reads: GraphReads, folders: FolderReader, ids: ReadonlyArray<GraphId>, spec: MailBatchSpec): Promise<Result<WritePlan, GraphError>> => {
   const batch: Batch = { planned: [], skipped: [] };
   for (const id of ids) {
-    const planned = await planOne(reads, folders, id, spec, batch);
-    if (!planned.ok) return planned;
+    const stop = await planOne(reads, folders, id, spec, batch);
+    if (stop !== undefined) return err(stop);
   }
   return ok({
     changes: batch.planned.map((item) => item.change),

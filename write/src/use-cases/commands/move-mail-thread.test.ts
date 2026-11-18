@@ -27,6 +27,7 @@ describe('move-mail-thread', () => {
     ]);
     expect(mailbox.calls).toContain("GET /me/mailFolders/inbox-id/messages?$filter=conversationId%20eq%20'c1'&$select=id&$top=1000");
     expect(mailbox.calls.filter((call) => !call.startsWith('GET'))).toEqual([]);
+    expect(answer).not.toHaveProperty('skipped');
   });
 
   it('moves them, and the undo moves them back', async () => {

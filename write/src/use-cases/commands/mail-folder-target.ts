@@ -2,7 +2,7 @@ import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
-import { graphId, parseGraphId } from '../../domain/graph-id.ts';
+import { graphId, isGraphId } from '../../domain/graph-id.ts';
 import type { FolderReader, MailFolder } from './mail-folder-reader.ts';
 import { isNotThere } from './mail-folder-reader.ts';
 
@@ -60,9 +60,8 @@ const topFolder = async (folders: FolderReader, name: string): Promise<Result<Ma
 
 // An id, else a display name at the top.
 const resolveIdOrName = async (folders: FolderReader, spec: string): Promise<Result<MailFolder, GraphError>> => {
-  const id = parseGraphId(spec, 'folder');
-  if (!id.ok) return topFolder(folders, spec);
-  const byId = await folders.folder(id.value);
+  if (!isGraphId(spec)) return topFolder(folders, spec);
+  const byId = await folders.folder(spec);
   return !byId.ok && isNotThere(byId.error) ? topFolder(folders, spec) : byId;
 };
 
@@ -105,21 +104,24 @@ const refused = (what: string, target: MailFolder, refusedFolder: MailFolder): G
   message: `${what}: "${target.displayName}" ${placeOf(target, refusedFolder)} a folder that no move puts mail in. A move into Deleted Items, Recoverable Items, Junk Email or Outbox, or into a folder in one of them, is a delete, a junk report or a send. To delete a draft, use delete-mail-draft.`,
 });
 
-// The deepest folder tree that the walk follows; Outlook allows far fewer levels.
-const MAX_DEPTH = 32;
+// The parent of the folder, or undefined at the root: the user cannot read the parent of the root.
+const parentOf = async (folders: FolderReader, folder: MailFolder): Promise<Result<MailFolder | undefined, GraphError>> => {
+  if (!isGraphId(folder.parentFolderId)) return ok(undefined);
+  const parent = await folders.folder(folder.parentFolderId);
+  return !parent.ok && isNotThere(parent.error) ? ok(undefined) : parent;
+};
 
-/** The folder `target`, or a refusal when it or a parent of it is a refused folder. */
+/** The folder `target`, or a refusal when it or a parent of it is a refused folder. The walk ends at the root, or at a folder it saw already. */
 export const refuseFolderInRefused = async (folders: FolderReader, target: MailFolder, what: string): Promise<Result<MailFolder, GraphError>> => {
   const ids = await refusedIds(folders);
   if (!ids.ok) return ids;
-  let current: MailFolder = target;
-  for (let depth = 0; depth < MAX_DEPTH; depth += 1) {
+  const seen = new Set<string>();
+  let current: MailFolder | undefined = target;
+  while (current !== undefined && !seen.has(current.id)) {
     const hit = ids.value.get(current.id);
     if (hit !== undefined) return err(refused(what, target, hit));
-    const parentId = parseGraphId(current.parentFolderId, 'mail folder');
-    // The root has no parent that the user can read: the walk ends there.
-    const parent = parentId.ok && parentId.value !== current.id ? await folders.folder(parentId.value) : undefined;
-    if (parent === undefined || (!parent.ok && isNotThere(parent.error))) return ok(target);
+    seen.add(current.id);
+    const parent = await parentOf(folders, current);
     if (!parent.ok) return parent;
     current = parent.value;
   }
