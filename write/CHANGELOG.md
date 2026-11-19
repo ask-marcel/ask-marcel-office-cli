@@ -10,9 +10,10 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 - `create-planner-bucket --plan --name`, `update-planner-bucket --bucket-id`
   (`--name`, `--after`, `--first true`) and `delete-planner-bucket
-  --bucket-id`. A plan and a bucket are found by name (no case) or id. Planner
-  deletes the tasks of a bucket with it: the dry-run gives their count, and a
-  bucket with tasks has no undo.
+  --bucket-id`. A plan and a bucket are found by name (no case) or id. The
+  dry-run of a delete gives the count of the tasks of the bucket, and a bucket
+  with tasks has no undo: Planner can delete its tasks, or keep them with no
+  bucket that the board shows.
 - `create-planner-task --plan --bucket --title`, `update-planner-task
   --task-id` and `delete-planner-task --task-id`, with the options of the
   user's script: `--due`, `--start` (days, `none` removes one), `--status`,

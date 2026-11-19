@@ -225,8 +225,11 @@ Graph limits that the Planner commands meet:
   (`write/src/domain/planner-reference.ts`).
 - A checklist item has a key that the client makes. The undo of a removed item
   gives it a new key.
-- Planner deletes the tasks of a bucket with it. This CLI cannot make a bucket
-  and its tasks again, so that delete has no undo, and the dry-run says so.
+- A DELETE of a bucket with tasks: Planner can delete the tasks, or keep them
+  with the `bucketId` of the deleted bucket (live on 2026-11-19, on a plan of
+  the user, the task was still there 8 minutes later). This CLI cannot put a
+  bucket and its tasks back, so that delete has no undo, and the dry-run says
+  so.
 - A deleted task cannot come back with its id. The comments, the dates of
   creation and completion and the order hint of the task are lost.
 - Planner keeps the file of a task of a group plan in the document library of
