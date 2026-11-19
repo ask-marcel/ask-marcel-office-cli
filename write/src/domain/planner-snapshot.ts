@@ -62,8 +62,8 @@ const ENTRIES: Readonly<Record<string, Entry>> = {
   categoryDescriptions: { compared: textOrNull, restored: textOrNull },
 };
 
-// The value of a plain field when the item has none: an empty description, the automatic preview.
-const DEFAULTS: Fields = { description: '', previewType: 'automatic' };
+// The value of a plain field when the item has none: an empty description, the automatic preview, no checklist item, reference or description on a task.
+const DEFAULTS: Fields = { description: '', previewType: 'automatic', checklistItemCount: 0, referenceCount: 0, hasDescription: false };
 
 const plainOf = (fields: Fields, key: string): unknown => fields[key] ?? DEFAULTS[key] ?? null;
 
