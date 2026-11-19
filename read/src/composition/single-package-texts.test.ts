@@ -38,12 +38,12 @@ describe('the texts of the read package', () => {
     expect(flat(await captureStdout(() => docs?.outputHelp()))).toContain('Example: ask-marcel-office-read docs list-mail-messages');
   });
 
-  it('shows where each of the 29 write commands lives: in the list of the read bin commands, or in @ask-marcel/office-write', () => {
+  it('shows where each of the 32 write commands lives: in the list of the read bin commands, or in @ask-marcel/office-write', () => {
     const cli = readCli();
     const listed = new Set(cli.commands.map((command) => command.name()));
     const description = cli.description();
     const nowhere = WRITE_NAMES.filter((name) => !listed.has(name) && !description.includes('@ask-marcel/office-write'));
-    expect(WRITE_NAMES).toHaveLength(29);
+    expect(WRITE_NAMES).toHaveLength(32);
     expect(nowhere).toEqual([]);
   });
 });
