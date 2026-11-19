@@ -10,7 +10,7 @@ import { meta as deletePlannerBucket } from './delete-planner-bucket.ts';
 
 describe('the docs of the Planner bucket commands', () => {
   it('pins the meta of create-planner-bucket', () => {
-    expect(createPlannerBucket).toEqual({
+    expect(createPlannerBucket).toStrictEqual({
       summary: 'Add a bucket to a Planner plan. A plan that has a bucket of the same name is refused. The undo deletes the bucket if it has no task.',
       category: 'tasks',
       graphMethod: 'POST',
@@ -44,7 +44,7 @@ describe('the docs of the Planner bucket commands', () => {
   });
 
   it('pins the meta of update-planner-bucket', () => {
-    expect(updatePlannerBucket).toEqual({
+    expect(updatePlannerBucket).toStrictEqual({
       summary:
         'Rename a Planner bucket, or move it: --first true puts it first in the plan, --after puts it just after another bucket. The undo writes the name back and puts the bucket back between the buckets that were next to it.',
       category: 'tasks',
@@ -96,7 +96,7 @@ describe('the docs of the Planner bucket commands', () => {
   });
 
   it('pins the meta of delete-planner-bucket', () => {
-    expect(deletePlannerBucket).toEqual({
+    expect(deletePlannerBucket).toStrictEqual({
       summary:
         'Delete a Planner bucket. Planner deletes the tasks of the bucket with it: the dry-run gives their count, and a bucket with tasks has NO undo. Over MCP it runs on run-destructive-command.',
       category: 'tasks',

@@ -123,7 +123,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     if (path === '/me/planner/plans') return values('/planner/plans/', () => true);
     const [, , kind, id, sub] = path.split('/');
     if (kind === 'plans' && sub === 'buckets') return values('/planner/buckets/', (item) => item['planId'] === id);
-    if (kind === 'buckets' && sub === 'tasks') return values('/planner/tasks/', (item) => item['bucketId'] === id);
+    if (kind === 'buckets' && sub === 'tasks') return items.has(`/planner/buckets/${id}`) ? values('/planner/tasks/', (item) => item['bucketId'] === id) : err(notFound);
     return undefined;
   };
 
@@ -131,6 +131,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     if (path === '/me') return ok(ME);
     if (!path.startsWith('/users/')) return undefined;
     const spec = decodeURIComponent(path.slice('/users/'.length));
+    if (spec === ME.id) return ok(ME);
     return spec === ANN.id || spec === ANN.mail ? ok({ id: ANN.id, displayName: ANN.displayName }) : err(notFound);
   };
 
@@ -157,6 +158,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
   };
 
   const create = (path: string, body: Item): Result<unknown, GraphError> => {
+    if (path !== '/planner/tasks' && path !== '/planner/buckets') return err(notFound);
     const kind = path === '/planner/tasks' ? 'tasks' : 'buckets';
     const id = `${kind === 'tasks' ? 'task' : 'bucket'}-new-${++made}`;
     const item = put(`/planner/${kind}/${id}`, { ...body, id, ...(kind === 'buckets' ? { orderHint: String(body['orderHint'] ?? `new-${made}`) } : {}) });
@@ -176,7 +178,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     if (!beta) return err(badRequest('The property notes does not exist on type plannerTaskDetails.'));
     if (Object.hasOwn(body, 'description')) return err(badRequest('Setting both description and notes is an error.'));
     const content = String((body['notes'] as Item)['content'] ?? '');
-    return ok({ ...body, notes: { contentType: 'html', content }, description: textOf(content) });
+    return ok({ ...body, description: textOf(content) });
   };
 
   const change = (path: string, body: Item, options: PatchOptions | undefined): Result<unknown, GraphError> => {
