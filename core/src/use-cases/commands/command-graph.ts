@@ -1,7 +1,8 @@
-import type { ReadGraph, WriteGraph } from '../ports/graph.ts';
+import type { PatchOptions, ReadGraph, WriteGraph } from '../ports/graph.ts';
 import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './command-types.ts';
 import { postIfReadOnly } from '../../domain/read-only-post.ts';
 import { unlessSendsMail } from '../../domain/mail-send-guard.ts';
+import { unlessInvites } from '../../domain/invitation-guard.ts';
 import { patchOnAllowedRoot } from '../../domain/beta-patch.ts';
 import type { GraphError } from '../../domain/graph-error.ts';
 import type { Result } from '../../domain/result.ts';
@@ -42,11 +43,16 @@ const readGraphOf = (graph: ReadGraph): ReadGraph => ({
   fetchUrl: (url) => graph.fetchUrl(url),
 });
 
+// A PATCH with no attendees on an event, on the v1.0 root or on a beta path of the allow-list.
+const checkedPatch = async (graph: WriteGraph, path: string, body: unknown, options: PatchOptions | undefined): Promise<Result<unknown, GraphError>> =>
+  unlessInvites('PATCH', path, body, () => patchOnAllowedRoot(path, options?.api, () => graph.patch(path, body, options)));
+
 /**
  * The write graph inside any graph, the single package's full client included:
  * its basic-tier members only, with the no-send check (mail-send-guard.ts) in
  * front of each change: a change to a path that sends mail is refused before
- * any request, and so is a beta PATCH of a path that is not on the beta
+ * any request, and so is an event write with attendees, which sends an
+ * invitation (invitation-guard.ts), and a beta PATCH of a path that is not on the beta
  * allow-list (beta-patch.ts). The command registry gives every write command this view, so no
  * write command holds an elevated, guest or chat reader, and none sends mail.
  * Each member calls the graph's own member on the graph, so a caller's graph
@@ -56,8 +62,8 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
   get: (path, extraHeaders) => graph.get(path, extraHeaders),
   getBinary: (path) => graph.getBinary(path),
   fetchUrl: (url) => graph.fetchUrl(url),
-  post: (path, body) => unlessSendsMail('POST', path, () => graph.post(path, body)),
-  patch: (path, body, options) => unlessSendsMail('PATCH', path, () => patchOnAllowedRoot(path, options?.api, () => graph.patch(path, body, options))),
+  post: (path, body) => unlessSendsMail('POST', path, () => unlessInvites('POST', path, body, () => graph.post(path, body))),
+  patch: (path, body, options) => unlessSendsMail('PATCH', path, () => checkedPatch(graph, path, body, options)),
   put: (basePath, body, contentType) => graph.put(basePath, body, contentType),
   delete: (path, options) => unlessSendsMail('DELETE', path, () => graph.delete(path, options)),
   uploadAttachment: (target, file) => graph.uploadAttachment(target, file),
