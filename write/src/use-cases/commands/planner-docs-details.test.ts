@@ -11,7 +11,7 @@ import { meta as removePlannerChecklistItem } from './remove-planner-checklist-i
 
 describe('the docs of the Planner details and checklist commands', () => {
   it('pins the meta of update-planner-task-details', () => {
-    expect(updatePlannerTaskDetails).toEqual({
+    expect(updatePlannerTaskDetails).toStrictEqual({
       summary:
         'Change the details of a Planner task: the description as plain text (--description) or the notes as HTML (--notes-html, on Graph beta), the preview of the card, and the checklist from a file (--checklist-file). The undo writes the details of before back.',
       category: 'tasks',
@@ -71,7 +71,7 @@ describe('the docs of the Planner details and checklist commands', () => {
   });
 
   it('pins the meta of add-planner-checklist-item', () => {
-    expect(addPlannerChecklistItem).toEqual({
+    expect(addPlannerChecklistItem).toStrictEqual({
       summary: 'Add an item to the checklist of a Planner task (at most 20 items). The undo removes the item.',
       category: 'tasks',
       graphMethod: 'PATCH',
@@ -115,7 +115,7 @@ describe('the docs of the Planner details and checklist commands', () => {
   });
 
   it('pins the meta of update-planner-checklist-item', () => {
-    expect(updatePlannerChecklistItem).toEqual({
+    expect(updatePlannerChecklistItem).toStrictEqual({
       summary: 'Change the title of an item of the checklist of a Planner task, or check or uncheck it. The undo writes the title and the state of before back.',
       category: 'tasks',
       graphMethod: 'PATCH',
@@ -168,7 +168,7 @@ describe('the docs of the Planner details and checklist commands', () => {
   });
 
   it('pins the meta of remove-planner-checklist-item', () => {
-    expect(removePlannerChecklistItem).toEqual({
+    expect(removePlannerChecklistItem).toStrictEqual({
       summary: 'Remove an item from the checklist of a Planner task. The undo adds the item again with a new id.',
       category: 'tasks',
       graphMethod: 'PATCH',

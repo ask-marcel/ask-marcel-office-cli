@@ -11,7 +11,7 @@ import { meta as updatePlannerPlan } from './update-planner-plan.ts';
 
 describe('the docs of the Planner reference and plan commands', () => {
   it('pins the meta of add-planner-task-file', () => {
-    expect(addPlannerTaskFile).toEqual({
+    expect(addPlannerTaskFile).toStrictEqual({
       summary:
         'Attach a local file to a Planner task of a plan that is not of a group: the file goes into the folder "Planner attachments" of your OneDrive (shared with nobody), and the task gets a reference to it. A plan of a group is refused. The undo removes the reference and moves the file to the recycle bin.',
       category: 'tasks',
@@ -54,7 +54,7 @@ describe('the docs of the Planner reference and plan commands', () => {
   });
 
   it('pins the meta of add-planner-task-link', () => {
-    expect(addPlannerTaskLink).toEqual({
+    expect(addPlannerTaskLink).toStrictEqual({
       summary: 'Add a link (an http or https URL, with a name) to the references of a Planner task. The undo removes the link.',
       category: 'tasks',
       graphMethod: 'PATCH',
@@ -94,7 +94,7 @@ describe('the docs of the Planner reference and plan commands', () => {
   });
 
   it('pins the meta of remove-planner-task-link', () => {
-    expect(removePlannerTaskLink).toEqual({
+    expect(removePlannerTaskLink).toStrictEqual({
       summary: 'Remove a link or a file from the references of a Planner task (a file stays where it is). The undo adds the reference again.',
       category: 'tasks',
       graphMethod: 'PATCH',
@@ -128,7 +128,7 @@ describe('the docs of the Planner reference and plan commands', () => {
   });
 
   it('pins the meta of update-planner-plan', () => {
-    expect(updatePlannerPlan).toEqual({
+    expect(updatePlannerPlan).toStrictEqual({
       summary: 'Rename a Planner plan (--name) and its labels (--label-names). No command creates a plan. The undo writes the name and the label names of before back.',
       category: 'tasks',
       graphMethod: 'PATCH',

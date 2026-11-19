@@ -11,7 +11,7 @@ import { meta as deletePlannerTask } from './delete-planner-task.ts';
 
 describe('the docs of the Planner task commands', () => {
   it('pins the meta of create-planner-task', () => {
-    expect(createPlannerTask).toEqual({
+    expect(createPlannerTask).toStrictEqual({
       summary:
         'Add a task to a bucket of a Planner plan, with its dates, progress, priority, labels and people. An assignment to another person needs --notify-others true (Planner notifies that person). The undo deletes the task if nobody changed it.',
       category: 'tasks',
@@ -120,7 +120,7 @@ describe('the docs of the Planner task commands', () => {
   });
 
   it('pins the meta of update-planner-task', () => {
-    expect(updatePlannerTask).toEqual({
+    expect(updatePlannerTask).toStrictEqual({
       summary:
         'Change a Planner task: its title, days, progress, priority, labels, bucket (in the same plan) and people. A change of the assignment of another person needs --notify-others true (Planner notifies that person). The undo writes the fields of before back.',
       category: 'tasks',
@@ -235,7 +235,7 @@ describe('the docs of the Planner task commands', () => {
   });
 
   it('pins the meta of delete-planner-task', () => {
-    expect(deletePlannerTask).toEqual({
+    expect(deletePlannerTask).toStrictEqual({
       summary:
         'Delete a Planner task. The run journal keeps a copy, so the undo makes the task again with a new id. The undo assigns another person again only with --notify-others true on the delete. Over MCP it runs on run-destructive-command.',
       category: 'tasks',
