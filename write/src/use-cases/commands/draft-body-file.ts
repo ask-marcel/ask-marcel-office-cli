@@ -9,7 +9,7 @@ import { readLocalFile } from '@ask-marcel/office-core/use-cases/commands/read-l
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 
 /*
- * `--body-file` on the four draft commands: the body text comes from a local
+ * `--body-file` on the four draft commands and the calendar drafts: the body text comes from a local
  * file, for a body too long for a command line. The file is read before the
  * checks of the command, in the dry-run too, and its text goes into the text
  * option of the command (`--body-content` or `--comment`). So the checks, the
@@ -20,8 +20,8 @@ import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write
 /** The largest body file, in bytes. Graph takes a request of at most 4 MB, and JSON makes the text longer. */
 export const BODY_FILE_MAX_BYTES = 1_000_000;
 
-/** The text options that `--body-file` can stand in for. */
-export type BodyKey = 'bodyContent' | 'comment';
+/** The text options that `--body-file` can stand in for: `body` is the body of a calendar draft. */
+export type BodyKey = 'bodyContent' | 'comment' | 'body';
 
 /** How `--body-file` goes into a command. */
 export type BodyFileSpec = {
@@ -33,7 +33,7 @@ export type BodyFileSpec = {
   readonly exclusive: ReadonlyArray<BodyKey>;
 };
 
-const FLAGS: Readonly<Record<BodyKey, string>> = { bodyContent: '--body-content', comment: '--comment' };
+const FLAGS: Readonly<Record<BodyKey, string>> = { bodyContent: '--body-content', comment: '--comment', body: '--body' };
 
 /** The field of `--body-file` in the schema of a draft command: the exported schema names the params, and the file read checks the path. */
 export const BODY_FILE_FIELD = z.string().optional();
