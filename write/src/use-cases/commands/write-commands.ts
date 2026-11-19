@@ -27,6 +27,18 @@ import { CALENDAR_UNDO_HANDLERS } from './calendar-draft-undo.ts';
 import * as createPlannerBucket from './create-planner-bucket.ts';
 import * as deletePlannerBucket from './delete-planner-bucket.ts';
 import * as updatePlannerBucket from './update-planner-bucket.ts';
+import * as createPlannerTask from './create-planner-task.ts';
+import * as updatePlannerTask from './update-planner-task.ts';
+import * as deletePlannerTask from './delete-planner-task.ts';
+import * as updatePlannerTaskDetails from './update-planner-task-details.ts';
+import * as addPlannerChecklistItem from './add-planner-checklist-item.ts';
+import * as updatePlannerChecklistItem from './update-planner-checklist-item.ts';
+import * as removePlannerChecklistItem from './remove-planner-checklist-item.ts';
+import * as addPlannerTaskFile from './add-planner-task-file.ts';
+import * as addPlannerTaskLink from './add-planner-task-link.ts';
+import * as removePlannerTaskLink from './remove-planner-task-link.ts';
+import * as updatePlannerPlan from './update-planner-plan.ts';
+import { FILE_UNDO_HANDLERS } from './planner-file.ts';
 import { PLANNER_UNDO_HANDLERS } from './planner-undo.ts';
 import { TASK_COPY_UNDO_HANDLERS } from './planner-task-copy.ts';
 import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachment-to-pdf.ts';
@@ -91,6 +103,17 @@ const modules: Readonly<Record<string, WriteCommand>> = {
   'create-planner-bucket': createPlannerBucket,
   'update-planner-bucket': updatePlannerBucket,
   'delete-planner-bucket': deletePlannerBucket,
+  'create-planner-task': createPlannerTask,
+  'update-planner-task': updatePlannerTask,
+  'delete-planner-task': deletePlannerTask,
+  'update-planner-task-details': updatePlannerTaskDetails,
+  'add-planner-checklist-item': addPlannerChecklistItem,
+  'update-planner-checklist-item': updatePlannerChecklistItem,
+  'remove-planner-checklist-item': removePlannerChecklistItem,
+  'add-planner-task-file': addPlannerTaskFile,
+  'add-planner-task-link': addPlannerTaskLink,
+  'remove-planner-task-link': removePlannerTaskLink,
+  'update-planner-plan': updatePlannerPlan,
 };
 
 const commands: Readonly<Record<string, Command<WriteGraph>>> = Object.fromEntries(
@@ -111,6 +134,7 @@ const undoHandlers: UndoHandlers = {
   ...CALENDAR_UNDO_HANDLERS,
   ...PLANNER_UNDO_HANDLERS,
   ...TASK_COPY_UNDO_HANDLERS,
+  ...FILE_UNDO_HANDLERS,
 };
 
 export { commands, undoHandlers };
