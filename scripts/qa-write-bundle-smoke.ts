@@ -7,9 +7,9 @@
  *      (unpdf, mammoth, jszip, turndown), no playwright, no read graph
  *      (createReadGraph) and no member of the read tiers (getElevated,
  *      teamsChatIc3);
- *   2. `--version` answers the package version; `--help` lists the 32 write
+ *   2. `--version` answers the package version; `--help` lists the 46 write
  *      commands, `help-json`, `docs` and `undo` (not `mcp`: the bin serves it
- *      before commander); `help-json` gives the package and 36 entries, `mcp`
+ *      before commander); `help-json` gives the package and 50 entries, `mcp`
  *      and `undo` among them; `docs create-mail-draft` prints its page;
  *   3. a missing required flag and an unknown flag each exit 1 with the
  *      commander code and no crash line, before any token request (the run has
@@ -54,6 +54,9 @@ console.log(`write bundle smoke: ${ROOT} at ${PACKAGE.version}, node ${runtimeVe
 
 const WRITE_COMMANDS = [
   'add-mail-draft-attachment',
+  'add-planner-checklist-item',
+  'add-planner-task-file',
+  'add-planner-task-link',
   'add-todo-linked-resource',
   'add-todo-task-attachment',
   'add-todo-task-step',
@@ -65,11 +68,15 @@ const WRITE_COMMANDS = [
   'create-calendar-draft',
   'create-forward-draft',
   'create-mail-draft',
+  'create-planner-bucket',
+  'create-planner-task',
   'create-reply-draft',
   'create-todo-list',
   'create-todo-task',
   'delete-calendar-draft',
   'delete-mail-draft',
+  'delete-planner-bucket',
+  'delete-planner-task',
   'delete-todo-task',
   'delete-todo-task-step',
   'mark-mail-message',
@@ -77,11 +84,18 @@ const WRITE_COMMANDS = [
   'move-mail-thread',
   'move-todo-task',
   'remove-mail-draft-attachment',
+  'remove-planner-checklist-item',
+  'remove-planner-task-link',
   'remove-todo-task-attachment',
   'set-mail-categories',
   'set-mail-flag',
   'update-calendar-draft',
   'update-mail-draft',
+  'update-planner-bucket',
+  'update-planner-checklist-item',
+  'update-planner-plan',
+  'update-planner-task',
+  'update-planner-task-details',
   'update-todo-list',
   'update-todo-task',
   'update-todo-task-step',
@@ -167,13 +181,13 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
   return [
     ['--version answers the package version', exited(version.p, 0) && version.out.trim() === PACKAGE.version, `${exitNote(version.p)}, ${version.out.trim()}`],
     [
-      '--help lists the 32 write commands, help-json, docs and undo, and not mcp',
+      '--help lists the 46 write commands, help-json, docs and undo, and not mcp',
       exited(help.p, 0) && missingHelp.length === 0 && !helpListed('mcp'),
       missingHelp.length === 0 ? exitNote(help.p) : `missing ${missingHelp.join(', ')}`,
     ],
     [
-      'help-json gives the package and 36 entries, mcp and undo among them',
-      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 36 && names.includes('mcp') && names.includes('undo'),
+      'help-json gives the package and 50 entries, mcp and undo among them',
+      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 50 && names.includes('mcp') && names.includes('undo'),
       `${manifest.package ?? 'no package'}, ${names.length} entries`,
     ],
     ['docs create-mail-draft prints its page', exited(docs.p, 0) && docs.out.startsWith('# `create-mail-draft`'), exitNote(docs.p)],
@@ -258,8 +272,8 @@ const probeLibrary = (rt: string): ReadonlyArray<Check> => {
   const out = p.stdout?.toString() ?? '';
   return [
     [
-      'the library loads by name with its exports and the 32 commands',
-      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 32',
+      'the library loads by name with its exports and the 46 commands',
+      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 46',
       out || (p.stderr?.toString().slice(0, 200) ?? exitNote(p)),
     ],
   ];

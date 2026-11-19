@@ -73,6 +73,9 @@ reads the item before each write and in each undo check.
 The calendar drafts are the reference for a guard that a hidden mark on the
 item proves, and for a write whose answer is read back
 (`calendar-draft-ops.ts`, `calendar-draft-undo.ts`).
+The Planner commands are the reference for a change that sends the ETag of
+the item and asks for the item in the answer (`planner-patch.ts`,
+`planner-undo.ts`).
 
 ## The undo of the To Do commands
 
@@ -179,10 +182,62 @@ Graph limits that the calendar drafts meet:
   the old link does not work any more. The body comes back as plain text (the
   text of the user and the planned attendees), so its formatting is lost.
 
+## The undo of the Planner commands
+
+| Kind | Change | What the check compares | What the undo does |
+|:--|:--|:--|:--|
+| `delete-created-planner-item` | create a bucket or a task | the fields that the run set, as the answer of Planner gave them; for a task also its counts of checklist items and references and `hasDescription`; for a bucket also that it has no task | deletes the item with the ETag of its read |
+| `restore-planner-fields` | update a bucket, a task, the details of a task, a checklist item, a link, the name or the label names of a plan | the fields and the entries of a map (assignments, labels, checklist, references, label names) that the run set, as the answer of Planner gave them | writes the values of before back with the ETag of its read |
+| `recreate-planner-bucket` | delete an empty bucket | that the plan is there | makes the bucket again (new id) between the buckets that were next to it |
+| `planner-bucket-deleted-with-tasks` | delete a bucket with tasks | none | none: the status is `failed`, with the reason (`planner_bucket_no_undo`) |
+| `recreate-planner-task` | delete a task | that the plan is there | makes the task again from the copy in the journal (new id), then its details |
+| `delete-uploaded-planner-file` | the file of `add-planner-task-file` | the `cTag` (content) of the file in OneDrive | moves the file to the recycle bin of OneDrive |
+
+The ops are in `write/src/use-cases/commands/planner-patch.ts`,
+`planner-create.ts`, `planner-delete.ts`, `planner-task-copy.ts` and
+`planner-file.ts`, and the handlers in `planner-undo.ts`. The values that a
+check compares and the PATCH that an undo sends come from
+`write/src/domain/planner-snapshot.ts`. Each change sends the ETag of the item
+(`@odata.etag`) as `If-Match` (`WriteOptions.ifMatch` of the write port), and a
+412 of Planner gives `planner_item_changed`.
+
+An assignment of a person other than the user needs `--notify-others true`,
+in a run and in its undo: Planner sends that person a notification. So a
+removal of another person needs it too (its undo assigns the person again),
+and the undo of a delete assigns another person again only when the delete
+had it. The journal keeps that consent in the copy of the task.
+
+Graph limits that the Planner commands meet:
+
+- A PATCH or a DELETE needs `If-Match`. A PATCH answers 204 with no body,
+  unless the request asks `Prefer: return=representation` (the write port
+  sends it with `representation: true`). The ops ask for it, so the journal
+  keeps the values that Planner kept, and no read just after the write is
+  needed: Planner can answer such a read with old data.
+- The HTML `notes` of a task are on Graph beta only, and "setting both
+  description and notes is an error". The details PATCH with notes is the one
+  beta path (`core/src/domain/beta-patch.ts`). Graph v1.0 reads no notes, so
+  the checks compare the plain `description` that Planner keeps with them, and
+  the undo writes the description of before back: the HTML formatting of the
+  notes is lost.
+- The key of a reference is its URL with `%`, `.`, `:`, `@` and `#` encoded
+  (OData does not permit them in a property name), `%` first
+  (`write/src/domain/planner-reference.ts`).
+- A checklist item has a key that the client makes. The undo of a removed item
+  gives it a new key.
+- Planner deletes the tasks of a bucket with it. This CLI cannot make a bucket
+  and its tasks again, so that delete has no undo, and the dry-run says so.
+- A deleted task cannot come back with its id. The comments, the dates of
+  creation and completion and the order hint of the task are lost.
+- Planner keeps the file of a task of a group plan in the document library of
+  the group, which the token cannot write. `add-planner-task-file` refuses a
+  group plan (`planner_group_plan_file`), and puts the file of another plan in
+  the OneDrive of the user.
+
 ## Local files
 
 A command that reads a local file that a param names (`--ids-file`, `--file`,
-`--body-file`) gets a file reader as the third argument of `execute` and of
+`--body-file`, `--checklist-file`) gets a file reader as the third argument of `execute` and of
 `plan` (`LocalFileReader`). It reads with
 `readLocalFile(files, path, maxBytes)`
 (`core/src/use-cases/commands/read-local-file.ts`), which refuses a folder, a
@@ -210,7 +265,7 @@ effect `delete`, and it is on that tool.
 | Record | `{ version: 1, runId, command, startedAt, changes: [{ action, target, before, after, undo: { kind, data }, undoneAt? }] }` |
 
 The journal holds tenant data (ids, subjects, bodies, and the bytes of a
-removed attachment, the copy of a deleted calendar draft). No code writes it to a
+removed attachment, the copy of a deleted calendar draft or Planner task). No code writes it to a
 log.
 
 ## Error codes
