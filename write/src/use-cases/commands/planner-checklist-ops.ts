@@ -43,7 +43,7 @@ export const findItem = (checklist: Readonly<Record<string, ChecklistItem>>, spe
       `--item: ${keys.length} items of the checklist have this title. Give the id of the item, as get-planner-task-details returns it.`
     );
   return keys.length === 1
-    ? ok(keys[0] as string)
+    ? ok(keys[0])
     : refused('planner_checklist_item_not_found', '--item: the checklist of the task has no item with this id or title (the title must be exact).');
 };
 
