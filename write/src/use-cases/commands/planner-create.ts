@@ -20,8 +20,14 @@ export const NEW_TASK_COUNTERS = { checklistItemCount: 0, referenceCount: 0, has
 
 const answerSchema = z.object({ id: z.string() }).loose();
 
-/** The op that makes a bucket (`/planner/buckets`) or a task (`/planner/tasks`) of `body`. `idKey` names the id in `after`. */
-export const createOp = (resource: 'bucket' | 'task', body: Readonly<Record<string, unknown>>, before: ItemIds, after: (id: string) => ItemIds): TodoOp => {
+/** The op that makes a bucket (`/planner/buckets`) or a task (`/planner/tasks`) of `body`. `compared` is the shape that the undo check compares. */
+export const createOp = (
+  resource: 'bucket' | 'task',
+  body: Readonly<Record<string, unknown>>,
+  compared: Readonly<Record<string, unknown>>,
+  before: ItemIds,
+  after: (id: string) => ItemIds
+): TodoOp => {
   const change: PlannedChange = { action: `create-planner-${resource}`, target: resource === 'task' ? '/planner/tasks' : '/planner/buckets', before };
   return {
     change,
@@ -30,8 +36,7 @@ export const createOp = (resource: 'bucket' | 'task', body: Readonly<Record<stri
       if (!created.ok) return outcomeOf(created);
       const item = answerSchema.safeParse(created.value);
       if (!item.success || !isGraphId(item.data.id)) return outcomeOf(err(unreadable(`the Planner ${resource} it created`)));
-      const compared = Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'planId'));
-      const set = snapshotOf(item.data, resource === 'task' ? { ...compared, ...NEW_TASK_COUNTERS } : compared);
+      const set = snapshotOf(item.data, compared);
       return outcomeOf(ok({ ...change, after: after(item.data.id), undo: { kind: 'delete-created-planner-item', data: { resource, id: item.data.id, set } } }));
     },
   };

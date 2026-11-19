@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
 import { createOp } from './planner-create.ts';
-import { readBuckets } from './planner-reader.ts';
+import { readBuckets, refused } from './planner-reader.ts';
 import { resolvePlan } from './planner-resolve.ts';
 import { PLAN_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-texts.ts';
 import { todoPlan } from './todo-batch.ts';
@@ -27,9 +27,9 @@ const plan: PlanWrite = async (reads, params) => {
   const buckets = await readBuckets(reads, planId);
   if (!buckets.ok) return buckets;
   if (buckets.value.some((bucket) => bucket.name.trim().toLowerCase() === name.toLowerCase()))
-    return err({ type: 'validation_error', code: 'planner_bucket_exists', message: '--name: the plan has a bucket of this name. Give another name.' });
+    return refused('planner_bucket_exists', '--name: the plan has a bucket of this name. Give another name.');
   const before = { planId, plan: String(found.value.fields['title'] ?? ''), name };
-  return ok(todoPlan({ ops: [createOp('bucket', { name, planId }, before, (id) => ({ bucketId: id, name, planId }))] }));
+  return ok(todoPlan({ ops: [createOp('bucket', { name, planId }, { name }, before, (id) => ({ bucketId: id, name, planId }))] }));
 };
 
 const execute = createExecute(plan);

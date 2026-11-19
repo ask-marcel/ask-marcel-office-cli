@@ -38,7 +38,7 @@ const badLine = (lines: ReadonlyArray<ChecklistLine>): Result<never, GraphError>
   const index = lines.findIndex((line) => line.title === '' || line.title.length > CHECKLIST_TITLE_MAX);
   if (index >= 0) return refused('checklist_item_invalid', `--checklist-file: item ${index + 1} has no title, or a title of more than ${CHECKLIST_TITLE_MAX} characters.`);
   const twice = lines.findIndex((line, at) => lines.findIndex((other) => other.title === line.title) !== at);
-  return twice >= 0 ? refused('checklist_item_twice', `--checklist-file: item ${twice + 1} has the same title as an item before it.`) : undefined;
+  return twice === -1 ? undefined : refused('checklist_item_twice', `--checklist-file: item ${twice + 1} has the same title as an item before it.`);
 };
 
 /** The items of a checklist file, or the refusal of an empty file, of more than 20 items, of an item with no title or with a title twice. */
@@ -75,13 +75,12 @@ export const checklistPatchOf = (
   lines: ReadonlyArray<ChecklistLine>,
   newKey: () => string
 ): Record<string, ChecklistItem | null> => {
-  const keyOf = (title: string): string | undefined => Object.keys(current).find((key) => current[key]?.title === title);
   const patch: Record<string, ChecklistItem | null> = {};
-  for (const key of Object.keys(current)) if (!lines.some((line) => line.title === current[key]?.title)) patch[key] = null;
+  for (const [key, item] of Object.entries(current)) if (!lines.some((line) => line.title === item.title)) patch[key] = null;
   for (const line of lines) {
-    const key = keyOf(line.title);
-    const item = stateOf(line, key === undefined ? undefined : current[key]);
-    if (changed(item, key === undefined ? undefined : current[key])) patch[key ?? newKey()] = item;
+    const kept = Object.entries(current).find(([, item]) => item.title === line.title);
+    const item = stateOf(line, kept?.[1]);
+    if (changed(item, kept?.[1])) patch[kept?.[0] ?? newKey()] = item;
   }
   return patch;
 };
