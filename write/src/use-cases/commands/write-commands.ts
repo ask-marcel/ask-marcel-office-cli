@@ -24,6 +24,11 @@ import * as createCalendarDraft from './create-calendar-draft.ts';
 import * as deleteCalendarDraft from './delete-calendar-draft.ts';
 import * as updateCalendarDraft from './update-calendar-draft.ts';
 import { CALENDAR_UNDO_HANDLERS } from './calendar-draft-undo.ts';
+import * as createPlannerBucket from './create-planner-bucket.ts';
+import * as deletePlannerBucket from './delete-planner-bucket.ts';
+import * as updatePlannerBucket from './update-planner-bucket.ts';
+import { PLANNER_UNDO_HANDLERS } from './planner-undo.ts';
+import { TASK_COPY_UNDO_HANDLERS } from './planner-task-copy.ts';
 import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachment-to-pdf.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as createForwardDraft from './create-forward-draft.ts';
@@ -83,6 +88,9 @@ const modules: Readonly<Record<string, WriteCommand>> = {
   'create-calendar-draft': createCalendarDraft,
   'update-calendar-draft': updateCalendarDraft,
   'delete-calendar-draft': deleteCalendarDraft,
+  'create-planner-bucket': createPlannerBucket,
+  'update-planner-bucket': updatePlannerBucket,
+  'delete-planner-bucket': deletePlannerBucket,
 };
 
 const commands: Readonly<Record<string, Command<WriteGraph>>> = Object.fromEntries(
@@ -101,6 +109,8 @@ const undoHandlers: UndoHandlers = {
   ...TASK_UNDO_HANDLERS,
   ...ITEM_UNDO_HANDLERS,
   ...CALENDAR_UNDO_HANDLERS,
+  ...PLANNER_UNDO_HANDLERS,
+  ...TASK_COPY_UNDO_HANDLERS,
 };
 
 export { commands, undoHandlers };
