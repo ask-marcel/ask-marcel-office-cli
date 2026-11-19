@@ -2,7 +2,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import { patchOnAllowedRoot } from '../domain/beta-patch.ts';
 import { unlessSendsMail } from '../domain/mail-send-guard.ts';
-import type { WriteGraph, WriteOptions } from '../use-cases/ports/graph.ts';
+import type { PatchOptions, WriteGraph, WriteOptions } from '../use-cases/ports/graph.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError, GraphRequestCore } from './graph-request.ts';
 import { apiErrorFrom, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
@@ -92,6 +92,12 @@ const chunkedPut = async (core: GraphRequestCore, fetchFn: FetchFn, basePath: st
 // The `If-Match` header of a change that names the ETag it read; none otherwise.
 const ifMatchHeader = (options: WriteOptions = {}): Readonly<Record<string, string>> => (options.ifMatch === undefined ? {} : { 'If-Match': options.ifMatch });
 
+// The headers of a PATCH: its `If-Match`, and `Prefer: return=representation` when the caller asks for the item after the change.
+const patchHeaders = (options: PatchOptions = {}): Readonly<Record<string, string>> => ({
+  ...ifMatchHeader(options),
+  ...(options.representation === true ? { Prefer: 'return=representation' } : {}),
+});
+
 const deleteWith = async (core: GraphRequestCore, path: string, options?: WriteOptions): Promise<Result<unknown, GraphError>> => {
   const url = `${GRAPH_ROOT}${path}`;
   try {
@@ -118,7 +124,7 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
           core.json('basic', 'PATCH', path, {
             body,
             readBody: readWriteAnswer,
-            extraHeaders: ifMatchHeader(options),
+            extraHeaders: patchHeaders(options),
             ...(options?.api === 'beta' ? { root: GRAPH_BETA_ROOT } : {}),
           })
         )
