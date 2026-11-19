@@ -57,6 +57,20 @@ describe('the command-to-package directory', () => {
       'update-todo-list',
       'update-todo-task',
       'update-todo-task-step',
+      'create-planner-bucket',
+      'update-planner-bucket',
+      'delete-planner-bucket',
+      'create-planner-task',
+      'update-planner-task',
+      'delete-planner-task',
+      'update-planner-task-details',
+      'add-planner-checklist-item',
+      'update-planner-checklist-item',
+      'remove-planner-checklist-item',
+      'add-planner-task-file',
+      'add-planner-task-link',
+      'remove-planner-task-link',
+      'update-planner-plan',
     ]);
     expect([...COMMAND_DIRECTORY.keys()].filter((name) => !shipped.has(name))).toEqual([]);
   });
