@@ -8,7 +8,7 @@ import { isGraphId } from '../../domain/graph-id.ts';
 import { isLabelKey } from '../../domain/planner-fields.ts';
 import { isNotThere } from './mail-folder-reader.ts';
 import type { PlannerBucket, PlannerItem } from './planner-reader.ts';
-import { readBuckets, readPlannerItem } from './planner-reader.ts';
+import { readBuckets, readPlannerItem, refused } from './planner-reader.ts';
 import { unreadable } from './todo-reader.ts';
 
 /*
@@ -17,8 +17,6 @@ import { unreadable } from './todo-reader.ts';
  * found in the list of the plans, and a bucket in the list of the buckets of
  * its plan. A refusal does not list the names of the tenant.
  */
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 const plansSchema = z.object({ value: z.array(z.object({ id: z.string(), title: z.string() }).loose()) });
 
@@ -38,7 +36,7 @@ export const resolvePlan = async (reads: GraphReads, spec: string): Promise<Resu
   if (!read.ok) return read;
   const page = plansSchema.safeParse(read.value);
   if (!page.success) return err(unreadable('the Planner plans'));
-  const named = page.data.value.filter((plan) => plan.id === spec || plan.title.toLowerCase() === spec.toLowerCase());
+  const named = page.data.value.filter((plan) => plan.title.toLowerCase() === spec.toLowerCase());
   if (named.length > 1) return refused('planner_plan_ambiguous', `--plan: ${named.length} plans have this name. Give the id of the plan, as list-planner-plans returns it.`);
   return planById(reads, named[0]?.id ?? spec);
 };
@@ -68,7 +66,7 @@ export const labelNamesOf = (details: PlannerItem): Readonly<Record<string, stri
 
 // The key of a label given as a key or as a name of the plan (no case).
 const labelKeyOf = (spec: string, names: Readonly<Record<string, string>>): string | undefined =>
-  isLabelKey(spec) ? spec : Object.keys(names).find((key) => names[key]?.toLowerCase() === spec.toLowerCase());
+  isLabelKey(spec) ? spec : Object.entries(names).find(([, name]) => name.toLowerCase() === spec.toLowerCase())?.[0];
 
 /** The keys of the labels of `--labels` (keys or names, separated by commas; empty: no label). The refusal names the item, not its text. */
 export const resolveLabels = async (reads: GraphReads, planId: GraphId, raw: string): Promise<Result<ReadonlyArray<string>, GraphError>> => {

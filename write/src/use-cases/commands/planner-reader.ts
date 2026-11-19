@@ -16,6 +16,9 @@ import { unreadable } from './todo-reader.ts';
  * it goes into a later path.
  */
 
+/** The refusal of a Planner command, before any write: a `validation_error` with its code. */
+export const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
+
 /** The five kinds of Planner item that the commands change. */
 export type PlannerResource = 'task' | 'details' | 'bucket' | 'plan' | 'planDetails';
 

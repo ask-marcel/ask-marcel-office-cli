@@ -5,6 +5,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphReads } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { isNotThere } from './mail-folder-reader.ts';
 import { unreadable } from './todo-reader.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * The people of an assignment. Planner sends a notification to a person that
@@ -31,8 +32,6 @@ const isMail = (spec: string): boolean => {
   const parts = spec.split('@');
   return parts.length === 2 && parts.every((part) => MAIL_PART.test(part)) && (parts[1] ?? '').includes('.');
 };
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 type User = { readonly id: string; readonly name: string };
 

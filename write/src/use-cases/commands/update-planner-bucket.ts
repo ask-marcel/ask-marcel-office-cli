@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { GraphReads, PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { hintBetween } from '../../domain/planner-fields.ts';
@@ -12,6 +12,7 @@ import { patchOp } from './planner-patch.ts';
 import { resolveBucket } from './planner-resolve.ts';
 import { BUCKET_ID_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-texts.ts';
 import { todoPlan } from './todo-batch.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * Renames a bucket, or moves it: to the first place of the plan with --first
@@ -29,8 +30,6 @@ const schema = z.object({
 });
 
 type Params = z.infer<typeof schema>;
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 // The new order hint of the bucket, or undefined when the params do not move it.
 const hintOf = async (reads: GraphReads, bucket: BucketRead, params: Params): Promise<Result<string | undefined, GraphError>> => {

@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { GraphReads, ItemIds, PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
 import { isLabelKey } from '../../domain/planner-fields.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
 import { patchOp } from './planner-patch.ts';
-import { readPlannerItem } from './planner-reader.ts';
+import { readPlannerItem, refused } from './planner-reader.ts';
 import { resolvePlan } from './planner-resolve.ts';
 import { PLAN_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-texts.ts';
 import type { TodoOp } from './todo-batch.ts';
@@ -22,8 +22,6 @@ import { todoPlan } from './todo-batch.ts';
 
 const schema = z.object({ plan: z.string().trim().min(1), name: z.string().trim().min(1).max(255).optional(), labelNames: z.string().optional() });
 
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
-
 /** The label names of `--label-names`: `category1=Red,category3=` (an empty name removes it). The refusal names the item, not its text. */
 export const labelNamesOf = (raw: string): Result<Record<string, string | null>, GraphError> => {
   const names: Record<string, string | null> = {};
@@ -31,7 +29,7 @@ export const labelNamesOf = (raw: string): Result<Record<string, string | null>,
   for (const [index, item] of items.entries()) {
     const at = item.indexOf('=');
     const key = item.slice(0, Math.max(at, 0)).trim();
-    if (at < 0 || !isLabelKey(key) || Object.hasOwn(names, key))
+    if (!isLabelKey(key) || Object.hasOwn(names, key))
       return refused('planner_label_names_invalid', `--label-names: item ${index + 1} is not "categoryN=name" with N from 1 to 25, or names a label twice.`);
     const name = item.slice(at + 1).trim();
     names[key] = name === '' ? null : name;

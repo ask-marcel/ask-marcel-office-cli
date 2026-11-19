@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { PLANNER_STATUSES, plannerDayOf, priorityOf } from '../../domain/planner-fields.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * The options of the fields of a Planner task, with the names of the user's
@@ -30,8 +31,6 @@ export const taskFieldShape = {
 };
 
 export type TaskFieldParams = z.infer<z.ZodObject<typeof taskFieldShape>>;
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 const dayField = (key: string, value: string | undefined): Record<string, unknown> => (value === undefined ? {} : { [key]: plannerDayOf(value) });
 

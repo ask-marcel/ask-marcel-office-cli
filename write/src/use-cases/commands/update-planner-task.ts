@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { GraphReads, PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
 import { labelPatch } from '../../domain/planner-fields.ts';
+import { recordOf } from '../../domain/planner-snapshot.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
 import { assignmentChangeOf } from './planner-assignments.ts';
 import { patchOp } from './planner-patch.ts';
@@ -14,6 +15,7 @@ import { resolveBucket, resolveLabels } from './planner-resolve.ts';
 import { TASK_FIELD_OPTIONS, taskFieldShape, taskFieldsOf } from './planner-task-options.ts';
 import { NOTIFY_OTHERS_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES, TASK_ID_OPTION } from './planner-texts.ts';
 import { todoPlan } from './todo-batch.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * Changes the fields of a task, as the update op of the user's script: the
@@ -36,13 +38,11 @@ const schema = z.object({
 
 type Params = z.infer<typeof schema>;
 
-const mapOf = (value: unknown): Record<string, unknown> => (value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {});
-
 const labelsOf = async (reads: GraphReads, planId: GraphId, current: unknown, raw: string | undefined): Promise<Result<Record<string, unknown>, GraphError>> => {
   if (raw === undefined) return ok({});
   const keys = await resolveLabels(reads, planId, raw);
   if (!keys.ok) return keys;
-  const patch = labelPatch(mapOf(current) as Record<string, boolean>, keys.value);
+  const patch = labelPatch(recordOf(current) as Record<string, boolean>, keys.value);
   return ok(Object.keys(patch).length === 0 ? {} : { appliedCategories: patch });
 };
 
@@ -53,7 +53,7 @@ const bucketOf = async (reads: GraphReads, planId: GraphId, raw: string | undefi
 };
 
 const nothing = (): Result<never, GraphError> =>
-  err({ type: 'validation_error', code: 'planner_nothing_to_change', message: 'The params change nothing of the task: give a field, --labels, --bucket, --assign or --unassign.' });
+  refused('planner_nothing_to_change', 'The params change nothing of the task: give a field, --labels, --bucket, --assign or --unassign.');
 
 const plan: PlanWrite = async (reads, params) => {
   const parsed = parseParams(schema, params);
@@ -68,7 +68,7 @@ const plan: PlanWrite = async (reads, params) => {
   if (!labels.ok) return labels;
   const bucket = await bucketOf(reads, planId, p.bucket);
   if (!bucket.ok) return bucket;
-  const people = await assignmentChangeOf(reads, p, mapOf(item.fields['assignments']));
+  const people = await assignmentChangeOf(reads, p, recordOf(item.fields['assignments']));
   if (!people.ok) return people;
   const assignments = Object.keys(people.value.entries).length === 0 ? {} : { assignments: people.value.entries };
   const body = { ...fields.value, ...labels.value, ...bucket.value, ...assignments };
