@@ -25,6 +25,8 @@ export type CalendarDraft = {
   readonly id: GraphId;
   readonly subject: string;
   readonly stamp: string;
+  readonly start: string;
+  readonly end: string;
   readonly isAllDay: boolean;
   readonly isOnlineMeeting: boolean;
   readonly bodyText: string;
@@ -42,6 +44,8 @@ const MARK_FILTER = encodeURI(`singleValueExtendedProperties($filter=id eq '${DR
 const eventSchema = z
   .object({
     subject: z.string(),
+    start: z.object({ dateTime: z.string() }).loose(),
+    end: z.object({ dateTime: z.string() }).loose(),
     lastModifiedDateTime: z.string(),
     isAllDay: z.boolean(),
     isOnlineMeeting: z.boolean(),
@@ -55,7 +59,7 @@ const eventSchema = z
 
 type EventAnswer = z.infer<typeof eventSchema>;
 
-const REFUSALS: ReadonlySet<string> = new Set([
+const REFUSALS: ReadonlySet<string | undefined> = new Set([
   'not_a_calendar_draft',
   'calendar_draft_has_attendees',
   'not_calendar_organizer',
@@ -66,7 +70,7 @@ const REFUSALS: ReadonlySet<string> = new Set([
 const refused = (code: string, message: string): GraphError => ({ type: 'validation_error', code, message });
 
 /** Whether the error is a refusal of the guard: the event is not, or is no longer, a calendar draft. */
-export const isNotDraft = (error: GraphError): boolean => REFUSALS.has(error.code ?? '');
+export const isNotDraft = (error: GraphError): boolean => REFUSALS.has(error.code);
 
 const isMarked = (event: EventAnswer): boolean =>
   (event.singleValueExtendedProperties ?? []).some((property) => property.id.toLowerCase() === DRAFT_MARK.id.toLowerCase() && property.value === DRAFT_MARK.value);
@@ -103,8 +107,8 @@ export const readDraft = async (reads: GraphReads, id: GraphId, timeZone?: strin
   if (!event.success) return err(unreadable('a calendar event'));
   const broken = ruleBroken(event.data);
   if (broken !== undefined) return err(broken);
-  const { subject, lastModifiedDateTime, isAllDay, isOnlineMeeting, body } = event.data;
-  return ok({ id, subject, stamp: lastModifiedDateTime, isAllDay, isOnlineMeeting, bodyText: body.content, fields: event.data });
+  const { subject, start, end, lastModifiedDateTime, isAllDay, isOnlineMeeting, body } = event.data;
+  return ok({ id, subject, start: start.dateTime, end: end.dateTime, stamp: lastModifiedDateTime, isAllDay, isOnlineMeeting, bodyText: body.content, fields: event.data });
 };
 
 /** Whether the event is still the calendar draft that the plan read: the same `lastModifiedDateTime`, and each rule kept. */

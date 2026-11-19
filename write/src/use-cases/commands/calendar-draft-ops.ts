@@ -40,12 +40,6 @@ const timeSchema = z.object({ dateTime: z.string() }).loose();
 const answerSchema = z.object({ id: z.string(), subject: z.string(), start: timeSchema, end: timeSchema }).loose();
 const locationSchema = z.object({ displayName: z.string() });
 
-/** The date and time of a Graph time, or an empty text. */
-export const dateTimeOf = (value: unknown): string => {
-  const time = timeSchema.safeParse(value);
-  return time.success ? time.data.dateTime : '';
-};
-
 // A location compares by its name: Graph adds other fields to it.
 const comparable = (key: string, value: unknown): unknown => {
   if (key !== 'location') return value ?? null;
@@ -72,12 +66,16 @@ const settled = async (reads: GraphReads, id: GraphId, answer: Readonly<Record<s
 };
 
 /** The ids and the times of an event, for `before` and `after`. */
-export const draftIds = (id: string, fields: Readonly<Record<string, unknown>>): ItemIds => ({
+export const draftIds = (id: string, event: { readonly subject: string; readonly start: string; readonly end: string }): ItemIds => ({
   eventId: id,
-  subject: typeof fields['subject'] === 'string' ? fields['subject'] : '',
-  start: dateTimeOf(fields['start']),
-  end: dateTimeOf(fields['end']),
+  subject: event.subject,
+  start: event.start,
+  end: event.end,
 });
+
+type Answer = z.infer<typeof answerSchema>;
+
+const answerIds = (answer: Answer): ItemIds => draftIds(answer.id, { subject: answer.subject, start: answer.start.dateTime, end: answer.end.dateTime });
 
 /** Creates the event with the mark of this CLI. `text` is the body text that the undo check compares. */
 export const createDraftOp = (fields: Readonly<Record<string, unknown>>, text: string, before: ItemIds): TodoOp => {
@@ -90,14 +88,14 @@ export const createDraftOp = (fields: Readonly<Record<string, unknown>>, text: s
       const event = answerSchema.safeParse(created.value);
       if (!event.success || !isGraphId(event.data.id)) return outcomeOf(err(unreadable('the event it created')));
       const set = await settled(graph, event.data.id, event.data, fields);
-      return outcomeOf(ok({ ...change, after: draftIds(event.data.id, event.data), undo: { kind: 'delete-created-calendar-draft', data: { eventId: event.data.id, set, text } } }));
+      return outcomeOf(ok({ ...change, after: answerIds(event.data), undo: { kind: 'delete-created-calendar-draft', data: { eventId: event.data.id, set, text } } }));
     },
   };
 };
 
 /** Sets the fields of the event. `before` has the value of each field before the run; `text` is the body text that it writes, if any. */
 export const updateDraftOp = (draft: CalendarDraft, fields: Readonly<Record<string, unknown>>, before: Readonly<Record<string, unknown>>, text?: string): TodoOp => {
-  const change: PlannedChange = { action: 'update-calendar-draft', target: eventPath(draft.id), before: draftIds(draft.id, draft.fields) };
+  const change: PlannedChange = { action: 'update-calendar-draft', target: eventPath(draft.id), before: draftIds(draft.id, draft) };
   return {
     change,
     recheck: async (reads) => sameDraft(reads, draft),
@@ -107,9 +105,9 @@ export const updateDraftOp = (draft: CalendarDraft, fields: Readonly<Record<stri
       const event = answerSchema.safeParse(written.value);
       if (!event.success) return outcomeOf(err(unreadable('the event it changed')));
       const set = await settled(graph, draft.id, event.data, fields);
-      const data = { eventId: draft.id, before, set, ...(text === undefined ? {} : { text }) };
+      const data = { eventId: draft.id, before, set, text };
       return outcomeOf(
-        ok({ ...change, after: { ...draftIds(draft.id, event.data), fields: Object.keys(fields).join(', ') }, undo: { kind: 'restore-calendar-draft-fields', data } })
+        ok({ ...change, after: { ...answerIds({ ...event.data, id: draft.id }), fields: Object.keys(fields).join(', ') }, undo: { kind: 'restore-calendar-draft-fields', data } })
       );
     },
   };
@@ -119,7 +117,7 @@ const onlineOf = (draft: CalendarDraft): Record<string, unknown> => (draft.isOnl
 
 /** The fields that make the event again: its text body without the old Teams block, and a new Teams link if it had one. */
 export const copyOf = (draft: CalendarDraft): Record<string, unknown> => {
-  const kept = ['subject', 'start', 'end', 'isAllDay', 'showAs', 'categories', 'isReminderOn', 'reminderMinutesBeforeStart'].filter((key) => draft.fields[key] !== undefined);
+  const kept = ['subject', 'start', 'end', 'isAllDay', 'showAs', 'categories', 'isReminderOn', 'reminderMinutesBeforeStart'];
   return {
     ...Object.fromEntries(kept.map((key) => [key, draft.fields[key]])),
     location: { displayName: comparable('location', draft.fields['location']) },
@@ -130,7 +128,7 @@ export const copyOf = (draft: CalendarDraft): Record<string, unknown> => {
 
 /** Deletes the event. The run journal keeps its copy, so the undo can make it again (new id). */
 export const deleteDraftOp = (draft: CalendarDraft): TodoOp => {
-  const change: PlannedChange = { action: 'delete-calendar-draft', target: eventPath(draft.id), before: draftIds(draft.id, draft.fields) };
+  const change: PlannedChange = { action: 'delete-calendar-draft', target: eventPath(draft.id), before: draftIds(draft.id, draft) };
   return {
     change,
     recheck: async (reads) => sameDraft(reads, draft),

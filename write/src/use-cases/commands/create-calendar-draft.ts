@@ -35,7 +35,7 @@ const plan: PlanWrite = createBodyFilePlan(async (reads, params) => {
   if (!parsed.ok) return parsed;
   const zone = await readTimeZone(reads);
   if (!zone.ok) return zone;
-  const times = timeFieldsOf(parsed.value, parsed.value.allDay === 'true', zone.value);
+  const times = timeFieldsOf(parsed.value, parsed.value.allDay === 'true', zone.value, parsed.value);
   if (!times.ok) return times;
   const planned = plannedParam(parsed.value) ?? [];
   const text = draftBodyText(parsed.value.body ?? '', planned);
