@@ -70,6 +70,9 @@ more than one change in one op, and for an undo that makes an item again
 (`todo-batch.ts`, `todo-copy.ts`, `todo-task-undo.ts`, `todo-item-undo.ts`).
 The attachment commands of a mail draft are the reference for a guard that
 reads the item before each write and in each undo check.
+The calendar drafts are the reference for a guard that a hidden mark on the
+item proves, and for a write whose answer is read back
+(`calendar-draft-ops.ts`, `calendar-draft-undo.ts`).
 
 ## The undo of the To Do commands
 
@@ -131,9 +134,47 @@ Graph limits that these commands meet:
   there before.
 - A removed attachment cannot come back with its id. The undo makes a new one.
 
-`--body-file` on the four draft commands changes no undo: the file is read
-before the checks of the command, and its text goes into `--body-content` or
-`--comment` (`write/src/use-cases/commands/draft-body-file.ts`).
+`--body-file` on the four draft commands and the calendar drafts changes no undo: the file is read
+before the checks of the command, and its text goes into `--body-content`,
+`--comment` or `--body` (`write/src/use-cases/commands/draft-body-file.ts`).
+
+## The undo of the calendar drafts
+
+| Kind | Change | What the check compares | What the undo does |
+|:--|:--|:--|:--|
+| `delete-created-calendar-draft` | create a calendar draft | the guard (below), the fields that the run set and the body text that it wrote | deletes the event |
+| `restore-calendar-draft-fields` | update a calendar draft | the guard, the fields that the run set and the body text that it wrote | writes the fields of before back (the body of before as HTML, with its Teams block) |
+| `recreate-calendar-draft` | delete a calendar draft | none | creates the event again from the copy in the journal, with the mark (new id) |
+
+The guard (`write/src/use-cases/commands/calendar-draft-reader.ts`) reads the
+event with its hidden mark, an extended property of this CLI
+(`String {6b1f3c2e-9d47-4e8a-a5c1-3f20d7b9e461} Name askMarcelCalendarDraft`).
+It refuses an event with no mark, with one attendee or more, of another
+organizer, of a series, or with no prefix `[DRAFT] `. In a check, a refusal of
+the guard is `changed`: the undo never changes or deletes a meeting with
+attendees. The mark stays on the event, so the guard needs no run journal and
+holds after 30 days.
+
+Graph limits that the calendar drafts meet:
+
+- Graph sends an invitation to each attendee of an event that a POST creates
+  or a PATCH changes, and a cancellation when an event with attendees is
+  deleted. The write view of core refuses an event write with attendees
+  (`invitation_refused`) and the calendar actions that send mail (`cancel`,
+  `accept`, `decline`, `tentativelyAccept`, `forward`: `send_refused`).
+- The answer of a POST or a PATCH gives the times in the zone of the request,
+  and a GET in UTC (live run of 2026-11-19). So the ops read the event back
+  after the write, and the journal keeps the values of that read.
+- Exchange changes an online meeting a few seconds after its create: it adds
+  the Teams join block to the body and, with no location given, sets the
+  location to the Teams meeting. The checks compare neither the Teams block
+  nor a field that the run did not set.
+- A body with no Teams block makes Exchange remove the Teams meeting, so a new
+  body of an online meeting keeps the block of before (HTML).
+- A deleted event cannot come back with its id or its Teams link. The undo
+  makes a new event with a new id and, for an online meeting, a new Teams link:
+  the old link does not work any more. The body comes back as plain text (the
+  text of the user and the planned attendees), so its formatting is lost.
 
 ## Local files
 
@@ -166,7 +207,7 @@ effect `delete`, and it is on that tool.
 | Record | `{ version: 1, runId, command, startedAt, changes: [{ action, target, before, after, undo: { kind, data }, undoneAt? }] }` |
 
 The journal holds tenant data (ids, subjects, bodies, and the bytes of a
-removed attachment). No code writes it to a
+removed attachment, the copy of a deleted calendar draft). No code writes it to a
 log.
 
 ## Error codes

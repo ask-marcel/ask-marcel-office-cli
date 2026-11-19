@@ -6,6 +6,35 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the calendar drafts
+
+- `create-calendar-draft --subject --start --end` makes a draft of a meeting in
+  your calendar: an event with NO attendees, so Graph sends no invitation. The
+  subject gets the prefix `[DRAFT] ` (once). `--planned-attendees` puts the
+  addresses into the body as text only ("Planned attendees (NOT invited):
+  ..."). `--teams true` adds a Teams link. `--body` or `--body-file` gives the
+  text. `--all-day`, `--location`, `--show-as`, `--categories` and
+  `--reminder` set the other fields. The times are in the time zone of the
+  mailbox; a time that is not a day of the calendar and an end that is not
+  after the start are refused. The undo deletes the event.
+- `update-calendar-draft --event-id` changes the fields of a calendar draft. A
+  new body keeps the planned attendees and the Teams link, and new planned
+  attendees keep the text. The undo writes the fields of before back.
+- `delete-calendar-draft --event-id` deletes a calendar draft. Over MCP it runs
+  on `run-destructive-command`. The undo makes the event again from the run
+  journal, with a new id and, for an online meeting, a new Teams link.
+- Each calendar draft has a hidden mark of this CLI (an extended property). The
+  update and the delete read the event first and refuse, before any write, an
+  event with no mark, with attendees, of another organizer, of a series, or
+  with no prefix `[DRAFT] `. They read it again just before the write and pass
+  over an event that got attendees. The undo checks do the same.
+- No command can send a meeting invitation or an answer. The write graph
+  refuses a POST or a PATCH to an event whose body has attendees
+  (`invitation_refused`), and a change to `cancel`, `accept`, `decline` and
+  `tentativelyAccept` of an event (`send_refused`), before any request.
+- A new write class `calendar-draft` (not destructive) for the create and the
+  update.
+
 ### Added: the attachments and the body files of a mail draft
 
 - `add-mail-draft-attachment --message-id --file` attaches a local file of at
