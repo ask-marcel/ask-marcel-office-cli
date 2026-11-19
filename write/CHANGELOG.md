@@ -6,6 +6,46 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the Planner commands
+
+- `create-planner-bucket --plan --name`, `update-planner-bucket --bucket-id`
+  (`--name`, `--after`, `--first true`) and `delete-planner-bucket
+  --bucket-id`. A plan and a bucket are found by name (no case) or id. Planner
+  deletes the tasks of a bucket with it: the dry-run gives their count, and a
+  bucket with tasks has no undo.
+- `create-planner-task --plan --bucket --title`, `update-planner-task
+  --task-id` and `delete-planner-task --task-id`, with the options of the
+  user's script: `--due`, `--start` (days, `none` removes one), `--status`,
+  `--percent`, `--priority`, `--labels` (keys or label names), `--assign`,
+  `--unassign` and `--bucket`. An assignment to you needs nothing; a change of
+  the assignment of another person needs `--notify-others true`, as Planner
+  notifies that person. The dry-run shows each person. The undo of a delete
+  makes the task again with a new id, and assigns another person again only
+  when the delete had `--notify-others true`.
+- `update-planner-task-details --task-id` with `--description` (plain text,
+  Graph v1.0), `--notes-html` (HTML, Graph beta, decision D7), `--preview` and
+  `--checklist-file` (one item on each line, `[x] ` for a checked item). A
+  description with notes is refused, as Graph refuses it.
+- `add-planner-checklist-item`, `update-planner-checklist-item` and
+  `remove-planner-checklist-item`: an item is its id or its exact title.
+- `add-planner-task-link --url` and `remove-planner-task-link --url`: the key of
+  a reference is its URL with `%`, `.`, `:`, `@` and `#` encoded, as Graph asks.
+- `add-planner-task-file --file` puts a local file into the folder "Planner
+  attachments" of your OneDrive and links it to a task of a plan that is not of
+  a group. A group plan is refused: Planner keeps its files in the document
+  library of the group, which the token cannot write.
+- `update-planner-plan --plan` with `--name` and `--label-names`
+  (`category1=Red,category2=`). No command creates a plan or writes a comment.
+- Each change sends the ETag of the item as `If-Match` and asks for the item in
+  the answer (`Prefer: return=representation`). A change of the item between
+  the last read and the write gives `planner_item_changed`, and nothing
+  changes. The write port of core takes `representation: true` on a PATCH for it.
+- `delete-planner-bucket` and `delete-planner-task` are in the `delete` class
+  (MCP tool `run-destructive-command`); the 12 other Planner commands are in
+  the `task-write` class.
+- Write package now: 46 commands, 50 entries in `help-json`, 10 commands in the
+  `delete` class, `run-write-command` runs 36, 254 commands in the directory.
+
 ### Added: the calendar drafts
 
 - `create-calendar-draft --subject --start --end` makes a draft of a meeting in

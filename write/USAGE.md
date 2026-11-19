@@ -2,8 +2,8 @@
 
 This guide tells how to use the `ask-marcel-office-write` bin: the draft flow,
 the rules of each draft command, the draft attachments and body files, the
-mail state commands, the To Do commands, the calendar drafts,
-the dry-run and the undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
+mail state commands, the To Do commands, the calendar drafts, the Planner
+commands, the dry-run and the undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
 The list of commands is in [COMMANDS.md](COMMANDS.md). The output formats, the
 errors and `--output-path` are the same as in the
 [read usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/read/USAGE.md).
@@ -309,9 +309,70 @@ refuse, before any write:
 Each run reads the event again just before its write and passes over an event
 that changed or got attendees after the plan.
 
+## Planner
+
+The Planner commands change the buckets, the tasks, the details of a task and
+the names of a plan. No command creates a plan or writes a comment: a comment
+needs a scope that the token does not have, and Planner sends it to the group
+by mail.
+
+```sh
+ask-marcel-office-write create-planner-bucket --plan "Launch" --name "Waiting"
+ask-marcel-office-write update-planner-bucket --bucket-id "hsOf2dhO..." --after "To do"
+ask-marcel-office-write create-planner-task --plan "Launch" --bucket "Waiting" --title "Book the room" --due 2026-11-25 --priority important --labels "Red" --assign me
+ask-marcel-office-write update-planner-task --task-id "01gzSlKk..." --status completed
+ask-marcel-office-write update-planner-task-details --task-id "01gzSlKk..." --notes-html "<p>See the <b>budget</b></p>" --checklist-file ./steps.txt
+ask-marcel-office-write add-planner-checklist-item --task-id "01gzSlKk..." --title "Print the slides"
+ask-marcel-office-write add-planner-task-link --task-id "01gzSlKk..." --url "https://example.com/spec" --alias "Spec"
+ask-marcel-office-write update-planner-plan --plan "Launch" --label-names "category1=Urgent,category2="
+ask-marcel-office-write delete-planner-task --task-id "01gzSlKk..." --dry-run
+```
+
+1. `--plan`, `--bucket` and `--after` take a name (no case) or an id. A name
+   that two items have is refused: give the id.
+2. `--due` and `--start` are days (`YYYY-MM-DD`), kept at 10:00 UTC as the
+   Planner app does. `none` removes a day. `--status` (`notStarted`,
+   `inProgress`, `completed`) and `--percent` both set the progress: give one.
+   `--priority` is `urgent`, `important`, `medium`, `low` or 0 to 10.
+3. `--labels` takes `category1` to `category25` or the label names of the plan,
+   separated by commas. They replace the labels of before. An empty value
+   removes them all.
+4. `--assign` and `--unassign` take `me`, a mail address or a user id. An
+   assignment to you needs nothing. Planner sends a notification to each other
+   person, so a change of the assignment of another person is refused without
+   `--notify-others true`. The dry-run shows each person.
+5. `--description` is plain text on Graph v1.0. `--notes-html` is HTML on Graph
+   beta, the one beta path of this CLI. Planner keeps the plain text of the
+   notes as the description. Graph refuses both in one request, so the command
+   refuses them first.
+6. `--checklist-file` is a UTF-8 file with one item on each line (at most 20
+   items of 100 characters). `[x] ` marks a checked item and `[ ] ` an item that
+   is not checked. The checklist of the task becomes the list of the file: an
+   item of the same title stays, the other items are removed, and the new
+   titles are added.
+7. A checklist item (`--item`) is its id or its exact title, and must name one
+   item.
+8. `add-planner-task-file` puts the local file into the folder "Planner
+   attachments" of your OneDrive (shared with nobody) and adds a reference to
+   it. It refuses a plan of a group: the Planner app keeps the files of a group
+   plan in the document library of the group, which this CLI cannot write. For
+   such a plan, give a link to a file that is in SharePoint or OneDrive already
+   with `add-planner-task-link`.
+9. `delete-planner-bucket` deletes the tasks of the bucket too. The dry-run
+   gives their count, and a bucket with tasks has no undo.
+
+Each change reads the ETag of the item (`@odata.etag`) and sends it back as
+`If-Match`. Each run reads the item again just before its write and passes over
+an item that changed after the plan. If the item changes between that read and
+the write, Planner refuses the change, and the command gives the code
+`planner_item_changed`: nothing changed, so run the command again. The write
+asks Planner for the item after the change (`Prefer: return=representation`).
+So the undo compares a later read with the values that Planner kept, and not
+with a read just after the write, which Planner can answer with old data.
+
 ## Dry-run and undo
 
-The draft commands, the attachment commands of a draft, the mail state commands, the To Do commands and the calendar draft commands take `--dry-run`, and each run
+The draft commands, the attachment commands of a draft, the mail state commands, the To Do commands, the calendar draft commands and the Planner commands take `--dry-run`, and each run
 that is not a dry-run can be undone. The PDF conversions have neither:
 they leave nothing in your tenant.
 
@@ -383,6 +444,28 @@ What the undo does:
   the run journal: Graph gives it a new id (shown in `now`), the mark of this
   CLI, a plain-text body (the formatting of the body is lost) and, for an
   online meeting, a new Teams link. The old link does not work any more.
+- The undo of `create-planner-bucket` deletes the bucket, only if its name did
+  not change and it has no task. The undo of `create-planner-task` deletes the
+  task, only if the fields that the run set did not change and nobody added a
+  checklist item, a reference or a description to it.
+- The undo of `update-planner-bucket`, `update-planner-task`,
+  `update-planner-task-details`, the checklist commands, the link commands and
+  `update-planner-plan` writes the values of before back, only if each value
+  still has the value that the run set. A bucket goes back between the buckets
+  that were next to it. A removed checklist item comes back with a new id. HTML
+  notes come back as their plain text: Graph v1.0 reads no HTML notes.
+- The undo of `delete-planner-task` makes the task again from the copy in the
+  run journal, with a new id (shown in `now`): its fields, labels, bucket,
+  description, preview, checklist (in its order) and references, and your
+  assignment. It assigns another person again only when the delete had
+  `--notify-others true`. Lost: the comments, the dates of creation and
+  completion, the place of the task in its bucket, and the HTML formatting of
+  the notes.
+- The undo of `delete-planner-bucket` makes an empty bucket again (new id)
+  between the buckets that were next to it. A bucket that had tasks has no
+  undo (`planner_bucket_no_undo`): Planner deleted its tasks with it.
+- The undo of `add-planner-task-file` removes the reference, then moves the
+  file to the recycle bin of your OneDrive, only if its content did not change.
 - An undo that cannot reverse a change passes over it and gives the status
   `changed` (or `missing` when the item is gone).
 - A run that is fully undone cannot be undone again (`run_already_undone`).
@@ -396,7 +479,7 @@ The run journal is in `~/.ask-marcel/runs/`, one file for each run. It keeps a
 run 30 days: each write removes the older runs. An older run gives
 `run_expired`, and an unknown run id gives `run_not_found`. The journal holds
 the ids, the subjects and the bodies that an undo writes back (a calendar
-draft too), and the bytes of
+draft too, and the copy of a deleted Planner task), and the bytes of
 a removed To Do attachment or draft attachment, so do not share it.
 
 ## The PDF conversions
@@ -440,7 +523,7 @@ undo { runId }                                                   → shows the u
 undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
-`run-write-command` runs 24 commands: the write commands that do not delete. It
+`run-write-command` runs 36 commands: the write commands that do not delete. It
 has `readOnlyHint: false` and `destructiveHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
@@ -453,12 +536,13 @@ hosts that may write drafts and change the state of your mail.
 `delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
 `move-todo-task` (it deletes the original after the copy), `delete-todo-task-step`,
 `remove-todo-task-attachment`, `apply-todo-ops` (an op can move or delete a
-task) and `delete-calendar-draft`. It has `destructiveHint: true`, so a host asks you before it runs it.
+task), `delete-calendar-draft`, `delete-planner-bucket` (it deletes the tasks of
+the bucket too) and `delete-planner-task`. It has `destructiveHint: true`, so a host asks you before it runs it.
 Each tool refuses a command of another tool and names the right one.
 
 `undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,
 because it can move a draft to Deleted Items or delete a To Do item, an
-attachment of a draft or a calendar draft: a host asks
+attachment of a draft, a calendar draft, or a Planner bucket, task or file: a host asks
 you before it runs it.
 
 ## Library
@@ -477,7 +561,7 @@ if (draft?.ok) console.log(draft.value);
 
 | Export | What it is |
 |:--|:--|
-| `commands` | Each of the 32 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file` and `--body-file`. |
+| `commands` | Each of the 46 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file`, `--body-file` and `--checklist-file`. |
 | `createWriteGraph(tokens)` | The write graph over a `TokenSource`: the basic token, with `get`, `post`, `patch`, `put` and `delete`. |
 | `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
 | `createWriteClient()` | `createWriteGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
@@ -485,7 +569,8 @@ if (draft?.ok) console.log(draft.value);
 
 `meta.effect` is `draft` for the mail-draft operations, `transient-upload` for
 the PDF conversions, `mail-state` for the mail state changes, `task-write` for
-the To Do changes that delete nothing, and `delete` for the commands that delete
+the To Do and Planner changes that delete nothing, `calendar-draft` for the
+calendar drafts that delete nothing, and `delete` for the commands that delete
 or move an item.
 
 ## Your own token
