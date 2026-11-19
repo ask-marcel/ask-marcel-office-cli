@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { ItemIds, PlannedChange } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
+import type { GraphReads, ItemIds, PlannedChange } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { draftTextOf } from '../../domain/calendar-draft-body.ts';
+import type { GraphId } from '../../domain/graph-id.ts';
 import { isGraphId } from '../../domain/graph-id.ts';
 import type { TodoOp } from './todo-batch.ts';
 import { outcomeOf } from './todo-batch.ts';
 import type { CalendarDraft } from './calendar-draft-reader.ts';
-import { DRAFT_MARK, eventPath, sameDraft } from './calendar-draft-reader.ts';
+import { DRAFT_MARK, eventPath, readDraft, sameDraft } from './calendar-draft-reader.ts';
 import { unreadable } from './todo-reader.ts';
 
 /*
@@ -59,6 +60,17 @@ export const comparedOf = (fields: Readonly<Record<string, unknown>>, keys: Read
 /** The keys of the written fields that an undo check compares. */
 export const comparedKeys = (fields: Readonly<Record<string, unknown>>): ReadonlyArray<string> => Object.keys(fields).filter((key) => !NOT_COMPARED.has(key));
 
+/**
+ * The values that the undo check will compare, read back after the write:
+ * the answer of a write gives the times in the zone of the request, and a
+ * read in UTC. When the read fails, the answer is the best value, and the
+ * undo then says `changed` rather than undo a wrong event.
+ */
+const settled = async (reads: GraphReads, id: GraphId, answer: Readonly<Record<string, unknown>>, fields: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>> => {
+  const now = await readDraft(reads, id);
+  return comparedOf(now.ok ? now.value.fields : answer, comparedKeys(fields));
+};
+
 /** The ids and the times of an event, for `before` and `after`. */
 export const draftIds = (id: string, fields: Readonly<Record<string, unknown>>): ItemIds => ({
   eventId: id,
@@ -77,7 +89,7 @@ export const createDraftOp = (fields: Readonly<Record<string, unknown>>, text: s
       if (!created.ok) return outcomeOf(created);
       const event = answerSchema.safeParse(created.value);
       if (!event.success || !isGraphId(event.data.id)) return outcomeOf(err(unreadable('the event it created')));
-      const set = comparedOf(event.data, comparedKeys(fields));
+      const set = await settled(graph, event.data.id, event.data, fields);
       return outcomeOf(ok({ ...change, after: draftIds(event.data.id, event.data), undo: { kind: 'delete-created-calendar-draft', data: { eventId: event.data.id, set, text } } }));
     },
   };
@@ -94,7 +106,7 @@ export const updateDraftOp = (draft: CalendarDraft, fields: Readonly<Record<stri
       if (!written.ok) return outcomeOf(written);
       const event = answerSchema.safeParse(written.value);
       if (!event.success) return outcomeOf(err(unreadable('the event it changed')));
-      const set = comparedOf(event.data, comparedKeys(fields));
+      const set = await settled(graph, draft.id, event.data, fields);
       const data = { eventId: draft.id, before, set, ...(text === undefined ? {} : { text }) };
       return outcomeOf(
         ok({ ...change, after: { ...draftIds(draft.id, event.data), fields: Object.keys(fields).join(', ') }, undo: { kind: 'restore-calendar-draft-fields', data } })

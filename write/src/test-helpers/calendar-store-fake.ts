@@ -9,7 +9,8 @@ import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.t
  * calendar draft commands. It answers `GET /me/mailboxSettings/timeZone` and
  * the requests on `/me/events`. As Exchange does: a new event gets the id
  * `event-<n>`; each write gives the event a new `lastModifiedDateTime`; Graph
- * adds fields to a location; an online meeting gets a Teams join block at the
+ * adds fields to a location; the answer of a write gives the times in the zone
+ * of the request, and a read in UTC; an online meeting gets a Teams join block at the
  * end of its body, and loses its meeting when a new body has no block; a GET
  * gives the body in text with `Prefer: outlook.body-content-type="text"`, else
  * in HTML, and the extended properties only with `$expand`.
@@ -71,6 +72,15 @@ const keptOf = (body: Record<string, unknown>): Record<string, unknown> => ({
   ...(body['location'] === undefined ? {} : { location: { ...(body['location'] as object), locationType: 'default', uniqueId: 'loc-1' } }),
 });
 
+// The answer of a write gives the times in the zone of the request, as Graph does; a read gives them in UTC.
+const answerOf = (event: Event | undefined, body: Record<string, unknown>): unknown => {
+  const sent = (key: string): Record<string, unknown> => {
+    const time = body[key] as { dateTime?: string; timeZone?: string } | undefined;
+    return time?.dateTime === undefined ? {} : { [key]: { dateTime: `${time.dateTime}.0000000`, timeZone: time.timeZone } };
+  };
+  return { ...structuredClone(event), ...sent('start'), ...sent('end') };
+};
+
 const DEFAULTS = {
   isAllDay: false,
   location: { displayName: '', locationType: 'default' },
@@ -124,7 +134,7 @@ export const createCalendarStoreFake = (seed: ReadonlyArray<Event> = []): Calend
     const event: Event = { ...DEFAULTS, ...keptOf(body), id, lastModifiedDateTime: stamp() };
     const online = body['isOnlineMeeting'] === true;
     events.set(id, online ? { ...event, body: { contentType: 'html', content: teamsBody(textOf(event['body'] as object), id) } } : event);
-    return ok(structuredClone(events.get(id)));
+    return ok(answerOf(events.get(id), body));
   };
 
   const change = (path: string, body: Record<string, unknown>): Result<unknown, GraphError> => {
@@ -133,7 +143,7 @@ export const createCalendarStoreFake = (seed: ReadonlyArray<Event> = []): Calend
     const content = String((body['body'] as { content?: unknown } | undefined)?.content ?? TEAMS_RULE);
     const lost = event['isOnlineMeeting'] === true && !content.includes(TEAMS_RULE) ? { isOnlineMeeting: false } : {};
     events.set(event.id, { ...event, ...keptOf(body), ...lost, lastModifiedDateTime: stamp() });
-    return ok(structuredClone(events.get(event.id)));
+    return ok(answerOf(events.get(event.id), body));
   };
 
   const answer = (method: string, raw: string, run: () => Result<unknown, GraphError>): Result<unknown, GraphError> => {

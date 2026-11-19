@@ -73,6 +73,20 @@ describe('an answer that this CLI cannot read', () => {
   });
 });
 
+describe('a failed read just after a write', () => {
+  it('keeps the change in the run, and its undo says changed rather than delete the event', async () => {
+    const calendar = createCalendarStoreFake();
+    const journal = createRunJournalFake();
+    calendar.failures.set('GET /me/events/event-1', BUSY);
+    expect(await runWrite(calendar.graph, 'create-calendar-draft', MEETING, { journal })).toMatchObject({ done: 1, failed: [] });
+    calendar.failures.clear();
+    expect(statusesOf(await undoWrite(calendar.graph, journal, true))).toEqual([
+      'changed: The item changed after the run, so the undo passes over it. Look at it and reverse it by hand if you still want to.',
+    ]);
+    expect(calendar.events.has('event-1')).toBe(true);
+  });
+});
+
 describe('a failed call in an undo', () => {
   it('marks the undo failed when the read of its check fails', async () => {
     const calendar = createCalendarStoreFake();
