@@ -2,7 +2,7 @@
 
 This page lists the commands of the `ask-marcel-office-write` bin of `@ask-marcel/office-write`.
 
-The 29 commands are in 3 categories. `help-json` lists 33 entries: the 29 commands and the 4 lifecycle commands below.
+The 32 commands are in 3 categories. `help-json` lists 36 entries: the 32 commands and the 4 lifecycle commands below.
 
 `help-json` adds `docs`, `help-json` and `mcp` to the commands. A mail draft is never sent: you send it from Outlook. The read commands are in the `ask-marcel-office-read` bin of `@ask-marcel/office-read`. The sign-in commands are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
 
@@ -74,5 +74,8 @@ The table of each category gives the command name, a summary, the parameters and
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
 | `convert-calendar-event-attachment-to-pdf` | Convert an attachment on an Outlook calendar event to PDF on the fly (shares the mail-attachment pipeline). fileAttachment uploads the bytes to a temp folder under /me/drive, runs Graph `?format=pdf`, then deletes the temp item; referenceAttachment resolves via /shares/{token}/driveItem and converts in place; plain-text and `pdf` sources short-circuit to a raw-bytes envelope (Graph’s `?format=pdf` does not accept `pdf` as an input). image attachments are rejected (Graph rejects image inputs); itemAttachment (embedded mail/event/contact) is unsupported — use convert-calendar-event-attachment-to-markdown. Best for the deck attached to a meeting, where PDF preserves slide layout for a vision-capable LLM. | `--event-id`, `--attachment-id` | `GET /me/events/{event-id}/attachments/{attachment-id}` |
+| `create-calendar-draft` | Create a DRAFT event in your calendar: the subject gets the prefix "[DRAFT] ", and the event has NO attendees, so no invitation is sent. The planned attendees go into the body as text only. --teams true adds a Teams link. You send the invitation yourself from Outlook. | `--subject`, `--start`, `--end`, `--all-day`, `--location`, `--body`, `--body-file`, `--planned-attendees`, `--show-as`, `--categories`, `--reminder`, `--teams` | `POST /me/events` |
+| `delete-calendar-draft` | Delete a DRAFT event that create-calendar-draft made. An event with attendees is refused before any write, so no cancellation is sent. The undo makes the event again from the run journal, with a new id and, for an online meeting, a new Teams link. Over MCP it runs on run-destructive-command. | `--event-id` | `DELETE /me/events/{event-id}` |
+| `update-calendar-draft` | Change the fields of a DRAFT event that create-calendar-draft made: the subject (it keeps the prefix "[DRAFT] "), the times, the location, the body, the planned attendees (as text) and the other options. An event with attendees is refused before any write, so no update or invitation is sent. | `--event-id`, `--subject`, `--start`, `--end`, `--all-day`, `--location`, `--body`, `--body-file`, `--planned-attendees`, `--show-as`, `--categories`, `--reminder` | `PATCH /me/events/{event-id}` |
 
 <!-- AUTO-GENERATED-COMMANDS:END -->

@@ -2,7 +2,7 @@
 
 This guide tells how to use the `ask-marcel-office-write` bin: the draft flow,
 the rules of each draft command, the draft attachments and body files, the
-mail state commands, the To Do commands,
+mail state commands, the To Do commands, the calendar drafts,
 the dry-run and the undo, the PDF conversions, the MCP server, the library and the variables. To install the package, read [README.md](README.md).
 The list of commands is in [COMMANDS.md](COMMANDS.md). The output formats, the
 errors and `--output-path` are the same as in the
@@ -250,9 +250,68 @@ after the plan is in `skipped`, with the reason. A write that Graph refuses is
 in `failed`, and the next ops still run. The changes made stay in the run, so
 the undo can reverse them.
 
+## Calendar drafts
+
+The calendar draft commands make, change and delete a draft of a meeting in
+your default calendar. A calendar draft has NO attendees, so Graph sends no
+invitation, no update and no cancellation. You send the invitation yourself
+from Outlook.
+
+```sh
+ask-marcel-office-write create-calendar-draft --subject "Budget review" --start 2026-11-20T14:00 --end 2026-11-20T15:00 --planned-attendees "a@example.com; b@example.com" --teams true --dry-run
+ask-marcel-office-write create-calendar-draft --subject "Offsite" --start 2026-11-23 --end 2026-11-25 --all-day true --body-file ./agenda.txt
+ask-marcel-office-write update-calendar-draft --event-id "AAMkAD..." --start 2026-11-20T15:00 --end 2026-11-20T16:00
+ask-marcel-office-write update-calendar-draft --event-id "AAMkAD..." --planned-attendees "c@example.com"
+ask-marcel-office-write delete-calendar-draft --event-id "AAMkAD..." --dry-run
+```
+
+1. The subject gets the prefix `[DRAFT] `. A subject that starts with it does
+   not get it a second time.
+2. `--start` and `--end` are `YYYY-MM-DDTHH:mm` in the time zone of the
+   mailbox (not of the computer). With `--all-day true`, they are days
+   (`YYYY-MM-DD`), and the end is the day after the last day. A time that is
+   not a day of the calendar, and an end that is not after the start, are
+   refused before any write.
+3. `--planned-attendees` takes mail addresses separated by `;` or `,`. They go
+   into the body as text only, on a line of their own: "Planned attendees (NOT
+   invited): a@example.com; b@example.com". No option gives the event
+   attendees.
+4. `--teams true` adds a Teams link. Exchange adds the join block to the body a
+   few seconds after the create, and sets the location to the Teams meeting
+   when you give none.
+5. `--body` is plain text. `--body-file <path>` reads it from a UTF-8 file, as
+   for the mail drafts. A new body keeps the planned attendees and the Teams
+   link of before; new planned attendees keep the text of before. An empty
+   `--planned-attendees` removes the line.
+6. `--location`, `--show-as`, `--categories` and `--reminder <minutes>`
+   (`none` turns it off) set the other fields. An empty `--location` or
+   `--categories` removes it.
+
+To send the invitation: open the event in Outlook, copy the addresses of the
+"Planned attendees" line into the attendee field, and select Send. After that,
+the event has attendees, and the CLI refuses to change or delete it.
+
+`update-calendar-draft` and `delete-calendar-draft` read the event first. They
+refuse, before any write:
+
+- an event that `create-calendar-draft` did not make (`not_a_calendar_draft`).
+  Each calendar draft has a hidden mark, an extended property of this CLI that
+  Outlook does not show. The mark stays on the event, so this check does not
+  need the run journal.
+- an event with one attendee or more (`calendar_draft_has_attendees`): a change
+  could send them an update, and a delete a cancellation.
+- an event of which you are not the organizer (`not_calendar_organizer`).
+- a part of a series (`calendar_series`). The CLI makes no series.
+- an event whose subject does not start with `[DRAFT] `
+  (`calendar_draft_prefix_missing`). Remove the prefix in Outlook when the
+  meeting is no longer a draft.
+
+Each run reads the event again just before its write and passes over an event
+that changed or got attendees after the plan.
+
 ## Dry-run and undo
 
-The draft commands, the attachment commands of a draft, the mail state commands and the To Do commands take `--dry-run`, and each run
+The draft commands, the attachment commands of a draft, the mail state commands, the To Do commands and the calendar draft commands take `--dry-run`, and each run
 that is not a dry-run can be undone. The PDF conversions have neither:
 they leave nothing in your tenant.
 
@@ -315,6 +374,15 @@ What the undo does:
 - The undo of `create-todo-list` keeps the list, because no command deletes a
   list: its status is `failed`, with the reason. Delete the list in To Do.
 - The undo of `apply-todo-ops` reverses each change of the run in the same way.
+- The undo of `create-calendar-draft` deletes the event, and the undo of
+  `update-calendar-draft` writes the fields of before back. Each one runs only
+  if the event is still a calendar draft with no attendees, and if the fields
+  and the body text that the run set did not change. A change of the Teams
+  join block, which Exchange makes, does not stop it.
+- The undo of `delete-calendar-draft` makes the event again from the copy in
+  the run journal: Graph gives it a new id (shown in `now`), the mark of this
+  CLI, a plain-text body (the formatting of the body is lost) and, for an
+  online meeting, a new Teams link. The old link does not work any more.
 - An undo that cannot reverse a change passes over it and gives the status
   `changed` (or `missing` when the item is gone).
 - A run that is fully undone cannot be undone again (`run_already_undone`).
@@ -327,7 +395,8 @@ Each change of an undo has a status: `will-undo`, `undone`, `already-undone`,
 The run journal is in `~/.ask-marcel/runs/`, one file for each run. It keeps a
 run 30 days: each write removes the older runs. An older run gives
 `run_expired`, and an unknown run id gives `run_not_found`. The journal holds
-the ids, the subjects and the bodies that an undo writes back, and the bytes of
+the ids, the subjects and the bodies that an undo writes back (a calendar
+draft too), and the bytes of
 a removed To Do attachment or draft attachment, so do not share it.
 
 ## The PDF conversions
@@ -371,7 +440,7 @@ undo { runId }                                                   → shows the u
 undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
-`run-write-command` runs 22 commands: the write commands that do not delete. It
+`run-write-command` runs 24 commands: the write commands that do not delete. It
 has `readOnlyHint: false` and `destructiveHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
@@ -383,13 +452,13 @@ hosts that may write drafts and change the state of your mail.
 `run-destructive-command` runs the commands that delete or move an item:
 `delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
 `move-todo-task` (it deletes the original after the copy), `delete-todo-task-step`,
-`remove-todo-task-attachment` and `apply-todo-ops` (an op can move or delete a
-task). It has `destructiveHint: true`, so a host asks you before it runs it.
+`remove-todo-task-attachment`, `apply-todo-ops` (an op can move or delete a
+task) and `delete-calendar-draft`. It has `destructiveHint: true`, so a host asks you before it runs it.
 Each tool refuses a command of another tool and names the right one.
 
 `undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,
-because it can move a draft to Deleted Items or delete a To Do item or an
-attachment of a draft: a host asks
+because it can move a draft to Deleted Items or delete a To Do item, an
+attachment of a draft or a calendar draft: a host asks
 you before it runs it.
 
 ## Library
@@ -408,7 +477,7 @@ if (draft?.ok) console.log(draft.value);
 
 | Export | What it is |
 |:--|:--|
-| `commands` | Each of the 29 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file` and `--body-file`. |
+| `commands` | Each of the 32 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file` and `--body-file`. |
 | `createWriteGraph(tokens)` | The write graph over a `TokenSource`: the basic token, with `get`, `post`, `patch`, `put` and `delete`. |
 | `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
 | `createWriteClient()` | `createWriteGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
