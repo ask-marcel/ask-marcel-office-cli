@@ -1,17 +1,18 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { LocalFileReader } from '@ask-marcel/office-core/use-cases/commands/read-local-file.ts';
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { PREVIEW_TYPES } from '../../domain/planner-fields.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
-import { checklistBodyOf, checklistOf } from './planner-checklist-ops.ts';
+import { checklistBodyOf, checklistOf, lastHintOf } from './planner-checklist-ops.ts';
 import { patchOp } from './planner-patch.ts';
 import { readDetails } from './planner-task-reader.ts';
 import { PLANNER_RESPONSE, PLANNER_SCOPES, TASK_ID_OPTION } from './planner-texts.ts';
 import { todoPlan } from './todo-batch.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * Changes the details of a task: the plain-text description (Graph v1.0), the
@@ -31,8 +32,6 @@ const schema = z.object({
 });
 
 type Params = z.infer<typeof schema>;
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 const badParams = (p: Params): Result<never, GraphError> | undefined => {
   if (p.description !== undefined && p.notesHtml !== undefined)
@@ -55,7 +54,7 @@ const plan: PlanWrite = async (reads, params, files?: LocalFileReader) => {
   if (bad !== undefined) return bad;
   const details = await readDetails(reads, parsed.value.taskId);
   if (!details.ok) return details;
-  const checklist = await checklistBodyOf(files, parsed.value.checklistFile, checklistOf(details.value));
+  const checklist = await checklistBodyOf(files, parsed.value.checklistFile, checklistOf(details.value), lastHintOf(details.value));
   if (!checklist.ok) return checklist;
   const body = { ...textFieldsOf(parsed.value), ...checklist.value.body };
   if (Object.keys(body).length === 0) return refused('planner_nothing_to_change', 'The checklist of the file is the checklist of the task: there is nothing to change.');

@@ -1,12 +1,15 @@
 import { z } from 'zod';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { CHECKLIST_MAX_ITEMS, CHECKLIST_TITLE_MAX, checklistValue } from '../../domain/planner-checklist.ts';
+import type { ChecklistItem } from '../../domain/planner-checklist.ts';
+import { hintBetween } from '../../domain/planner-fields.ts';
 import { parseParams } from './mail-state-command.ts';
-import { checklistOf, findItem } from './planner-checklist-ops.ts';
+import { checklistOf, findItem, lastHintOf } from './planner-checklist-ops.ts';
 import { patchOp } from './planner-patch.ts';
 import { readDetails } from './planner-task-reader.ts';
 import { todoPlan } from './todo-batch.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * The plans of the three checklist commands: add an item, change the title or
@@ -14,8 +17,6 @@ import { todoPlan } from './todo-batch.ts';
  * task with its ETag. The undo removes an added item, writes a changed item
  * back, and adds a removed item again (with a new id).
  */
-
-const refused = (code: string, message: string): ReturnType<PlanWrite> => Promise.resolve(err({ type: 'validation_error', code, message }));
 
 const title = z.string().trim().min(1).max(CHECKLIST_TITLE_MAX);
 const checked = z.enum(['true', 'false']).optional();
@@ -34,7 +35,8 @@ export const addPlan: PlanWrite = async (reads, params) => {
   if (Object.values(items).some((item) => item.title === parsed.value.title))
     return refused('planner_checklist_item_exists', '--title: the checklist of the task has an item with this title.');
   const key = crypto.randomUUID();
-  const body = { checklist: { [key]: checklistValue({ title: parsed.value.title, isChecked: parsed.value.checked === 'true' }) } };
+  const value = { ...checklistValue({ title: parsed.value.title, isChecked: parsed.value.checked === 'true' }), orderHint: hintBetween(lastHintOf(details.value), undefined) };
+  const body = { checklist: { [key]: value } };
   const before = { taskId: details.value.id, itemId: key, title: parsed.value.title };
   return ok(todoPlan({ ops: [patchOp({ action: 'add-planner-checklist-item', resource: 'details', item: details.value, body, before })] }));
 };
@@ -51,7 +53,7 @@ export const updatePlan: PlanWrite = async (reads, params) => {
   const items = checklistOf(details.value);
   const key = findItem(items, parsed.value.item);
   if (!key.ok) return key;
-  const now = items[key.value] ?? { title: '', isChecked: false };
+  const now = items[key.value] as ChecklistItem;
   const next = { title: parsed.value.title ?? now.title, isChecked: parsed.value.checked === undefined ? now.isChecked : parsed.value.checked === 'true' };
   const before = { taskId: details.value.id, itemId: key.value, title: now.title };
   return ok(
@@ -72,7 +74,7 @@ export const removePlan: PlanWrite = async (reads, params) => {
   const items = checklistOf(details.value);
   const key = findItem(items, parsed.value.item);
   if (!key.ok) return key;
-  const before = { taskId: details.value.id, itemId: key.value, title: items[key.value]?.title ?? '' };
+  const before = { taskId: details.value.id, itemId: key.value, title: (items[key.value] as ChecklistItem).title };
   return ok(
     todoPlan({ ops: [patchOp({ action: 'remove-planner-checklist-item', resource: 'details', item: details.value, body: { checklist: { [key.value]: null } }, before })] })
   );

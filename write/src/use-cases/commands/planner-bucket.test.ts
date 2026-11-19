@@ -113,7 +113,7 @@ describe('update-planner-bucket', () => {
           action: 'update-planner-bucket',
           target: '/planner/buckets/bucket-a',
           before: { bucketId: 'bucket-a', name: 'To do', planId: 'plan-1' },
-          after: { bucketId: 'bucket-a', name: 'To do', planId: 'plan-1', fields: 'name' },
+          after: { bucketId: 'bucket-a', planId: 'plan-1', fields: 'name' },
         },
       ],
     });
