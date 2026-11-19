@@ -38,6 +38,29 @@ export const NOTIFY_OTHERS_OPTION: CommandOptionMeta = {
   argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
 };
 
+export const CHECKLIST_ITEM_OPTION: CommandOptionMeta = {
+  name: 'item',
+  key: 'item',
+  required: true,
+  description: 'The item of the checklist: its id, as get-planner-task-details returns it, or its exact title. It must name exactly one item.',
+  argumentHint: { kind: 'idOrName' },
+};
+
+export const CHECKLIST_OPTION_CHECKED: CommandOptionMeta = {
+  name: 'checked',
+  key: 'checked',
+  required: false,
+  description: '`true` checks the item, `false` unchecks it.',
+  argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+};
+
+export const LINK_URL_OPTION: CommandOptionMeta = {
+  name: 'url',
+  key: 'url',
+  required: true,
+  description: 'The full http or https URL of the link, at most 2048 characters.',
+};
+
 /** The scope of each Planner command. */
 export const PLANNER_SCOPES = ['Tasks.ReadWrite'] as const;
 
