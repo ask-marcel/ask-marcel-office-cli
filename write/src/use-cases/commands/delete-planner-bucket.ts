@@ -10,8 +10,9 @@ import { BUCKET_ID_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-te
 import { todoPlan } from './todo-batch.ts';
 
 /*
- * Deletes a bucket. Planner deletes the tasks of the bucket with it, so the
- * dry-run gives the count of its tasks, and a bucket with tasks has no undo.
+ * Deletes a bucket. The dry-run gives the count of its tasks, and a bucket
+ * with tasks has no undo: Planner can delete the tasks with it, or keep them
+ * with no bucket (live, 2026-11-19), and this CLI cannot put them back.
  * The undo of an empty bucket makes it again (new id) at its place.
  */
 
@@ -33,7 +34,7 @@ const execute = createExecute(plan);
 
 const meta: WriteCommandMeta = {
   summary:
-    'Delete a Planner bucket. Planner deletes the tasks of the bucket with it: the dry-run gives their count, and a bucket with tasks has NO undo. Over MCP it runs on run-destructive-command.',
+    'Delete a Planner bucket. The dry-run gives the count of its tasks, and a bucket with tasks has NO undo: Planner can delete its tasks or keep them with no bucket, so move or delete them first. Over MCP it runs on run-destructive-command.',
   category: 'tasks',
   graphMethod: 'DELETE',
   graphPathTemplate: '/planner/buckets/{bucket-id}',
@@ -42,7 +43,7 @@ const meta: WriteCommandMeta = {
   example: '{write-bin} delete-planner-bucket --bucket-id "hsOf2dhOJkqyYYZEtdzDe2QAIUCR" --dry-run',
   bodyTemplate: 'no body, with If-Match: <ETag of the bucket>',
   effect: 'delete',
-  undo: 'for a bucket with no task: makes the bucket again (new id) between the buckets that were next to it. For a bucket with tasks: none, as Planner deleted its tasks with it',
+  undo: 'for a bucket with no task: makes the bucket again (new id) between the buckets that were next to it. For a bucket with tasks: none (this CLI cannot put a bucket and its tasks back)',
   scopesRequired: [...PLANNER_SCOPES],
   responseShape: PLANNER_RESPONSE,
 };

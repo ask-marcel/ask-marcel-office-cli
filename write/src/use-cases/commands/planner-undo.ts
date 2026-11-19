@@ -86,7 +86,7 @@ const noBucketUndo = (tasks: number): Result<never, GraphError> =>
   err({
     type: 'validation_error',
     code: 'planner_bucket_no_undo',
-    message: `The bucket had ${tasks} task(s) when the run deleted it, and Planner deleted them with it. This CLI cannot make a bucket and its tasks again, so this change has no undo.`,
+    message: `The bucket had ${tasks} task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.`,
   });
 
 const applyBucket = async (graph: WriteGraph, data: z.infer<typeof bucketSchema>): Promise<Result<unknown, GraphError>> => {
