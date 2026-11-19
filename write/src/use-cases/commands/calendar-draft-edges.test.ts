@@ -56,6 +56,39 @@ describe('the subject and the body of a calendar draft', () => {
   });
 });
 
+describe('the Teams join block and the text of the user', () => {
+  it('keeps each word of the text of an event that is not an online meeting', async () => {
+    const text = 'Agenda for the Microsoft Teams meeting of next week\n____________\nNotes';
+    const calendar = createCalendarStoreFake([seededDraft('ev-a', { body: { contentType: 'text', content: `${text}\n\nPlanned attendees (NOT invited): a@example.com` } })]);
+    const journal = createRunJournalFake();
+    await runWrite(calendar.graph, 'update-calendar-draft', { eventId: 'ev-a', plannedAttendees: 'b@example.com' }, { journal });
+    expect(bodyOf(calendar, 'ev-a')).toEqual({ contentType: 'text', content: `${text}\n\nPlanned attendees (NOT invited): b@example.com` });
+    expect(statusesOf(await undoWrite(calendar.graph, journal, false))).toEqual(['will-undo']);
+  });
+
+  it.each([
+    ['the last title with its line of ten underscores', '_'.repeat(10), 'Microsoft Teams meeting<br>Join: x'],
+    ['the last title alone after nine underscores, which stay in the text', '_'.repeat(9), 'Microsoft Teams meeting<br>Join: x'],
+  ])('cuts the block of an online meeting at %s', async (_name, rule, block) => {
+    const own = 'See the Microsoft Teams meeting notes';
+    const html = `<html><body><p>${own}</p><div>${rule}</div><div>${block}</div></body></html>`;
+    const calendar = createCalendarStoreFake([seededDraft('ev-a', online(html))]);
+    await runWrite(calendar.graph, 'update-calendar-draft', { eventId: 'ev-a', plannedAttendees: 'b@example.com' });
+    const kept = rule.length === 10 ? own : `${own}<br>${rule}`;
+    const tail = rule.length === 10 ? `<div>${rule}</div><div>${block}</div></body></html>` : `${block}</div></body></html>`;
+    expect(bodyOf(calendar, 'ev-a')).toEqual({ contentType: 'html', content: `<html><body><p>${kept}<br><br>Planned attendees (NOT invited): b@example.com</p>${tail}` });
+  });
+});
+
+describe('an online meeting with no text of the user', () => {
+  it('gets the planned attendees before its whole Teams block', async () => {
+    const block = `<div>${'_'.repeat(10)}</div><div>Microsoft Teams meeting<br>Join: x</div></body></html>`;
+    const calendar = createCalendarStoreFake([seededDraft('ev-a', online(`<html><body>${block}`))]);
+    await runWrite(calendar.graph, 'update-calendar-draft', { eventId: 'ev-a', plannedAttendees: 'b@example.com' });
+    expect(bodyOf(calendar, 'ev-a')).toEqual({ contentType: 'html', content: `<html><body><p>Planned attendees (NOT invited): b@example.com</p>${block}` });
+  });
+});
+
 describe('the times of a calendar draft at their limits', () => {
   it('refuses a new start at the end of the event, and an all-day change with the end alone', async () => {
     const calendar = createCalendarStoreFake([seededDraft('ev-a')]);
@@ -110,8 +143,27 @@ describe('the undo of the calendar drafts at their edges', () => {
     const calendar = createCalendarStoreFake();
     const journal = createRunJournalFake();
     await runWrite(calendar.graph, 'create-calendar-draft', { ...MEETING, teams: 'true', body: 'Agenda' }, { journal });
-    calendar.edit('event-1', { ...online('<html><body><p>Agenda</p>Microsoft Teams meeting<br>Join: y</body></html>'), isOnlineMeeting: false, onlineMeetingProvider: 'unknown' });
+    calendar.edit('event-1', { ...online('<html><body><p>Agenda</p>Microsoft Teams meeting<br>Join: y</body></html>'), onlineMeetingProvider: 'unknown' });
     expect(statusesOf(await undoWrite(calendar.graph, journal, true))).toEqual(['undone']);
+  });
+
+  it('keeps an online meeting whose Teams link was turned off after the run', async () => {
+    const calendar = createCalendarStoreFake();
+    const journal = createRunJournalFake();
+    await runWrite(calendar.graph, 'create-calendar-draft', { ...MEETING, teams: 'true', body: 'Agenda' }, { journal });
+    calendar.edit('event-1', { isOnlineMeeting: false });
+    expect(statusesOf(await undoWrite(calendar.graph, journal, true))).toEqual([
+      'changed: The item changed after the run, so the undo passes over it. Look at it and reverse it by hand if you still want to.',
+    ]);
+  });
+
+  it('keeps the whole text of a deleted event that is not an online meeting', async () => {
+    const content = 'Agenda for the Microsoft Teams meeting of next week\n____________\nNotes';
+    const calendar = createCalendarStoreFake([seededDraft('ev-a', { body: { contentType: 'text', content } })]);
+    const journal = createRunJournalFake();
+    await runWrite(calendar.graph, 'delete-calendar-draft', { eventId: 'ev-a' }, { journal });
+    await undoWrite(calendar.graph, journal, true);
+    expect(calendar.events.get('event-1')?.['body']).toEqual({ contentType: 'text', content });
   });
 
   it('makes a deleted event again with each of its fields, a trimmed text and an empty location', async () => {

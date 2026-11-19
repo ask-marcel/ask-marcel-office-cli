@@ -33,8 +33,8 @@ export const DRAFT_FIELDS: ReadonlySet<string> = new Set([
   'onlineMeetingProvider',
 ]);
 
-// The fields that Exchange changes on its own after a write (the Teams join block in the body), so no undo check compares them.
-const NOT_COMPARED: ReadonlySet<string> = new Set(['body', 'isOnlineMeeting', 'onlineMeetingProvider']);
+// The fields that Exchange changes on its own after a write (the Teams join block in the body, the provider of the link), so no undo check compares them.
+const NOT_COMPARED: ReadonlySet<string> = new Set(['body', 'onlineMeetingProvider']);
 
 const timeSchema = z.object({ dateTime: z.string() }).loose();
 const answerSchema = z.object({ id: z.string(), subject: z.string(), start: timeSchema, end: timeSchema }).loose();
@@ -121,7 +121,7 @@ export const copyOf = (draft: CalendarDraft): Record<string, unknown> => {
   return {
     ...Object.fromEntries(kept.map((key) => [key, draft.fields[key]])),
     location: { displayName: comparable('location', draft.fields['location']) },
-    body: { contentType: 'text', content: draftTextOf(draft.bodyText) },
+    body: { contentType: 'text', content: draftTextOf(draft.bodyText, draft.isOnlineMeeting) },
     ...onlineOf(draft),
   };
 };

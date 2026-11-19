@@ -30,7 +30,9 @@ const checkDraft = async (reads: GraphReads, eventId: GraphId, set: Readonly<Rec
   const read = await readDraft(reads, eventId);
   if (!read.ok) return isNotDraft(read.error) ? ok('changed') : notThere(read.error);
   const now = comparedOf(read.value.fields, Object.keys(set));
-  const same = Object.keys(set).every((key) => canonical(now[key]) === canonical(set[key])) && (text === undefined || sameText(draftTextOf(read.value.bodyText), text));
+  const same =
+    Object.keys(set).every((key) => canonical(now[key]) === canonical(set[key])) &&
+    (text === undefined || sameText(draftTextOf(read.value.bodyText, read.value.isOnlineMeeting), text));
   return ok(same ? 'ready' : 'changed');
 };
 
