@@ -5,12 +5,15 @@ import { err } from './result.ts';
 /*
  * The no-send check of the write graph (product rule: no command sends mail).
  * A POST to one of these Graph actions sends mail at once, and a JSON batch
- * can carry such a POST in its body. The actions that make a draft
- * (`createReply`, `createReplyAll`, `createForward`) are not on the list.
+ * can carry such a POST in its body. A calendar event sends mail too: `cancel`
+ * sends a cancellation to its attendees, `accept`, `decline` and
+ * `tentativelyAccept` an answer to its organizer, and `forward` the
+ * invitation. The actions that make a draft (`createReply`,
+ * `createReplyAll`, `createForward`) are not on the list.
  */
 
 // The last path segment of each sending action, in lower case.
-const SENDING_ACTIONS: ReadonlySet<string> = new Set(['send', 'sendmail', 'reply', 'replyall', 'forward', '$batch']);
+const SENDING_ACTIONS: ReadonlySet<string> = new Set(['send', 'sendmail', 'reply', 'replyall', 'forward', '$batch', 'cancel', 'accept', 'decline', 'tentativelyaccept']);
 
 // The path as the request sends it. The URL parser resolves dot segments
 // (`x/..`, `%2e%2e`) and drops the query, as fetch does with the Graph root in
