@@ -183,14 +183,14 @@ describe('delete-planner-bucket', () => {
 
   it('says on the dry-run that a bucket with tasks has no undo, and the undo refuses it', async () => {
     const planner = createPlannerStoreFake();
-    const note = 'none: Planner deletes the 1 task(s) of the bucket with it, and this CLI cannot make them again';
+    const note = 'none: the bucket has 1 task(s). Planner can delete them with it or keep them with no bucket, and this CLI cannot put them back: move or delete them first';
     const dry = await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' }, { dryRun: true });
     expect(dry).toMatchObject({ changes: [{ before: { bucketId: 'bucket-a', name: 'To do', planId: 'plan-1', tasks: '1', undo: note } }] });
     const journal = createRunJournalFake();
     await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' }, { journal });
     expect(planner.items.has('/planner/tasks/task-1')).toBe(false);
     expect(statusesOf(await undoWrite(planner.graph, journal, true))).toEqual([
-      'failed: The bucket had 1 task(s) when the run deleted it, and Planner deleted them with it. This CLI cannot make a bucket and its tasks again, so this change has no undo.',
+      'failed: The bucket had 1 task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.',
     ]);
   });
 

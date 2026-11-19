@@ -12,13 +12,14 @@ import { deletePlanner, sameItem } from './planner-patch.ts';
 /*
  * The delete of a Planner bucket or task. Just before the write the op reads
  * the item again and passes over one that changed; a bucket that got or lost
- * a task is passed over too, as its undo depends on it. Planner deletes the
- * tasks of a bucket with it, so a bucket with tasks has no undo: the plan
- * says so before the run.
+ * a task is passed over too, as its undo depends on it. A bucket with tasks
+ * has no undo (Planner can delete the tasks or keep them with no bucket, and
+ * this CLI cannot put them back): the plan says so before the run.
  */
 
 /** The words that the dry-run and the answer give to a bucket that has tasks. */
-export const noBucketUndoNote = (tasks: number): string => `none: Planner deletes the ${tasks} task(s) of the bucket with it, and this CLI cannot make them again`;
+export const noBucketUndoNote = (tasks: number): string =>
+  `none: the bucket has ${tasks} task(s). Planner can delete them with it or keep them with no bucket, and this CLI cannot put them back: move or delete them first`;
 
 // Both the bucket and the count of its tasks are as the plan read them.
 const sameBucket = async (reads: GraphReads, bucket: PlannerItem, tasks: number): Promise<Result<boolean, GraphError>> => {

@@ -119,7 +119,8 @@ describe('the edges of the Planner commands', () => {
     const refusal: Result<never, GraphError> = err({
       type: 'validation_error',
       code: 'planner_bucket_no_undo',
-      message: 'The bucket had 2 task(s) when the run deleted it, and Planner deleted them with it. This CLI cannot make a bucket and its tasks again, so this change has no undo.',
+      message:
+        'The bucket had 2 task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.',
     });
     expect(await handler?.check(planner.graph, { bucketId: 'bucket-a', tasks: 2 })).toEqual(refusal);
     expect(await handler?.apply(planner.graph, { bucketId: 'bucket-a', tasks: 2 })).toEqual(refusal);
