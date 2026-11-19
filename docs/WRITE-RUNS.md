@@ -171,6 +171,9 @@ Graph limits that the calendar drafts meet:
   nor a field that the run did not set.
 - A body with no Teams block makes Exchange remove the Teams meeting, so a new
   body of an online meeting keeps the block of before (HTML).
+- Only an online meeting has a Teams block: the last "Microsoft Teams meeting"
+  title, with the line of underscores just before it. The text of another
+  event stays whole, whatever words it holds.
 - A deleted event cannot come back with its id or its Teams link. The undo
   makes a new event with a new id and, for an online meeting, a new Teams link:
   the old link does not work any more. The body comes back as plain text (the

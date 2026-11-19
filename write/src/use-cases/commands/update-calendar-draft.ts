@@ -36,7 +36,7 @@ const bodyChange = async (reads: GraphReads, draft: CalendarDraft, params: Draft
   if (params.body === undefined && planned === undefined) return ok(undefined);
   const html = await readHtmlBody(reads, draft.id);
   if (!html.ok) return html;
-  const text = draftBodyText(params.body ?? ownTextOf(draft.bodyText), planned ?? plannedInBody(draft.bodyText));
+  const text = draftBodyText(params.body ?? ownTextOf(draft.bodyText, draft.isOnlineMeeting), planned ?? plannedInBody(draft.bodyText, draft.isOnlineMeeting));
   const block = draft.isOnlineMeeting ? teamsBlockOf(html.value) : '';
   const field = block === '' ? { contentType: 'text', content: text } : { contentType: 'html', content: htmlBodyWith(text, block) };
   return ok({ field: { body: field }, before: { body: { contentType: 'html', content: html.value } }, text });
