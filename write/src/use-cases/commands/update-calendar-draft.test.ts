@@ -36,8 +36,8 @@ describe('update-calendar-draft', () => {
         after: { ...BEFORE, subject: '[DRAFT] Budget review 2', start: '2026-11-20T15:00:00.0000000', end: '2026-11-20T16:00:00.0000000', fields: 'subject, start, end' },
       },
     ]);
-    expect(calendar.calls).toEqual(['GET /me/mailboxSettings/timeZone', 'GET /me/events/ev-a', 'GET /me/events/ev-a', 'PATCH /me/events/ev-a']);
-    expect(calendar.prefers.slice(1)).toEqual([`outlook.timezone="${CALENDAR_ZONE}", outlook.body-content-type="text"`, 'outlook.body-content-type="text"']);
+    expect(calendar.calls).toEqual(['GET /me/mailboxSettings/timeZone', 'GET /me/events/ev-a', 'GET /me/events/ev-a', 'PATCH /me/events/ev-a', 'GET /me/events/ev-a']);
+    expect(calendar.prefers.slice(1, 3)).toEqual([`outlook.timezone="${CALENDAR_ZONE}", outlook.body-content-type="text"`, 'outlook.body-content-type="text"']);
     expect(statusesOf(await undoWrite(calendar.graph, journal, true))).toEqual(['undone']);
     expect(calendar.events.get('ev-a')).toMatchObject({ subject: '[DRAFT] Budget review', start: { dateTime: '2026-11-20T14:00:00.0000000' } });
   });

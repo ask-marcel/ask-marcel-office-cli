@@ -23,7 +23,7 @@ describe('create-calendar-draft', () => {
     const params = { ...MEETING, plannedAttendees: 'a@example.com, b@example.com;', body: '  Agenda: the figures  ', location: 'Room 3' };
     const run = await runWrite(calendar.graph, 'create-calendar-draft', params, { journal });
     expect(run).toMatchObject({ done: 1, skipped: [], failed: [], runId: RUN_ID });
-    expect(calendar.calls).toEqual(['GET /me/mailboxSettings/timeZone', 'POST /me/events']);
+    expect(calendar.calls).toEqual(['GET /me/mailboxSettings/timeZone', 'POST /me/events', 'GET /me/events/event-1']);
     const event = calendar.events.get('event-1');
     expect(event).toMatchObject({
       subject: '[DRAFT] Budget review',
