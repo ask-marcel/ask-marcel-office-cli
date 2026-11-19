@@ -57,7 +57,7 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write delete-calendar-draft` | Deletes a calendar draft that this CLI made. |
 | `ask-marcel-office-write create-planner-bucket` | Adds a bucket to a Planner plan. |
 | `ask-marcel-office-write update-planner-bucket` | Renames a bucket, or moves it in its plan. |
-| `ask-marcel-office-write delete-planner-bucket` | Deletes a bucket and, with it, its tasks. |
+| `ask-marcel-office-write delete-planner-bucket` | Deletes a bucket (move or delete its tasks first). |
 | `ask-marcel-office-write create-planner-task` | Creates a Planner task in a bucket. |
 | `ask-marcel-office-write update-planner-task` | Changes the fields, labels, bucket and people of a task. |
 | `ask-marcel-office-write delete-planner-task` | Deletes a Planner task. |
@@ -99,7 +99,7 @@ the run journal with a new id. A new calendar draft is deleted, an updated one
 gets its old fields back, and a deleted one comes back with a new id (and a new
 Teams link). A Planner change gets its old values back, a new bucket or task is
 deleted, and a deleted task comes back with a new id. A deleted bucket with
-tasks has no undo: Planner deletes its tasks with it.
+tasks has no undo.
 The undo passes over an item that changed after the run. No command deletes a
 To Do list, so the undo of `create-todo-list` keeps the list. The run journal is in `~/.ask-marcel/runs/` and
 keeps a run 30 days. The details are in
