@@ -89,7 +89,8 @@ const meta: WriteCommandMeta = {
     },
   ],
   example: '{write-bin} update-planner-bucket --bucket-id "hsOf2dhOJkqyYYZEtdzDe2QAIUCR" --name "Waiting" --after "To do" --dry-run',
-  bodyTemplate: "{ name?: '{name}', orderHint?: '<hint of the bucket before> <hint of the bucket after>!' } with If-Match: <ETag of the bucket>",
+  bodyTemplate:
+    "{ name?: '{name}', orderHint?: '<hint of {after}> <hint of the bucket after it>!', or ' <hint of the first bucket>!' with {first} true } with If-Match: <ETag of the bucket>",
   effect: 'task-write',
   undo: 'writes the name back and puts the bucket back between the buckets that were next to it, only if the name and the order hint that the run set did not change',
   scopesRequired: [...PLANNER_SCOPES],
