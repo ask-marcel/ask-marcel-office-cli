@@ -137,8 +137,10 @@ type WriteOptions = { readonly ifMatch?: string };
  * A PATCH can also ask for Graph beta (`api: 'beta'`). Only the paths on the
  * beta allow-list may (domain/beta-patch.ts: the details of a Planner task, for
  * the HTML `notes`); any other path asked for beta is refused before any request.
+ * `representation: true` sends `Prefer: return=representation`: Planner then
+ * answers the item as it keeps it after the change, with its new ETag.
  */
-type PatchOptions = WriteOptions & { readonly api?: 'beta' };
+type PatchOptions = WriteOptions & { readonly api?: 'beta'; readonly representation?: boolean };
 
 type WriteGraph = {
   get: (path: string, extraHeaders?: Record<string, string>) => Promise<Result<unknown, GraphError>>;
