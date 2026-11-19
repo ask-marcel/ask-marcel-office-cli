@@ -163,7 +163,7 @@ const CLAIMS: ReadonlyArray<Claim> = [
     role: 'write',
     file: DOCS.readme,
     label: 'write commands by effect',
-    pattern: /the (\d+) write commands: (\d+) mail-draft operations, (\d+) PDF conversions, (\d+) mail state changes, (\d+) To Do changes, (\d+) calendar draft changes and (\d+) deletes/,
+    pattern: /the (\d+) write commands: (\d+) mail-draft operations, (\d+) PDF conversions, (\d+) mail state changes, (\d+) To Do and Planner changes, (\d+) calendar draft changes and (\d+) deletes/,
     expected: [write, draft, transientUpload, mailState, taskWrite, calendarDraft, deletes],
   },
   { role: 'write', file: DOCS.usage, label: 'write command count', pattern: /\b[Tt]he (\d+) write commands\b/, expected: [write] },
