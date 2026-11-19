@@ -47,6 +47,45 @@ describe('the edges of the Planner commands', () => {
     expect(planner.items.get('/planner/buckets/bucket-a')).toMatchObject({ name: 'Backlog' });
   });
 
+  it('gives planner_item_changed for a 409 of Planner too, which a PATCH with an old ETag got live', async () => {
+    const planner = createPlannerStoreFake();
+    planner.failures.set('PATCH /planner/buckets/bucket-a', { type: 'api_error', status: 409, message: 'The attempted changes conflicted with already accepted changes.' });
+    expect(await runWrite(planner.graph, 'update-planner-bucket', { bucketId: 'bucket-a', name: 'Backlog' })).toMatchObject({
+      error: {
+        code: 'planner_item_changed',
+        message:
+          'Planner refused the change: the item changed after this command read it (its ETag is not the same). Nothing changed. Run the command again to read the item as it is now.',
+      },
+    });
+  });
+
+  it('puts new checklist items after the last item, in the order of the file', async () => {
+    const planner = createPlannerStoreFake();
+    const files = createLocalBytesFake({ 'steps.txt': utf8Bytes('One\n[x] Draft\nTwo\nSend') });
+    await runWrite(planner.graph, 'update-planner-task-details', { taskId: 'task-1', checklistFile: 'steps.txt' }, { files });
+    const hints = Object.values(planner.items.get('/planner/tasks/task-1/details')?.['checklist'] as Record<string, { title: string; orderHint: string }>).map((item) => [
+      item.title,
+      item.orderHint,
+    ]);
+    expect(hints.toSorted((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([
+      ['Draft', '2'],
+      ['One', '2 !'],
+      ['Send', '1'],
+      ['Two', '2 ! !'],
+    ]);
+    await runWrite(planner.graph, 'add-planner-checklist-item', { taskId: 'task-1', title: 'Three' });
+    const added = Object.values(planner.items.get('/planner/tasks/task-1/details')?.['checklist'] as Record<string, { title: string; orderHint: string }>).find(
+      (item) => item.title === 'Three'
+    );
+    expect(added?.orderHint).toBe('2 ! ! !');
+  });
+
+  it('gives the ids of the item and the fields of the change after an update, not the values of before', async () => {
+    const planner = createPlannerStoreFake();
+    const run = await runWrite(planner.graph, 'update-planner-task', { taskId: 'task-1', title: 'Report' });
+    expect((run['changes'] as ReadonlyArray<{ after: unknown }>)[0]?.after).toEqual({ taskId: 'task-1', planId: 'plan-1', fields: 'title' });
+  });
+
   it('refuses a bucket name of two buckets and asks for the id', async () => {
     const planner = createPlannerStoreFake();
     planner.edit('/planner/buckets/bucket-b', { name: 'TO DO' });
