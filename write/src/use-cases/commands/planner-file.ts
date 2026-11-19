@@ -77,7 +77,7 @@ const TYPES: Readonly<Record<string, string>> = { doc: 'Word', docx: 'Word', xls
 
 const typeOf = (name: string): string => TYPES[name.slice(name.lastIndexOf('.') + 1).toLowerCase()] ?? 'Other';
 
-const uploadedSchema = z.object({ id: z.string(), webUrl: z.string().url(), cTag: z.string().optional() }).loose();
+const uploadedSchema = z.object({ id: z.string(), webUrl: z.url(), cTag: z.string().optional() }).loose();
 
 /** The file to put and the details of the task to link it from. */
 export type FileSpec = {

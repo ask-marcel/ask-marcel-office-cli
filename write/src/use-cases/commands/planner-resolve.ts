@@ -53,7 +53,7 @@ export const resolveBucket = async (reads: GraphReads, planId: GraphId, spec: st
   if (named.length > 1)
     return refused('planner_bucket_ambiguous', `${what}: ${named.length} buckets of the plan have this name. Give the id of the bucket, as list-plan-buckets returns it.`);
   return named.length === 1
-    ? ok(named[0] as PlannerBucket)
+    ? ok(named[0])
     : refused('planner_bucket_not_found', `${what}: the plan has no bucket with this name or id. list-plan-buckets gives the name and the id of each bucket.`);
 };
 
