@@ -118,7 +118,7 @@ const refuseUpdate = ({ subject, bodyContent, comment, bodyContentType, toRecipi
     return {
       type: 'validation_error',
       message:
-        'At least one field must be provided to update (--subject, --body-content, --comment, --to-recipients, --cc-recipients, --bcc-recipients, or --importance). Pass an empty string to a recipient flag to clear that list.',
+        'At least one field must be provided to update (--subject, --body-content, --body-file, --comment, --to-recipients, --cc-recipients, --bcc-recipients, or --importance). Pass an empty string to a recipient flag to clear that list.',
     };
   }
 
