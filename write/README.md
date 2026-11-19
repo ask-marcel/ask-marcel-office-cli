@@ -1,8 +1,8 @@
 # @ask-marcel/office-write
 
-`@ask-marcel/office-write` holds the 32 write commands: 5 mail-draft operations,
-3 PDF conversions, 5 mail state changes, 9 To Do changes, 2 calendar draft
-changes and 8 deletes. These Microsoft Graph commands change the state of your
+`@ask-marcel/office-write` holds the 46 write commands: 5 mail-draft operations,
+3 PDF conversions, 5 mail state changes, 21 To Do and Planner changes, 2
+calendar draft changes and 10 deletes. These Microsoft Graph commands change the state of your
 tenant. Its bin is `ask-marcel-office-write`. It sends no mail and no meeting
 invitation: a draft stays unsent until you send it from Outlook, and a calendar
 draft has no attendees.
@@ -55,13 +55,27 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write create-calendar-draft` | Creates a DRAFT event with no attendees: the planned attendees go into the body as text. |
 | `ask-marcel-office-write update-calendar-draft` | Changes the fields of a calendar draft that this CLI made. |
 | `ask-marcel-office-write delete-calendar-draft` | Deletes a calendar draft that this CLI made. |
+| `ask-marcel-office-write create-planner-bucket` | Adds a bucket to a Planner plan. |
+| `ask-marcel-office-write update-planner-bucket` | Renames a bucket, or moves it in its plan. |
+| `ask-marcel-office-write delete-planner-bucket` | Deletes a bucket and, with it, its tasks. |
+| `ask-marcel-office-write create-planner-task` | Creates a Planner task in a bucket. |
+| `ask-marcel-office-write update-planner-task` | Changes the fields, labels, bucket and people of a task. |
+| `ask-marcel-office-write delete-planner-task` | Deletes a Planner task. |
+| `ask-marcel-office-write update-planner-task-details` | Changes the description, the HTML notes, the preview or the checklist of a task. |
+| `ask-marcel-office-write add-planner-checklist-item` | Adds an item to the checklist of a task. |
+| `ask-marcel-office-write update-planner-checklist-item` | Changes the title or the check mark of an item. |
+| `ask-marcel-office-write remove-planner-checklist-item` | Removes an item of the checklist. |
+| `ask-marcel-office-write add-planner-task-file` | Puts a local file in your OneDrive and links it to a task. |
+| `ask-marcel-office-write add-planner-task-link` | Adds a link to a task. |
+| `ask-marcel-office-write remove-planner-task-link` | Removes a link or a file reference of a task. |
+| `ask-marcel-office-write update-planner-plan` | Renames a plan and its labels. |
 | `ask-marcel-office-write undo <runId> [--apply]` | Shows the undo of a write run, or does it with `--apply`. |
 | `ask-marcel-office-write mcp` | Serves the MCP server over stdio (see below). |
 | `ask-marcel-office-write docs <command>` | Prints the Markdown page of one command. |
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 36 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
+`help-json` lists 50 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
@@ -74,7 +88,7 @@ they refuse a sent or received message and a draft in the Outbox. The details
 are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#draft-attachments-and-body-files).
 
-Each draft, attachment, mail state, To Do and calendar draft command takes `--dry-run`: it shows the
+Each draft, attachment, mail state, To Do, calendar draft and Planner command takes `--dry-run`: it shows the
 changes and makes none. A run that is not a dry-run gives a `runId`, and
 `undo <runId> --apply` reverses it: a new draft goes to Deleted Items, an update
 gets its old fields back, a moved message goes back to its folder, a read
@@ -83,7 +97,9 @@ deleted, and a deleted To Do task, step or attachment comes back with a new id.
 An attachment added to a draft is removed, and a removed one comes back from
 the run journal with a new id. A new calendar draft is deleted, an updated one
 gets its old fields back, and a deleted one comes back with a new id (and a new
-Teams link).
+Teams link). A Planner change gets its old values back, a new bucket or task is
+deleted, and a deleted task comes back with a new id. A deleted bucket with
+tasks has no undo: Planner deletes its tasks with it.
 The undo passes over an item that changed after the run. No command deletes a
 To Do list, so the undo of `create-todo-list` keeps the list. The run journal is in `~/.ask-marcel/runs/` and
 keeps a run 30 days. The details are in
@@ -96,8 +112,18 @@ mail state commands are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#mail-state),
 the To Do commands in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#to-do),
-and the calendar drafts in
-[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#calendar-drafts).
+the calendar drafts in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#calendar-drafts),
+and the Planner commands in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#planner).
+
+The Planner commands send each change with the ETag of the item that they
+read (`If-Match`), so Planner refuses a change of an item that changed in
+between: run the command again. An assignment to another person than you needs
+`--notify-others true`, as Planner notifies that person. The HTML notes of
+`update-planner-task-details --notes-html` go to Graph beta, the one beta path of
+this CLI. `add-planner-task-file` works only on a plan that is not of a group.
+No command creates a plan or writes a comment.
 
 `update-calendar-draft` and `delete-calendar-draft` change only an event that
 `create-calendar-draft` made (it has a hidden mark of this CLI), that has no
@@ -162,7 +188,8 @@ The server has six tools: `list-commands`, `get-command-docs`,
 `run-destructive-command` runs the commands that delete or move an item
 (`delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
 `move-todo-task`, `delete-todo-task-step`, `remove-todo-task-attachment`,
-`apply-todo-ops`), takes
+`apply-todo-ops`, `delete-calendar-draft`, `delete-planner-bucket`,
+`delete-planner-task`), takes
 `dryRun`, and has the destructive mark, so a host asks you first. `undo` shows the undo of a run and
 is read-only. `undo-apply` does it and has the destructive mark too. A read
 command gets a pointer to the read server (`ask-marcel-office-read mcp`). Register
@@ -185,7 +212,7 @@ const draft = await commands['create-mail-draft']?.execute(graph, {
 
 The library exports:
 
-- `commands`: the 32 write commands, each on the write graph alone;
+- `commands`: the 46 write commands, each on the write graph alone;
 - `createWriteGraph(tokens)`: the write graph over a token source;
 - `createEnvThenHelperTokenSource()`: the tier variables of the process, else the
   token helper of `@ask-marcel/office-auth`;
