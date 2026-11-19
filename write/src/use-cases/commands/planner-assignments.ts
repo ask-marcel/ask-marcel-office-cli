@@ -1,10 +1,11 @@
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphReads } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { ASSIGNMENT } from '../../domain/planner-fields.ts';
 import type { PlannerPerson } from './planner-people.ts';
 import { namesOf, readMe, resolvePeople, withoutConsent } from './planner-people.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * The assignments of a create or an update of a task: the PATCH entries of
@@ -19,8 +20,6 @@ export type PeopleParams = { readonly assign?: string; readonly unassign?: strin
 export type AssignmentChange = { readonly entries: Record<string, unknown>; readonly shown: Record<string, string> };
 
 const NONE: AssignmentChange = { entries: {}, shown: {} };
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 const hasId = (people: ReadonlyArray<PlannerPerson>, id: string): boolean => people.some((person) => person.id === id);
 

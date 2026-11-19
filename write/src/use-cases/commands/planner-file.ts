@@ -15,6 +15,7 @@ import type { PlannerItem } from './planner-reader.ts';
 import { patchOp, sameItem } from './planner-patch.ts';
 import { unreadable } from './todo-reader.ts';
 import { createTodoUndoHandler, notThere } from './todo-undo-handler.ts';
+import { refused } from './planner-reader.ts';
 
 /*
  * A file of a Planner task. Planner keeps a file of a task as a reference to
@@ -32,8 +33,6 @@ export const FILE_FOLDER = 'Planner attachments';
 
 /** The largest file that this CLI attaches to a task. */
 export const PLANNER_FILE_MAX_BYTES = 25_000_000;
-
-const refused = (code: string, message: string): Result<never, GraphError> => err({ type: 'validation_error', code, message });
 
 // OneDrive refuses these characters in a name; the name is also encoded before it goes into the path.
 const BAD_NAME = /["*:<>?/\\|]/;
