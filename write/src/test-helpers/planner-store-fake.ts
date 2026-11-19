@@ -25,6 +25,8 @@ export type Item = Record<string, unknown>;
 export type PlannerStoreFake = {
   readonly graph: WriteGraph;
   readonly items: Map<string, Item>;
+  /** The files of the OneDrive of the user, by `/me/drive/items/{id}`. */
+  readonly drive: Map<string, Item>;
   readonly calls: string[];
   readonly failures: Map<string, GraphError>;
   readonly answers: Map<string, unknown>;
@@ -132,9 +134,26 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     return spec === ANN.id || spec === ANN.mail ? ok({ id: ANN.id, displayName: ANN.displayName }) : err(notFound);
   };
 
+  const drive = new Map<string, Item>();
+
+  const file = (path: string): Result<unknown, GraphError> | undefined => {
+    if (!path.startsWith('/me/drive/')) return undefined;
+    const found = drive.get(path) ?? [...drive.values()].find((item) => item['path'] === path);
+    return found === undefined ? err(notFound) : ok(structuredClone(found));
+  };
+
+  const upload = (path: string, bytes: Uint8Array, contentType: string | undefined): Result<unknown, GraphError> => {
+    const id = `drive-${++made}`;
+    const name = decodeURIComponent(path.split('/').at(-1) ?? '');
+    const webUrl = `https://contoso-my.sharepoint.com/personal/robin/Documents/Planner%20attachments/${encodeURIComponent(name)}`;
+    const item = { id, name, path, size: bytes.byteLength, contentType, webUrl, cTag: `"c:{${id}},1"` };
+    drive.set(`/me/drive/items/${id}`, item);
+    return ok(structuredClone(item));
+  };
+
   const getAt = (path: string): Result<unknown, GraphError> => {
     const item = items.get(path);
-    return list(path) ?? user(path) ?? (item === undefined ? err(notFound) : ok(structuredClone(item)));
+    return list(path) ?? user(path) ?? file(path) ?? (item === undefined ? err(notFound) : ok(structuredClone(item)));
   };
 
   const create = (path: string, body: Item): Result<unknown, GraphError> => {
@@ -171,6 +190,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
   };
 
   const remove = (path: string, options: PatchOptions | undefined): Result<unknown, GraphError> => {
+    if (path.startsWith('/me/drive/items/')) return drive.delete(path) ? ok(undefined) : err(notFound);
     const found = checkMatch(path, options);
     if (!found.ok) return found;
     for (const key of [...items.keys()]) if (key === path || key.startsWith(`${path}/`)) items.delete(key);
@@ -197,6 +217,7 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     post: async (path, body) => answer(`POST ${path}`, () => create(path, body as Item)),
     patch: async (path, body, options) => answer(`PATCH ${path}${options?.api === 'beta' ? ' [beta]' : ''}`, () => change(path, body as Item, options)),
     delete: async (path, options) => answer(`DELETE ${path}`, () => remove(path, options)),
+    put: async (path, bytes, contentType) => answer(`PUT ${path}`, () => upload(path, bytes, contentType)),
   });
 
   const edit = (path: string, fields: Item): void => {
@@ -204,5 +225,5 @@ export const createPlannerStoreFake = (seed: Array<[string, Item]> = seedPlanner
     if (item !== undefined) put(path, merged(item, fields));
   };
 
-  return { graph, items, calls, failures, answers, hooks, edit };
+  return { graph, items, drive, calls, failures, answers, hooks, edit };
 };
