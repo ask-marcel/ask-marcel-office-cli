@@ -116,7 +116,7 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
     expect(await cli('undo', RUN_1)).toMatchObject({ ok: false, errorCode: 'run_not_found' });
   });
 
-  it('gives --dry-run to the four draft commands, add-mail-draft-attachment, remove-mail-draft-attachment, the six mail state commands and the 14 To Do commands only', () => {
+  it('gives --dry-run to the four draft commands, add-mail-draft-attachment, remove-mail-draft-attachment, the six mail state commands, the 14 To Do commands and the three calendar draft commands only', () => {
     const program = buildWriteCli({ graph: createMailboxFake().graph, logger: createLoggerFake(), fs: createFileSystemFake() });
     const withDryRun = program.commands.filter((command) => command.options.some((option) => option.long === '--dry-run')).map((command) => command.name());
     expect(withDryRun.toSorted((a, b) => a.localeCompare(b))).toEqual([
@@ -126,11 +126,13 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
       'add-todo-task-step',
       'apply-todo-ops',
       'complete-todo-task',
+      'create-calendar-draft',
       'create-forward-draft',
       'create-mail-draft',
       'create-reply-draft',
       'create-todo-list',
       'create-todo-task',
+      'delete-calendar-draft',
       'delete-mail-draft',
       'delete-todo-task',
       'delete-todo-task-step',
@@ -142,6 +144,7 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
       'remove-todo-task-attachment',
       'set-mail-categories',
       'set-mail-flag',
+      'update-calendar-draft',
       'update-mail-draft',
       'update-todo-list',
       'update-todo-task',

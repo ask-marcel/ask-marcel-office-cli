@@ -21,7 +21,7 @@ const SEED: ReadonlyArray<StoredMessage> = [
 const writes = (calls: ReadonlyArray<string>): ReadonlyArray<string> => calls.filter((call) => !call.startsWith('GET'));
 
 describe('delete-mail-draft', () => {
-  it('is in the destructive class, with remove-mail-draft-attachment and the To Do commands that delete or move', () => {
+  it('is in the destructive class, with remove-mail-draft-attachment, the To Do commands that delete or move, and delete-calendar-draft', () => {
     expect(
       Object.entries(commands)
         .filter(([, command]) => command.meta.effect === 'delete')
@@ -34,6 +34,7 @@ describe('delete-mail-draft', () => {
       'apply-todo-ops',
       'delete-todo-task-step',
       'remove-todo-task-attachment',
+      'delete-calendar-draft',
     ]);
   });
 
