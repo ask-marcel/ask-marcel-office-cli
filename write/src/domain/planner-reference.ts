@@ -32,13 +32,14 @@ export const urlOfReferenceKey = (key: string): string => CODES.toReversed().red
 
 const refused = (message: string): Result<never, GraphError> => err({ type: 'validation_error', code: 'invalid_reference_url', message });
 
-const isWeb = (url: string): boolean => {
+/** Whether `url` is an http or https URL. */
+export const isWebUrl = (url: string): boolean => {
   const parsed = URL.parse(url);
-  return parsed !== null && (parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== '';
+  return parsed !== null && (parsed.protocol === 'https:' || parsed.protocol === 'http:');
 };
 
 /** Checks the URL of a link: an http or https URL of at most 2048 characters. The refusal does not quote the URL. */
 export const parseReferenceUrl = (raw: string, what: string): Result<string, GraphError> => {
   if (raw.length > REFERENCE_URL_MAX) return refused(`${what}: the URL has ${raw.length} characters, above the limit of ${REFERENCE_URL_MAX}.`);
-  return isWeb(raw) ? ok(raw) : refused(`${what}: give a full http or https URL, for example https://example.com/page.`);
+  return isWebUrl(raw) ? ok(raw) : refused(`${what}: give a full http or https URL, for example https://example.com/page.`);
 };

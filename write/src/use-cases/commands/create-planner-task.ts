@@ -4,7 +4,7 @@ import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/command
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
 import { assignmentChangeOf } from './planner-assignments.ts';
-import { createOp } from './planner-create.ts';
+import { createOp, NEW_TASK_COUNTERS } from './planner-create.ts';
 import { resolveBucket, resolveLabels, resolvePlan } from './planner-resolve.ts';
 import { TASK_FIELD_OPTIONS, taskFieldShape, taskFieldsOf } from './planner-task-options.ts';
 import { NOTIFY_OTHERS_OPTION, PLAN_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-texts.ts';
@@ -59,7 +59,7 @@ const plan: PlanWrite = async (reads, params) => {
     ...people.value.shown,
   };
   const after = (id: string): Record<string, string> => ({ taskId: id, title: parsed.value.title, planId, bucketId: bucket.value.id });
-  return ok(todoPlan({ ops: [createOp('task', body, before, after)] }));
+  return ok(todoPlan({ ops: [createOp('task', body, { ...body, ...NEW_TASK_COUNTERS }, before, after)] }));
 };
 
 const execute = createExecute(plan);

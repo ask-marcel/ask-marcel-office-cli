@@ -9,8 +9,8 @@ import type { ChecklistItem } from '../../domain/planner-checklist.ts';
 import type { GraphId } from '../../domain/graph-id.ts';
 import { graphIdSchema, isGraphId } from '../../domain/graph-id.ts';
 import { ASSIGNMENT, byHint, hintBetween, labelsOn } from '../../domain/planner-fields.ts';
-import { parseReferenceUrl, urlOfReferenceKey } from '../../domain/planner-reference.ts';
-import { checklistItemOf, referenceOf, referenceValue } from '../../domain/planner-snapshot.ts';
+import { isWebUrl, urlOfReferenceKey } from '../../domain/planner-reference.ts';
+import { checklistItemOf, recordOf, referenceOf, referenceValue } from '../../domain/planner-snapshot.ts';
 import type { PlannerItem } from './planner-reader.ts';
 import { readPlannerItem } from './planner-reader.ts';
 import { readMe } from './planner-people.ts';
@@ -44,7 +44,7 @@ const taskSchema = z
   })
   .strict();
 
-const referenceKeySchema = z.string().refine((key) => parseReferenceUrl(urlOfReferenceKey(key), 'reference').ok);
+const referenceKeySchema = z.string().refine((key) => isWebUrl(urlOfReferenceKey(key)));
 
 const copySchema = z.object({
   task: taskSchema,
@@ -61,11 +61,11 @@ const copySchema = z.object({
 
 type Copy = z.infer<typeof copySchema>;
 
-const entriesOf = (value: unknown): ReadonlyArray<readonly [string, unknown]> => (value !== null && typeof value === 'object' ? Object.entries(value) : []);
+const entriesOf = (value: unknown): ReadonlyArray<readonly [string, unknown]> => Object.entries(recordOf(value));
 
 const checklistOf = (details: PlannerItem): ReadonlyArray<ChecklistItem> =>
   entriesOf(details.fields['checklist'])
-    .map(([, value]) => ({ item: checklistItemOf(value), hint: String((value as { orderHint?: unknown } | null)?.orderHint ?? '') }))
+    .map(([, value]) => ({ item: checklistItemOf(value), hint: String(recordOf(value)['orderHint'] ?? '') }))
     .filter((entry): entry is { item: ChecklistItem; hint: string } => entry.item !== undefined)
     .toSorted((a, b) => byHint(a.hint, b.hint))
     .map((entry) => entry.item);
@@ -114,12 +114,10 @@ const detailsBody = (details: Copy['details']): Record<string, unknown> => {
     return [crypto.randomUUID(), { ...checklistValue(item), orderHint: hint }] as const;
   });
   return {
-    ...(details.description === '' ? {} : { description: details.description }),
+    description: details.description,
     previewType: details.previewType,
-    ...(checklist.length === 0 ? {} : { checklist: Object.fromEntries(checklist) }),
-    ...(Object.keys(details.references).length === 0
-      ? {}
-      : { references: Object.fromEntries(Object.entries(details.references).map(([key, value]) => [key, referenceValue(value)])) }),
+    checklist: Object.fromEntries(checklist),
+    references: Object.fromEntries(Object.entries(details.references).map(([key, value]) => [key, referenceValue(value)])),
   };
 };
 
@@ -149,7 +147,7 @@ const recreate = async (graph: WriteGraph, copy: Copy): Promise<Result<unknown, 
   if (!me.ok) return me;
   const created = await graph.post('/planner/tasks', { ...copy.task, assignments: assignmentsOf(copy, me.value.id) });
   if (!created.ok) return created;
-  const id = String((created.value as { id?: unknown } | null)?.id ?? '');
+  const id = String(recordOf(created.value)['id'] ?? '');
   if (!isGraphId(id)) return err(unreadable('the Planner task it made again'));
   return ok({ now: { taskId: id, ...(await writeDetails(graph, id, copy.details)) } });
 };

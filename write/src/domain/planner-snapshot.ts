@@ -18,13 +18,14 @@ type Fields = Readonly<Record<string, unknown>>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const mapOf = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
+/** The value as a record, or an empty record when it is not one (null, an array, a string). */
+export const recordOf = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
 
 const textOrNull = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
 /** The title and the state of a checklist item that Graph gives, or undefined. */
 export const checklistItemOf = (value: unknown): ChecklistItem | undefined => {
-  const item = mapOf(value);
+  const item = recordOf(value);
   return typeof item['title'] === 'string' && typeof item['isChecked'] === 'boolean' ? { title: item['title'], isChecked: item['isChecked'] } : undefined;
 };
 
@@ -73,8 +74,8 @@ const valuesOf = (fields: Fields, shape: Fields, pick: (entry: Entry) => (value:
       if (key === 'notes') return ['description', plainOf(fields, 'description')];
       const entry = ENTRIES[key];
       if (entry === undefined) return [key, plainOf(fields, key)];
-      const now = mapOf(fields[key]);
-      return [key, Object.fromEntries(Object.keys(mapOf(shape[key])).map((sub) => [sub, pick(entry)(now[sub])]))];
+      const now = recordOf(fields[key]);
+      return [key, Object.fromEntries(Object.keys(recordOf(shape[key])).map((sub) => [sub, pick(entry)(now[sub])]))];
     })
   );
 
