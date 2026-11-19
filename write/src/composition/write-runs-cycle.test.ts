@@ -116,11 +116,14 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
     expect(await cli('undo', RUN_1)).toMatchObject({ ok: false, errorCode: 'run_not_found' });
   });
 
-  it('gives --dry-run to the four draft commands, add-mail-draft-attachment, remove-mail-draft-attachment, the six mail state commands, the 14 To Do commands and the three calendar draft commands only', () => {
+  it('gives --dry-run to the four draft commands, add-mail-draft-attachment, remove-mail-draft-attachment, the six mail state commands, the 14 To Do commands, the three calendar draft commands and the 14 Planner commands only', () => {
     const program = buildWriteCli({ graph: createMailboxFake().graph, logger: createLoggerFake(), fs: createFileSystemFake() });
     const withDryRun = program.commands.filter((command) => command.options.some((option) => option.long === '--dry-run')).map((command) => command.name());
     expect(withDryRun.toSorted((a, b) => a.localeCompare(b))).toEqual([
       'add-mail-draft-attachment',
+      'add-planner-checklist-item',
+      'add-planner-task-file',
+      'add-planner-task-link',
       'add-todo-linked-resource',
       'add-todo-task-attachment',
       'add-todo-task-step',
@@ -129,11 +132,15 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
       'create-calendar-draft',
       'create-forward-draft',
       'create-mail-draft',
+      'create-planner-bucket',
+      'create-planner-task',
       'create-reply-draft',
       'create-todo-list',
       'create-todo-task',
       'delete-calendar-draft',
       'delete-mail-draft',
+      'delete-planner-bucket',
+      'delete-planner-task',
       'delete-todo-task',
       'delete-todo-task-step',
       'mark-mail-message',
@@ -141,11 +148,18 @@ describe('the cycle of a draft command: dry-run, run, undo', () => {
       'move-mail-thread',
       'move-todo-task',
       'remove-mail-draft-attachment',
+      'remove-planner-checklist-item',
+      'remove-planner-task-link',
       'remove-todo-task-attachment',
       'set-mail-categories',
       'set-mail-flag',
       'update-calendar-draft',
       'update-mail-draft',
+      'update-planner-bucket',
+      'update-planner-checklist-item',
+      'update-planner-plan',
+      'update-planner-task',
+      'update-planner-task-details',
       'update-todo-list',
       'update-todo-task',
       'update-todo-task-step',
