@@ -13,8 +13,8 @@ export const PLANNED_MARK = 'Planned attendees (NOT invited):';
 // The start of the Teams join block in a text or an HTML body: a line of underscores, or its title.
 const TEAMS_START = /_{10,}|Microsoft Teams meeting/;
 
-/** The subject with the prefix `[DRAFT] ` once: a prefix that the user gave is not added again. */
-export const draftSubject = (subject: string): string => `${DRAFT_PREFIX}${subject.trim().replace(/^\[DRAFT\]\s*/i, '')}`;
+/** The subject with the prefix `[DRAFT] ` once: a prefix that the user gave is not added again. The schema trims the subject. */
+export const draftSubject = (subject: string): string => `${DRAFT_PREFIX}${subject.replace(/^\[DRAFT\]\s*/i, '')}`;
 
 /** Whether the subject starts with the prefix that this CLI gives. */
 export const hasDraftPrefix = (subject: string): boolean => subject.startsWith(DRAFT_PREFIX);
@@ -30,20 +30,29 @@ export const plannedOf = (value: string): ReadonlyArray<string> =>
 export const draftBodyText = (text: string, planned: ReadonlyArray<string>): string =>
   [text.trim(), planned.length > 0 ? `${PLANNED_MARK} ${planned.join('; ')}` : ''].filter((part) => part !== '').join('\n\n');
 
+// The text before the index `at`, or all of it when `at` is -1 (not found).
+const before = (text: string, at: number): string => (at === -1 ? text : text.slice(0, at));
+
 /** The text of a body that Graph gave as text, without the Teams join block: the text of the user and the planned attendees. */
-export const draftTextOf = (bodyText: string): string => (bodyText.split(TEAMS_START)[0] ?? '').trim();
+export const draftTextOf = (bodyText: string): string => before(bodyText, bodyText.search(TEAMS_START)).trim();
 
 /** The text of the user in a body that Graph gave as text, without the planned attendees and the Teams join block. */
-export const ownTextOf = (bodyText: string): string => (draftTextOf(bodyText).split(PLANNED_MARK)[0] ?? '').trim();
+export const ownTextOf = (bodyText: string): string => {
+  const text = draftTextOf(bodyText);
+  return before(text, text.indexOf(PLANNED_MARK));
+};
 
 /** The planned attendees on the line of the mark in a body that Graph gave as text. */
 export const plannedInBody = (bodyText: string): ReadonlyArray<string> => {
-  const after = draftTextOf(bodyText).split(PLANNED_MARK)[1];
-  return after === undefined ? [] : plannedOf(after.split(/\r?\n/)[0] ?? '');
+  const text = draftTextOf(bodyText);
+  const at = text.indexOf(PLANNED_MARK);
+  if (at === -1) return [];
+  const line = text.slice(at + PLANNED_MARK.length);
+  return plannedOf(before(line, line.search(/\r?\n/)));
 };
 
-/** The text with each run of white space as one space: Graph can change the line ends of a body. */
-export const sameText = (a: string, b: string): boolean => a.replaceAll(/\s+/g, ' ').trim() === b.replaceAll(/\s+/g, ' ').trim();
+/** Whether two texts are the same when each run of white space is one space: Graph can change the line ends of a body. The texts are trimmed. */
+export const sameText = (a: string, b: string): boolean => a.replaceAll(/\s+/g, ' ') === b.replaceAll(/\s+/g, ' ');
 
 const escapeHtml = (text: string): string => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 

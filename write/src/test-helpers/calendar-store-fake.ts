@@ -28,6 +28,8 @@ export type CalendarStoreFake = {
   readonly events: Map<string, Event>;
   readonly calls: string[];
   readonly prefers: string[];
+  /** The full path of each GET, with its query. */
+  readonly paths: string[];
   readonly failures: Map<string, GraphError>;
   readonly answers: Map<string, unknown>;
   readonly hooks: { afterRead?: (count: number) => void };
@@ -100,6 +102,7 @@ export const createCalendarStoreFake = (seed: ReadonlyArray<Event> = []): Calend
   const events = new Map<string, Event>(seed.map((event) => [event.id, { ...DEFAULTS, ...event }]));
   const calls: string[] = [];
   const prefers: string[] = [];
+  const paths: string[] = [];
   const failures = new Map<string, GraphError>();
   const answers = new Map<string, unknown>();
   const hooks: CalendarStoreFake['hooks'] = {};
@@ -159,6 +162,7 @@ export const createCalendarStoreFake = (seed: ReadonlyArray<Event> = []): Calend
   const graph = fakeWriteGraph({
     get: async (raw, headers) => {
       prefers.push(headers?.['Prefer'] ?? '');
+      paths.push(raw);
       return answer('GET', raw, () => getAt(raw.split('?')[0] ?? '', raw.split('?')[1] ?? '', headers?.['Prefer'] ?? ''));
     },
     post: async (raw, body) => answer('POST', raw, () => create(body as Record<string, unknown>)),
@@ -171,7 +175,7 @@ export const createCalendarStoreFake = (seed: ReadonlyArray<Event> = []): Calend
     if (event !== undefined) events.set(id, { ...event, ...fields, lastModifiedDateTime: stamp() });
   };
 
-  return { graph, events, calls, prefers, failures, answers, hooks, edit };
+  return { graph, events, calls, prefers, paths, failures, answers, hooks, edit };
 };
 
 /** A calendar draft as create-calendar-draft leaves it, for a seed. */

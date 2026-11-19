@@ -7,7 +7,7 @@ import type { GraphReads, PlanWrite, WritePlan } from '@ask-marcel/office-core/u
 import { draftBodyText, htmlBodyWith, ownTextOf, plannedInBody, teamsBlockOf } from '../../domain/calendar-draft-body.ts';
 import { parseGraphId } from '../../domain/graph-id.ts';
 import { CALENDAR_DRAFT_RESPONSE, DRAFT_BODY_FILE, EVENT_ID_OPTION } from './calendar-draft-texts.ts';
-import { dateTimeOf, updateDraftOp } from './calendar-draft-ops.ts';
+import { updateDraftOp } from './calendar-draft-ops.ts';
 import type { DraftParams } from './calendar-draft-options.ts';
 import { DRAFT_FIELD_OPTIONS, draftFieldShape, plainFieldsOf, plannedParam, timeFieldsOf } from './calendar-draft-options.ts';
 import type { CalendarDraft } from './calendar-draft-reader.ts';
@@ -47,7 +47,7 @@ const nothing: GraphError = { type: 'validation_error', code: 'nothing_to_update
 // The time fields of the options, checked with the times and the all-day form of the event.
 const timesOf = (params: DraftParams, draft: CalendarDraft, timeZone: string): Result<Record<string, unknown>, GraphError> => {
   const allDay = params.allDay === undefined ? draft.isAllDay : params.allDay === 'true';
-  return timeFieldsOf(params, allDay, timeZone, { start: dateTimeOf(draft.fields['start']), end: dateTimeOf(draft.fields['end']) });
+  return timeFieldsOf(params, allDay, timeZone, draft);
 };
 
 // The value of each field before the run: a field that Graph did not give is empty; the body is the HTML of before.

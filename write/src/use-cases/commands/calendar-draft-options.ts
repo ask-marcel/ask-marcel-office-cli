@@ -66,25 +66,25 @@ const badTime = (flag: string, allDay: boolean): Result<never, GraphError> =>
   refused('invalid_event_time', `${flag} must be a day of the calendar in the form ${allDay ? DAY_FORM : MINUTE_FORM}, in the time zone of the mailbox.`);
 
 // The time as a minute, to compare: a given day of an all-day event starts at 00:00, and a time not given is the one of the event.
-const minuteOfTime = (value: string | undefined, allDay: boolean, current: string | undefined): string => {
-  if (value === undefined) return minuteOf(current ?? '');
+const minuteOfTime = (value: string | undefined, allDay: boolean, current: string): string => {
+  if (value === undefined) return minuteOf(current);
   return allDay ? `${value}T00:00` : value;
 };
 
-// A change of --all-day on an event changes the form of both times.
-const lacksTimes = (params: DraftParams, current: CurrentTimes | undefined): boolean =>
-  params.allDay !== undefined && current !== undefined && (params.start === undefined || params.end === undefined);
+// A change of --all-day changes the form of both times. A create has both.
+const lacksTimes = (params: DraftParams): boolean => params.allDay !== undefined && (params.start === undefined || params.end === undefined);
 
 const badForm = (params: DraftParams, allDay: boolean): Result<never, GraphError> | undefined => {
   if (params.start !== undefined && !isEventTime(params.start, allDay)) return badTime('--start', allDay);
   return params.end !== undefined && !isEventTime(params.end, allDay) ? badTime('--end', allDay) : undefined;
 };
 
-const endsAfterStart = (params: DraftParams, allDay: boolean, current: CurrentTimes | undefined): boolean =>
-  (params.start === undefined && params.end === undefined) || minuteOfTime(params.end, allDay, current?.end) > minuteOfTime(params.start, allDay, current?.start);
+// An event that a person made of no time in Outlook can still change its other fields.
+const endsAfterStart = (params: DraftParams, allDay: boolean, current: CurrentTimes): boolean =>
+  (params.start === undefined && params.end === undefined) || minuteOfTime(params.end, allDay, current.end) > minuteOfTime(params.start, allDay, current.start);
 
-const checkTimes = (params: DraftParams, allDay: boolean, current: CurrentTimes | undefined): Result<undefined, GraphError> => {
-  if (lacksTimes(params, current)) return refused('calendar_all_day_needs_times', '--all-day changes the form of the times, so give --start and --end with it.');
+const checkTimes = (params: DraftParams, allDay: boolean, current: CurrentTimes): Result<undefined, GraphError> => {
+  if (lacksTimes(params)) return refused('calendar_all_day_needs_times', '--all-day changes the form of the times, so give --start and --end with it.');
   const form = badForm(params, allDay);
   if (form !== undefined) return form;
   if (!endsAfterStart(params, allDay, current))
@@ -92,8 +92,8 @@ const checkTimes = (params: DraftParams, allDay: boolean, current: CurrentTimes 
   return ok(undefined);
 };
 
-/** The Graph fields of the times, after their check; `current` is absent on a create. */
-export const timeFieldsOf = (params: DraftParams, allDay: boolean, timeZone: string, current?: CurrentTimes): Result<Record<string, unknown>, GraphError> => {
+/** The Graph fields of the times, after their check. `current` has the times of the event, or of the params on a create. */
+export const timeFieldsOf = (params: DraftParams, allDay: boolean, timeZone: string, current: CurrentTimes): Result<Record<string, unknown>, GraphError> => {
   const checked = checkTimes(params, allDay, current);
   if (!checked.ok) return checked;
   return ok({
