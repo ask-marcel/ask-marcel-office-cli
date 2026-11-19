@@ -20,6 +20,10 @@ import * as updateTodoList from './update-todo-list.ts';
 import * as updateTodoTask from './update-todo-task.ts';
 import * as updateTodoTaskStep from './update-todo-task-step.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
+import * as createCalendarDraft from './create-calendar-draft.ts';
+import * as deleteCalendarDraft from './delete-calendar-draft.ts';
+import * as updateCalendarDraft from './update-calendar-draft.ts';
+import { CALENDAR_UNDO_HANDLERS } from './calendar-draft-undo.ts';
 import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachment-to-pdf.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as createForwardDraft from './create-forward-draft.ts';
@@ -76,6 +80,9 @@ const modules: Readonly<Record<string, WriteCommand>> = {
   'remove-todo-task-attachment': removeTodoTaskAttachment,
   'create-todo-list': createTodoList,
   'update-todo-list': updateTodoList,
+  'create-calendar-draft': createCalendarDraft,
+  'update-calendar-draft': updateCalendarDraft,
+  'delete-calendar-draft': deleteCalendarDraft,
 };
 
 const commands: Readonly<Record<string, Command<WriteGraph>>> = Object.fromEntries(
@@ -93,6 +100,7 @@ const undoHandlers: UndoHandlers = {
   ...FIELD_UNDO_HANDLERS,
   ...TASK_UNDO_HANDLERS,
   ...ITEM_UNDO_HANDLERS,
+  ...CALENDAR_UNDO_HANDLERS,
 };
 
 export { commands, undoHandlers };
