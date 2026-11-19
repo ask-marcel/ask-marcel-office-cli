@@ -96,7 +96,7 @@ type PaginationStrategy =
   | 'preferMaxPageSize';
 
 /** What a command does to the tenant; see `CommandMeta.effect`. Extended as the writes grow. */
-type CommandEffect = 'read' | 'draft' | 'transient-upload' | 'mail-state' | 'task-write' | 'delete';
+type CommandEffect = 'read' | 'draft' | 'transient-upload' | 'mail-state' | 'task-write' | 'delete' | 'calendar-draft';
 
 type CommandMeta = {
   readonly summary: string;
@@ -182,7 +182,8 @@ type CommandMeta = {
    * `task-write` creates or changes a To Do or Planner item; `delete` deletes an
    * item (a mail draft goes to Deleted Items; a To Do task, step or attachment is
    * deleted, and a To Do move deletes the original), the one destructive class, which
-   * MCP serves on a tool of its own. Required, so a new
+   * MCP serves on a tool of its own; `calendar-draft` creates or changes an event
+   * with no attendees, so no invitation is sent. Required, so a new
    * command chooses its class instead of inheriting `read`. The MCP routing
    * (run-command takes only `read`), the MCP annotations, the top-level `--help`
    * narrative and the per-command docs derive from it, and the manifest /

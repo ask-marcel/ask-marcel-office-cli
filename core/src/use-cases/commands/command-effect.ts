@@ -32,6 +32,10 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
     action:
       'delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, or an attachment of a mail draft, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id',
   },
+  'calendar-draft': {
+    destructive: false,
+    action: 'create or change a DRAFT event in your calendar: it has no attendees, so no invitation is sent (you add the attendees and send it yourself from Outlook)',
+  },
 };
 
 /** The registry's write commands, one group per effect (in the order the registry first names it), names sorted. */

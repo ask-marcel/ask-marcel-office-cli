@@ -34,6 +34,6 @@ describe('the writes of a registry', () => {
   });
 
   it('change nothing destructively, except the delete class', () => {
-    expect(Object.values(WRITE_EFFECTS).map((effect) => effect.destructive)).toEqual([false, false, false, false, true]);
+    expect(Object.values(WRITE_EFFECTS).map((effect) => effect.destructive)).toEqual([false, false, false, false, true, false]);
   });
 });
