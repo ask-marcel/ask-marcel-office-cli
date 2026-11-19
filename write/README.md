@@ -1,10 +1,11 @@
 # @ask-marcel/office-write
 
-`@ask-marcel/office-write` holds the 29 write commands: 5 mail-draft operations,
-3 PDF conversions, 5 mail state changes, 9 To Do changes and 7 deletes. These
-Microsoft Graph commands change the state of your tenant. Its bin is
-`ask-marcel-office-write`. It sends no mail: a draft stays unsent until you send
-it from Outlook. It cannot create or change calendar items.
+`@ask-marcel/office-write` holds the 32 write commands: 5 mail-draft operations,
+3 PDF conversions, 5 mail state changes, 9 To Do changes, 2 calendar draft
+changes and 8 deletes. These Microsoft Graph commands change the state of your
+tenant. Its bin is `ask-marcel-office-write`. It sends no mail and no meeting
+invitation: a draft stays unsent until you send it from Outlook, and a calendar
+draft has no attendees.
 
 Install it next to `@ask-marcel/office-read` and `@ask-marcel/office-auth`. The
 write commands take ids that the read commands give, for example the message id
@@ -51,13 +52,16 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write remove-todo-task-attachment` | Removes a file attachment of a To Do task. |
 | `ask-marcel-office-write create-todo-list` | Creates a To Do list. |
 | `ask-marcel-office-write update-todo-list` | Gives a To Do list a new name. |
+| `ask-marcel-office-write create-calendar-draft` | Creates a DRAFT event with no attendees: the planned attendees go into the body as text. |
+| `ask-marcel-office-write update-calendar-draft` | Changes the fields of a calendar draft that this CLI made. |
+| `ask-marcel-office-write delete-calendar-draft` | Deletes a calendar draft that this CLI made. |
 | `ask-marcel-office-write undo <runId> [--apply]` | Shows the undo of a write run, or does it with `--apply`. |
 | `ask-marcel-office-write mcp` | Serves the MCP server over stdio (see below). |
 | `ask-marcel-office-write docs <command>` | Prints the Markdown page of one command. |
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 33 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
+`help-json` lists 36 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
@@ -70,14 +74,16 @@ they refuse a sent or received message and a draft in the Outbox. The details
 are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#draft-attachments-and-body-files).
 
-Each draft, attachment, mail state and To Do command takes `--dry-run`: it shows the
+Each draft, attachment, mail state, To Do and calendar draft command takes `--dry-run`: it shows the
 changes and makes none. A run that is not a dry-run gives a `runId`, and
 `undo <runId> --apply` reverses it: a new draft goes to Deleted Items, an update
 gets its old fields back, a moved message goes back to its folder, a read
 state, a flag or categories get their old value, a new To Do task or step is
 deleted, and a deleted To Do task, step or attachment comes back with a new id.
 An attachment added to a draft is removed, and a removed one comes back from
-the run journal with a new id.
+the run journal with a new id. A new calendar draft is deleted, an updated one
+gets its old fields back, and a deleted one comes back with a new id (and a new
+Teams link).
 The undo passes over an item that changed after the run. No command deletes a
 To Do list, so the undo of `create-todo-list` keeps the list. The run journal is in `~/.ask-marcel/runs/` and
 keeps a run 30 days. The details are in
@@ -88,8 +94,16 @@ Outbox, or in a folder in one of them. `delete-mail-draft` is the one command
 that puts a message in Deleted Items, and it takes only an unsent draft. The
 mail state commands are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#mail-state),
-and the To Do commands in
-[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#to-do).
+the To Do commands in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#to-do),
+and the calendar drafts in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#calendar-drafts).
+
+`update-calendar-draft` and `delete-calendar-draft` change only an event that
+`create-calendar-draft` made (it has a hidden mark of this CLI), that has no
+attendees and the prefix `[DRAFT] `, and of which you are the organizer. They
+read the event first and refuse any other event before a write, so no update
+and no cancellation is sent.
 
 A PDF conversion of a file attachment uploads it to a temporary file in the
 `.ask-marcel-temp` folder of your OneDrive. Then it tries to delete that file. A
@@ -171,7 +185,7 @@ const draft = await commands['create-mail-draft']?.execute(graph, {
 
 The library exports:
 
-- `commands`: the 29 write commands, each on the write graph alone;
+- `commands`: the 32 write commands, each on the write graph alone;
 - `createWriteGraph(tokens)`: the write graph over a token source;
 - `createEnvThenHelperTokenSource()`: the tier variables of the process, else the
   token helper of `@ask-marcel/office-auth`;
