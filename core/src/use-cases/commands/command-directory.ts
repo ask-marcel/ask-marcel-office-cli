@@ -47,6 +47,7 @@ const WRITE_COMMANDS: ReadonlyArray<string> = [
   'create-calendar-draft',
   'create-forward-draft',
   'create-mail-draft',
+  'create-mail-folder',
   'create-planner-bucket',
   'create-planner-task',
   'create-reply-draft',
