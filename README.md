@@ -29,7 +29,7 @@ server, its own library and its own docs.
 |:--|:--|:--|:--|:--|
 | `@ask-marcel/office-auth` | `ask-marcel-office-auth` | Signs you in, keeps the token cache and gives the tokens to the other two packages. | Yes | [README](auth/README.md) · [USAGE](auth/USAGE.md) · [COMMANDS](auth/COMMANDS.md) |
 | `@ask-marcel/office-read` | `ask-marcel-office-read` | Reads mail, calendar, OneDrive and SharePoint, Teams and chats, users, Excel, OneNote, To Do and Planner. Converts files and mail to markdown. It cannot change your tenant. | Yes | [README](read/README.md) · [USAGE](read/USAGE.md) · [COMMANDS](read/COMMANDS.md) |
-| `@ask-marcel/office-write` | `ask-marcel-office-write` | Writes mail drafts and never sends them. Converts mail, group post and calendar attachments to PDF through a temporary OneDrive file. | Only for drafts and PDF conversions | [README](write/README.md) · [USAGE](write/USAGE.md) · [COMMANDS](write/COMMANDS.md) |
+| `@ask-marcel/office-write` | `ask-marcel-office-write` | Writes mail drafts and calendar drafts and never sends them. Changes the state of mail, and the tasks of To Do and Planner. Each change has a dry-run and an undo. Converts mail, group post and calendar attachments to PDF through a temporary OneDrive file. | Only to change your tenant or to convert to PDF | [README](write/README.md) · [USAGE](write/USAGE.md) · [COMMANDS](write/COMMANDS.md) |
 
 Start with the [read package README](read/README.md). It shows what an agent
 can do with your Microsoft 365 data.
@@ -55,8 +55,8 @@ ask-marcel-office-auth login
 ask-marcel-office-read my-quick-context
 ```
 
-To also write mail drafts and convert attachments to PDF, install the three
-packages:
+To also write (drafts, mail state, To Do, Planner) and convert attachments to
+PDF, install the three packages:
 
 ```sh
 npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-write
@@ -64,6 +64,21 @@ npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-writ
 
 The packages need Node 20 or later, or Bun 1.0 or later, on macOS, Windows or
 Linux. Each package README shows how to register its MCP server.
+
+## If you used 2.8.0
+
+The bin `ask-marcel-office` is gone. A script or a skill that calls it must
+call the bin of the package that owns the command:
+
+| Command of 2.8.0 | Bin to call now |
+|:--|:--|
+| `login`, `logout`, `status` | `ask-marcel-office-auth` |
+| The mail draft commands and the `*-to-pdf` conversions | `ask-marcel-office-write` |
+| All the other commands | `ask-marcel-office-read` |
+
+`scopes-check` and `update` are gone. The [changelog of the facade](cli/CHANGELOG.md)
+gives the full list of changes. The write bin also has commands that 2.8.0 did
+not have: the [write package README](write/README.md) lists them.
 
 ## The agent skill
 

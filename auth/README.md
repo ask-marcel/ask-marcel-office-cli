@@ -10,7 +10,7 @@ You do not need an Azure app registration or the consent of a tenant admin.
 ## Install
 
 Install it with the read package. Add the write package only on hosts that may
-write mail drafts.
+change your tenant.
 
 ```sh
 npm i -g @ask-marcel/office-auth @ask-marcel/office-read

@@ -4,8 +4,9 @@
 commands that change nothing in your tenant. They read mail, calendar, OneDrive
 and SharePoint, Teams and chats, users, Excel, OneNote and To Do. They convert
 Office files, PDF and mail to markdown on the fly. Its bin is
-`ask-marcel-office-read`. It cannot write: the mail drafts and the three
-attachment-to-PDF conversions are in `@ask-marcel/office-write`.
+`ask-marcel-office-read`. It cannot write: the commands that change your tenant
+(drafts, mail state, To Do and Planner) and the three attachment-to-PDF
+conversions are in `@ask-marcel/office-write`.
 
 You do not need an Azure app registration, the consent of a tenant admin or a
 client secret. `@ask-marcel/office-auth` signs you in with your own Microsoft 365
@@ -14,7 +15,7 @@ account, in a browser, one time.
 ## Install
 
 Install it with `@ask-marcel/office-auth`, which signs you in. Add
-`@ask-marcel/office-write` only on hosts that may write drafts.
+`@ask-marcel/office-write` only on hosts that may change your tenant.
 
 ```sh
 npm i -g @ask-marcel/office-auth @ask-marcel/office-read
@@ -54,7 +55,7 @@ Compared with the tools that you know:
 |---|---|---|---|
 | Sign-in | An Entra app registration, always. Each auth flow needs a client id. | An Entra app registration. Its `setup` command makes one, and its permissions can need the consent of an admin. | Your own account, in a browser, one time. No app registration. |
 | Made for | Backend services | Admins and scripts | LLMs that call tools: markdown out, small fields, a repair hint on each error |
-| Can it break things | It can do what the permissions of your app allow. | Yes: it creates, changes and deletes items in the tenant. | No. The read package cannot write. The mail drafts and the three attachment-to-PDF conversions are in `@ask-marcel/office-write`, which you install only where you need it. |
+| Can it break things | It can do what the permissions of your app allow. | Yes: it creates, changes and deletes items in the tenant. | No. The read package cannot write. The commands that change your tenant, the deletes too, and the three attachment-to-PDF conversions are in `@ask-marcel/office-write`, which you install only where you need it. |
 
 ## The three walls it removes
 
@@ -340,7 +341,8 @@ bin. To give the library your own token, set a tier variable or
 - [@ask-marcel/office-auth](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/auth/README.md):
   the sign-in.
 - [@ask-marcel/office-write](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/README.md):
-  the mail drafts and the three attachment-to-PDF conversions.
+  the drafts, the changes of mail state, To Do and Planner, and the three
+  attachment-to-PDF conversions.
 
 ## Develop
 

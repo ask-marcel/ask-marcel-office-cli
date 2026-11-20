@@ -21,7 +21,7 @@ export const commandPackage: CommandPackage<Command<ReadGraph>> = {
   lifecycle: LIFECYCLE_ENTRIES,
   // The CLI adds the read counts that the registry gives.
   description:
-    'Microsoft Graph CLI, read commands only: the write commands (mail drafts and PDF conversions) are in @ask-marcel/office-write. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). Safe default for LLM autonomy.',
+    'Microsoft Graph CLI, read commands only: the write commands (mail and calendar drafts, the state of mail, To Do, Planner and PDF conversions) are in @ask-marcel/office-write. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). Safe default for LLM autonomy.',
   exampleCommand: 'list-mail-messages',
   ...SINGLE_PACKAGE_NAMES,
   packageName: PACKAGE_NAMES.read,
