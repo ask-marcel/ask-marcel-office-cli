@@ -357,12 +357,15 @@ ask-marcel-office-write delete-planner-task --task-id "01gzSlKk..." --dry-run
    it. It refuses a plan of a group: the Planner app keeps the files of a group
    plan in the document library of the group, which this CLI cannot write. For
    such a plan, give a link to a file that is in SharePoint or OneDrive already
-   with `add-planner-task-link`.
-9. The dry-run of `delete-planner-bucket` gives the count of the tasks of the
-   bucket, and a bucket with tasks has no undo. Planner can delete the tasks
-   with the bucket, or keep them with no bucket that the board shows (a live
-   run of 2026-11-19 on a plan of the user kept the task). So move or delete
-   the tasks first.
+   with `add-planner-task-link`. The file of another plan stays in your
+   OneDrive and is shared with nobody, so another member of that plan cannot
+   open it.
+9. `delete-planner-bucket` deletes an empty bucket only. A bucket with one task
+   or more is refused before any write (`planner_bucket_has_tasks`): delete the
+   tasks with `delete-planner-task`, or move them with `update-planner-task
+   --bucket`, then delete the bucket. A live run of 2026-11-19 found that
+   Planner kept the task of a deleted bucket, with the id of a bucket that is
+   gone.
 
 Each change reads the ETag of the item (`@odata.etag`) and sends it back as
 `If-Match`. Each run reads the item again just before its write and passes over
@@ -464,10 +467,9 @@ What the undo does:
   `--notify-others true`. Lost: the comments, the dates of creation and
   completion, the place of the task in its bucket, and the HTML formatting of
   the notes.
-- The undo of `delete-planner-bucket` makes an empty bucket again (new id)
-  between the buckets that were next to it. A bucket that had tasks has no
-  undo (`planner_bucket_no_undo`): this CLI cannot put a bucket and its tasks
-  back.
+- The undo of `delete-planner-bucket` makes the bucket again (new id) between
+  the buckets that were next to it. The command deletes only an empty bucket,
+  so this undo puts back all that it deleted.
 - The undo of `add-planner-task-file` removes the reference, then moves the
   file to the recycle bin of your OneDrive, only if its content did not change.
 - An undo that cannot reverse a change passes over it and gives the status
@@ -540,8 +542,8 @@ hosts that may write drafts and change the state of your mail.
 `delete-mail-draft`, `remove-mail-draft-attachment`, `delete-todo-task`,
 `move-todo-task` (it deletes the original after the copy), `delete-todo-task-step`,
 `remove-todo-task-attachment`, `apply-todo-ops` (an op can move or delete a
-task), `delete-calendar-draft`, `delete-planner-bucket` (a bucket with tasks has
-no undo) and `delete-planner-task`. It has `destructiveHint: true`, so a host asks you before it runs it.
+task), `delete-calendar-draft`, `delete-planner-bucket` (an empty bucket only) and
+`delete-planner-task`. It has `destructiveHint: true`, so a host asks you before it runs it.
 Each tool refuses a command of another tool and names the right one.
 
 `undo` has `readOnlyHint: true`. `undo-apply` has `destructiveHint: true`,

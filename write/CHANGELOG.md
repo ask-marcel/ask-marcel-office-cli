@@ -11,9 +11,9 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 - `create-planner-bucket --plan --name`, `update-planner-bucket --bucket-id`
   (`--name`, `--after`, `--first true`) and `delete-planner-bucket
   --bucket-id`. A plan and a bucket are found by name (no case) or id. The
-  dry-run of a delete gives the count of the tasks of the bucket, and a bucket
-  with tasks has no undo: Planner can delete its tasks, or keep them with no
-  bucket that the board shows.
+  delete refuses a bucket that has tasks (`planner_bucket_has_tasks`): delete
+  or move the tasks first. A live run found that Planner keeps the task of a
+  deleted bucket, with the id of a bucket that is gone.
 - `create-planner-task --plan --bucket --title`, `update-planner-task
   --task-id` and `delete-planner-task --task-id`, with the options of the
   user's script: `--due`, `--start` (days, `none` removes one), `--status`,
@@ -45,10 +45,8 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
   (MCP tool `run-destructive-command`); the 12 other Planner commands are in
   the `task-write` class.
 - The words of the `delete` class name the Planner task and the empty Planner
-  bucket, and say that the delete of a bucket with tasks has no undo. The words
-  of `task-write` say that the file of a Planner task goes into the OneDrive of
-  the user. `run-destructive-command` says that each run has an undo unless
-  those words say that it has none.
+  bucket. The words of `task-write` say that the file of a Planner task goes
+  into the OneDrive of the user.
 - Write package now: 46 commands, 50 entries in `help-json`, 10 commands in the
   `delete` class, `run-write-command` runs 36, 254 commands in the directory.
 
