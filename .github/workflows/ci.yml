@@ -141,10 +141,8 @@ jobs:
         run: bash scripts/mutation-scope-selftest.sh
       - name: per-file mutation gate selftest (a file below the break score and a file the run did not mutate are rejected)
         run: bun scripts/check-mutation-score.ts --selftest
-      # GHSA-fc5q-39xc-vjpf (picomatch <= 4.0.7) has no corrected version on 2026-11-18.
-      # picomatch comes only through typescript-eslint (lint time). Look again on 2026-12-18.
       - name: dependency CVEs (fails on high)
-        run: bun audit --audit-level=high --ignore=GHSA-fc5q-39xc-vjpf
+        run: bun audit --audit-level=high
   mutation:
     # Read's mutation, run in read/ and divided over parallel shards. One job
     # ran into the 6-hour job limit on 2026-10-15: a push of 241 commits gave
