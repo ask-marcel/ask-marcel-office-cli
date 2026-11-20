@@ -137,7 +137,8 @@ ask-marcel-office-write remove-mail-draft-attachment --message-id "AAMkAD..." --
 ## Mail state
 
 The mail state commands change the folder, the read state, the flag or the
-categories of a message, and `delete-mail-draft` deletes a draft. Each one takes
+categories of a message, `create-mail-folder` makes a mail folder, and
+`delete-mail-draft` deletes a draft. Each one takes
 `--dry-run`, and each run has an undo. None of them sends
 mail.
 
@@ -149,6 +150,7 @@ ask-marcel-office-write mark-mail-message --message-id "AAMkAD..." --read false
 ask-marcel-office-write set-mail-flag --message-id "AAMkAD..." --status flagged --due 2026-11-20
 ask-marcel-office-write set-mail-categories --message-id "AAMkAD..." --categories "Blue category,Project"
 ask-marcel-office-write delete-mail-draft --message-id "AAMkAD..."
+ask-marcel-office-write create-mail-folder --name "Clients" --parent inbox --dry-run
 ```
 
 - `move-mail-message` and `mark-mail-message` take one id or more in
@@ -171,6 +173,14 @@ ask-marcel-office-write delete-mail-draft --message-id "AAMkAD..."
 - `delete-mail-draft` moves an unsent draft to Deleted Items. It refuses a
   message that is not a draft (`not_a_draft`). It is the one command that puts a
   message in Deleted Items.
+- `create-mail-folder --name` makes a folder at the top of the mailbox, or in
+  `--parent` (the same forms as `--to`). The name has at most 255 characters
+  and no `/`, `\` or control character (`invalid_folder_name`): `--parent`
+  reads `/` as the step to a child folder. The parent cannot be, or be in,
+  Deleted Items, Recoverable Items, Junk Email or Outbox (`folder_refused`).
+  A parent that has a folder of the same name, with no case, is refused before
+  the write (`folder_exists`). The output gives the id of the new folder in
+  `after.folderId`.
 
 Do a dry-run first. It shows the current folder of each message (`before.folder`),
 so you see a draft that a search found in place of the received message. The
@@ -423,6 +433,10 @@ What the undo does:
   that the run set. To open the message does not stop this undo.
 - The undo of `delete-mail-draft` moves the draft back to Drafts (with a new
   id), only if it is still a draft in Deleted Items.
+- The undo of `create-mail-folder` deletes the folder
+  (`DELETE /me/mailFolders/{id}`), only if it has no message and no child
+  folder, and its name and its parent did not change. A live run found the
+  deleted folder neither at the top of the mailbox nor in Deleted Items.
 - The undo of `create-todo-task`, `add-todo-task-step`,
   `add-todo-linked-resource` and `add-todo-task-attachment` deletes the new
   item, only if it did not change after the run. For a task, the undo compares
@@ -529,7 +543,7 @@ undo { runId }                                                   → shows the u
 undo-apply { runId }                                             → does the undo of a run (destructive)
 ```
 
-`run-write-command` runs 36 commands: the write commands that do not delete. It
+`run-write-command` runs 37 commands: the write commands that do not delete. It
 has `readOnlyHint: false` and `destructiveHint: false`.
 `params` are the flags as `get-command-docs` shows them. A key is the flag
 name, with or without the `--` prefix (`body-content`), or its camelCase form
@@ -567,7 +581,7 @@ if (draft?.ok) console.log(draft.value);
 
 | Export | What it is |
 |:--|:--|
-| `commands` | Each of the 46 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file`, `--body-file` and `--checklist-file`. |
+| `commands` | Each of the 47 write commands, by name. Each one has `meta` and `execute(graph, params, files?)`. `files` reads the local file of `--ids-file`, `--file`, `--body-file` and `--checklist-file`. |
 | `createWriteGraph(tokens)` | The write graph over a `TokenSource`: the basic token, with `get`, `post`, `patch`, `put` and `delete`. |
 | `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
 | `createWriteClient()` | `createWriteGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
