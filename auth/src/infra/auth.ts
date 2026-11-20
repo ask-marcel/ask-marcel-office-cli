@@ -339,6 +339,17 @@ const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>
 // already drifted from the registry.
 
 const RECAPTURE_VIA_LOGIN = 'Run `{auth-bin} login` to (re)capture it';
+
+// Entra's code for a refresh token past the end of its sign-in session: the
+// refresh token of a single-page app lives about 24 hours from the browser
+// sign-in, and a redemption does not move that limit (proven 2026-11-19).
+const SESSION_ENDED_AADSTS = 'AADSTS700084';
+
+// The fail-fast text when Entra refused the redemption for that cause. It comes
+// from the result of the redemption, not from the logger, so the token helper
+// (whose logger is silent) gives it too.
+const sessionEndedMessage = (refused: string): string =>
+  `The sign-in session ended, so Entra refused to renew ${refused}. Microsoft limits the sign-in session of this client to about 24 hours after the browser sign-in, and a renewal does not move that limit. Run \`{auth-bin} login\` in a terminal: a plain login starts a new session. A command does not open a browser for this.`;
 const RECAPTURE_ELEVATED_VIA_LOGIN =
   'It carries no refresh token of its own, so re-capture it with `{auth-bin} login`: the login command self-escalates to a browser sign-in when the elevated token is missing. That sign-in needs a host with a display and may prompt, so unlike the other tiers this one cannot be refreshed non-interactively (a warm token cache does not imply warm browser-profile cookies).';
 
@@ -377,6 +388,13 @@ const SIGN_IN_IN_PROGRESS_CODE = 'sign_in_in_progress';
 // rung of the ladder (a browser, or the generic "run login" message).
 const mustReportAsIs = (r: Result<unknown, AuthError>): boolean =>
   !r.ok && r.error.type === 'auth_failed' && (r.error.code === CACHE_UNWRITABLE_CODE || r.error.code === SIGN_IN_IN_PROGRESS_CODE);
+
+// A result that ends the call: a token, or one of the two failures above. Any
+// other failure goes on to the next rung, or to the fail-fast of its tier.
+const settles = (r: Result<AccessToken, AuthError>): boolean => r.ok || mustReportAsIs(r);
+
+// A redemption that Entra refused because the sign-in session ended.
+const sessionEnded = (r: Result<unknown, AuthError> | undefined): boolean => r !== undefined && !r.ok && r.error.type === 'auth_failed' && r.error.cause === 'session_ended';
 
 // How long a call waits for the lock: up to a whole sign-in where a person can
 // see what is going on (a terminal, `login`), twenty seconds for an agent.
@@ -674,7 +692,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       const codes = await refusalCodes(res);
       logger.warn('auth.refresh.redeem_failed', { tier, status: res.status, ...codes });
       const detail = [res.status, codes.error, codes.aadsts].filter((part) => part !== undefined).join(', ');
-      return err({ type: 'auth_failed', message: `refresh failed (${detail})` });
+      const cause = codes.aadsts === SESSION_ENDED_AADSTS ? { cause: 'session_ended' as const } : {};
+      return err({ type: 'auth_failed', message: `refresh failed (${detail})`, ...cause });
     }
     const answer = await readTokenAnswer(res);
     if (!answer.ok) return answer;
@@ -741,6 +760,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return writeCache({ ...latest, refresh_token: rotated });
   };
 
+  const causeOf = (error: AuthError): { readonly cause?: 'session_ended' } => (error.type === 'auth_failed' && error.cause !== undefined ? { cause: error.cause } : {});
+
   const refreshSubstrateToken = async (
     cached: CachedToken,
     resource: string,
@@ -748,7 +769,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     rung: string
   ): Promise<Result<AccessToken, AuthError>> => {
     const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`, substrateTierOf(resource));
-    if (!redeemed.ok) return err({ type: 'auth_failed', message: `${rung}: ${redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled'}` });
+    if (!redeemed.ok)
+      return err({ type: 'auth_failed', message: `${rung}: ${redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled'}`, ...causeOf(redeemed.error) });
     const json = { access_token: redeemed.value.accessToken, refresh_token: redeemed.value.refreshToken };
     const raw = json.access_token ?? '';
     // Substrate tokens carry a non-Graph audience, so `accessToken()` (the Graph
@@ -803,16 +825,31 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   };
 
   // The fail-fast errors of the three secondary tiers, where no rung is left.
-  const secondaryUnavailable = (token: string, commands: ReadonlyArray<string>, remedy: string): Result<never, AuthError> =>
-    err({ type: 'auth_failed', message: failFastSecondaryMessage(token, commands, remedy), code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
+  // `failed` is the redemption that was tried, if one was: when Entra refused it
+  // because the sign-in session ended, the error says that.
+  type FailFast = (failed?: Result<AccessToken, AuthError>) => Result<never, AuthError>;
+  const secondaryUnavailable = (token: string, commands: ReadonlyArray<string>, remedy: string, failed?: Result<AccessToken, AuthError>): Result<never, AuthError> => {
+    if (sessionEnded(failed)) {
+      const refused = `the ${token} token (${SESSION_ENDED_AADSTS})`;
+      const message = sessionEndedMessage(refused) + neededByNote(commands, 'it');
+      return err({ type: 'auth_failed', message, code: SECONDARY_TOKEN_UNAVAILABLE_CODE, cause: 'session_ended' });
+    }
+    return err({ type: 'auth_failed', message: failFastSecondaryMessage(token, commands, remedy), code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
+  };
   const elevatedUnavailable = (): Result<never, AuthError> => secondaryUnavailable('Elevated (M365)', secondaryTokenCommands.elevated, RECAPTURE_ELEVATED_VIA_LOGIN);
-  const chatsvcaggUnavailable = (): Result<never, AuthError> => secondaryUnavailable('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN);
-  const ic3Unavailable = (): Result<never, AuthError> => secondaryUnavailable('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN);
+  const chatsvcaggUnavailable: FailFast = (failed) => secondaryUnavailable('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN, failed);
+  const ic3Unavailable: FailFast = (failed) => secondaryUnavailable('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN, failed);
+  const notAuthenticated: FailFast = (failed) => {
+    if (!sessionEnded(failed)) return err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
+    const message = sessionEndedMessage(`the basic (Microsoft Graph) token (${SESSION_ENDED_AADSTS})`);
+    return err({ type: 'auth_failed', message, code: NOT_AUTHENTICATED_CODE, cause: 'session_ended' });
+  };
 
   // The rungs that need a browser, when this session may open one.
   const browser = deps.browserRungs?.({ underLock, persistTeams, persistElevated, persistChatsvcagg, persistIc3, redeemMissedSubstrateAtLogin });
 
-  // The cache rung, then the refresh rung. Undefined when neither settles the call.
+  // The cache rung, then the refresh rung: the token, or the failed redemption.
+  // Undefined when there is nothing to redeem.
   const cachedOrRefreshedBasic = async (): Promise<Result<AccessToken, AuthError> | undefined> => {
     const cached = await readCache();
     const validated = accessToken(cached?.access_token ?? '');
@@ -821,8 +858,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       return ok(validated.value);
     }
     if (!holdsRefreshToken(cached, 'basic')) return undefined;
-    const refreshed = await refreshBasicInTurn();
-    return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
+    return refreshBasicInTurn();
   };
 
   const getAccessToken = async (options?: SignInOptions): Promise<Result<AccessToken, AuthError>> => {
@@ -831,15 +867,13 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // so a cache-hit login would otherwise never refresh it). The full capture
     // of a plain `login` (`renew`) skips them for the same reason.
     const mode = signInMode(options);
-    if (mode === 'cached') {
-      const settled = await cachedOrRefreshedBasic();
-      if (settled !== undefined) return settled;
-    }
+    const tried = mode === 'cached' ? await cachedOrRefreshedBasic() : undefined;
+    if (tried !== undefined && settles(tried)) return tried;
     // Command path: never launch an interactive browser for the basic token —
     // fail fast with a single-line "run login" error instead of the 5-minute
     // headless-hang poll. The `login` command's manager has this rung.
     const signIn = browser?.signIn;
-    if (!signIn) return err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
+    if (!signIn) return notAuthenticated(tried);
     // Under --force or renew, the browser layer skips its concurrent-refresh probe
     // so the still-valid cached token cannot short-circuit the full re-capture.
     return signIn(mode);
@@ -899,6 +933,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // there, or when the Teams client is not consented in it (AADSTS65001).
   const guestRefusal = (tenant: TenantId, error: AuthError): Result<never, AuthError> => {
     const detail = error.type === 'auth_failed' ? error.message : 'cancelled';
+    if (error.type === 'auth_failed' && error.cause === 'session_ended') {
+      return err({
+        type: 'auth_failed',
+        message: sessionEndedMessage(`a guest token for tenant ${tenant} (${detail})`),
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+        cause: 'session_ended',
+      });
+    }
     return err({
       type: 'auth_failed',
       message: `tenant ${tenant} refused a guest token (${detail}) — you may not be a guest in that tenant, or its administrator has not consented to this client`,
@@ -1010,12 +1052,24 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // 2026-08-31: a token minted at 07:18 was rejected at 13:47 with hours of
   // stated life left, while a freshly redeemed one worked instantly.
   // The headless rung of a substrate token: a redemption from the shared refresh
-  // token, past the dead token when the caller found one. Undefined when it does
-  // not settle the call, so the browser rung is next.
+  // token, past the dead token when the caller found one. Undefined when there
+  // is nothing to redeem. A result that does not settle the call sends it to
+  // the browser rung, or to the fail-fast, which names its cause.
   const redeemSubstrate = async (tier: SubstrateTier, cached: CachedToken | null, dead: string | undefined): Promise<Result<AccessToken, AuthError> | undefined> => {
     if (!holdsRefreshToken(cached, substrateTierOf(tier.resource))) return undefined;
-    const refreshed = await refreshSubstrateInTurn(tier, dead);
-    return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
+    return refreshSubstrateInTurn(tier, dead);
+  };
+
+  // A redemption that settles the call ends it. Else the browser rung is next,
+  // when this session has one, and else the fail-fast of the tier.
+  const afterRedemption = async (
+    redeemed: Result<AccessToken, AuthError> | undefined,
+    recapture: (() => Promise<Result<AccessToken, AuthError>>) | undefined,
+    failFast: FailFast
+  ): Promise<Result<AccessToken, AuthError>> => {
+    if (redeemed !== undefined && settles(redeemed)) return redeemed;
+    if (!recapture) return failFast(redeemed);
+    return recapture();
   };
 
   const getChatsvcaggAccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
@@ -1036,10 +1090,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // fail-fast branch below, a manager that was ALLOWED a browser skipped the
     // refresh entirely and opened a window for a token an HTTP call could mint.
     const redeemed = await redeemSubstrate(chatsvcaggTier, cached, ignoreCache ? cached?.chatsvcagg_access_token : undefined);
-    if (redeemed !== undefined) return redeemed;
-    const recapture = browser?.recaptureChatsvcagg;
-    if (!recapture) return chatsvcaggUnavailable();
-    return recapture();
+    return afterRedemption(redeemed, browser?.recaptureChatsvcagg, chatsvcaggUnavailable);
   };
 
   const getChatsvcaggRegion = async (): Promise<string> => {
@@ -1122,10 +1173,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     }
     // Headless first, same reasoning as chatsvcagg above.
     const redeemed = await redeemSubstrate(ic3Tier, cached, ignoreCache ? cached?.ic3_access_token : undefined);
-    if (redeemed !== undefined) return redeemed;
-    const recapture = browser?.recaptureIc3;
-    if (!recapture) return ic3Unavailable();
-    return recapture();
+    return afterRedemption(redeemed, browser?.recaptureIc3, ic3Unavailable);
   };
 
   // A replay: a service refused the token whose fingerprint the caller sends
@@ -1134,11 +1182,9 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // in turn and under the lock, so a replay that waited uses the token the one
   // before it saved. No replay reaches a browser.
   const notRefused = async (token: string, refused: TokenFingerprint): Promise<boolean> => (await tokenFingerprint(token)) !== refused;
-  const notAuthenticated = (): Result<never, AuthError> => err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
   // The redemption's own failure is reported when it must be; any other is the
-  // tier's fail-fast.
-  const orFailFast = (redeemed: Result<AccessToken, AuthError>, failFast: () => Result<never, AuthError>): Result<AccessToken, AuthError> =>
-    redeemed.ok || mustReportAsIs(redeemed) ? redeemed : failFast();
+  // tier's fail-fast, which names the end of the session when that was the cause.
+  const orFailFast = (redeemed: Result<AccessToken, AuthError>, failFast: FailFast): Result<AccessToken, AuthError> => (settles(redeemed) ? redeemed : failFast(redeemed));
 
   const replayBasic = async (refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
     const cached = await readCache();
@@ -1156,7 +1202,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return elevatedUnavailable();
   };
 
-  const replaySubstrate = async (tier: SubstrateTier, failFast: () => Result<never, AuthError>, refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+  const replaySubstrate = async (tier: SubstrateTier, failFast: FailFast, refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
     const cached = await readCache();
     const current = tier.fresh(cached);
     if (current?.startsWith('eyJ') === true && (await notRefused(current, refused))) return ok(accessTokenUnsafe(current));
