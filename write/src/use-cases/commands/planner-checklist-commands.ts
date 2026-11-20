@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { CHECKLIST_MAX_ITEMS, CHECKLIST_TITLE_MAX, checklistValue } from '../../domain/planner-checklist.ts';
-import type { ChecklistItem } from '../../domain/planner-checklist.ts';
 import { hintBetween } from '../../domain/planner-fields.ts';
 import { parseParams } from './mail-state-command.ts';
 import { checklistOf, findItem, lastHintOf } from './planner-checklist-ops.ts';
@@ -53,7 +52,7 @@ export const updatePlan: PlanWrite = async (reads, params) => {
   const items = checklistOf(details.value);
   const key = findItem(items, parsed.value.item);
   if (!key.ok) return key;
-  const now = items[key.value] as ChecklistItem;
+  const now = items[key.value];
   const next = { title: parsed.value.title ?? now.title, isChecked: parsed.value.checked === undefined ? now.isChecked : parsed.value.checked === 'true' };
   const before = { taskId: details.value.id, itemId: key.value, title: now.title };
   return ok(
@@ -74,7 +73,7 @@ export const removePlan: PlanWrite = async (reads, params) => {
   const items = checklistOf(details.value);
   const key = findItem(items, parsed.value.item);
   if (!key.ok) return key;
-  const before = { taskId: details.value.id, itemId: key.value, title: (items[key.value] as ChecklistItem).title };
+  const before = { taskId: details.value.id, itemId: key.value, title: items[key.value].title };
   return ok(
     todoPlan({ ops: [patchOp({ action: 'remove-planner-checklist-item', resource: 'details', item: details.value, body: { checklist: { [key.value]: null } }, before })] })
   );
