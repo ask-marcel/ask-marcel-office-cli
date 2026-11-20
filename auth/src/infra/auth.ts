@@ -8,7 +8,7 @@ import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fing
 import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
-import type { AuthError, CachedTierInfo } from '../use-cases/ports/auth-session.ts';
+import type { AuthError, CachedTierInfo, SessionEnd } from '../use-cases/ports/auth-session.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
@@ -81,6 +81,14 @@ type CachedToken = {
    * shared RT slot is correct and per-tenant RT chains are not needed).
    */
   guest_tokens?: Partial<Record<string, { access_token: string; expires_on: number }>>;
+  /**
+   * The time (seconds since the epoch) of the browser sign-in that gave the
+   * refresh token. Entra stops that refresh token about 24 hours later
+   * (AADSTS700084, proven 2026-11-19), and a redemption does not move the
+   * limit. Absent in a cache written before the time was kept: the end of the
+   * session is then not known.
+   */
+  signed_in_at?: number;
 };
 /**
  * Outcome of the elevated-token capture leg of the most recent
@@ -194,6 +202,8 @@ type AuthManager = {
    */
   getCachedChatsvcaggInfo?: () => Promise<CachedTierInfo>;
   getCachedIc3Info?: () => Promise<CachedTierInfo>;
+  /** Decode-only: the predicted end of the sign-in session, or undefined when the cache holds no time of the sign-in. */
+  getSessionEnd?: () => Promise<SessionEnd | undefined>;
 };
 
 /**
@@ -261,7 +271,10 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
 // missing token reads as "not captured yet", not "this token has no scopes".
 const TIER_REASON_INTERACTIVE =
   'not cached (absent or expired) — run `{auth-bin} login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
-const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `{auth-bin} login --force`';
+const TIER_REASON_AUTOMATIC =
+  'not cached — self-heals on the next Teams-chat command from the shared refresh token until the sign-in session ends (about 24 hours after the browser sign-in), or run `{auth-bin} login --force`';
+const TIER_REASON_SESSION_ENDED =
+  'not cached (absent or expired), and the sign-in session ended: Microsoft limits it to about 24 hours after the browser sign-in, so the shared refresh token cannot renew this token. Run `{auth-bin} login`: a plain login starts a new session.';
 const TIER_REASON_NO_REFRESH_TOKEN =
   'not cached (absent or expired), and the token cache holds no refresh token, so this token cannot renew itself. Run `{auth-bin} login`: it captures every token and a new refresh token.';
 
@@ -270,6 +283,19 @@ type TierRoute = { readonly refresh: TokenTierInfo['refresh']; readonly reason: 
 const ELEVATED_ROUTE: TierRoute = { refresh: 'interactive', reason: TIER_REASON_INTERACTIVE };
 const SELF_HEAL_ROUTE: TierRoute = { refresh: 'automatic', reason: TIER_REASON_AUTOMATIC };
 const NO_REFRESH_TOKEN_ROUTE: TierRoute = { refresh: 'interactive', reason: TIER_REASON_NO_REFRESH_TOKEN };
+const SESSION_ENDED_ROUTE: TierRoute = { refresh: 'interactive', reason: TIER_REASON_SESSION_ENDED };
+
+// Entra stops the refresh token of the Teams client (a single-page app) this
+// long after the browser sign-in that gave it. The texts say "about 24 hours".
+const SIGN_IN_SESSION_SECONDS = 24 * 60 * 60;
+
+// The route of the two substrate tiers: they renew themselves only while the
+// cache holds the refresh token and the sign-in session did not end.
+const substrateRoute = (refreshTokenCached: boolean, session: SessionEnd | undefined): TierRoute => {
+  if (!refreshTokenCached) return NO_REFRESH_TOKEN_ROUTE;
+  if (session !== undefined && session.endsInSeconds <= 0) return SESSION_ENDED_ROUTE;
+  return SELF_HEAL_ROUTE;
+};
 
 const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, route: TierRoute): TokenTierInfo => {
   if (info.available) return { ...info, refresh: route.refresh };
@@ -549,13 +575,17 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // one account's Graph token never sits next to another's chat token.
   // A capture can give a Graph token with no refresh token. Then the refresh
   // token of the same account stays, because an empty one stops every self-heal.
+  // A new refresh token starts a new sign-in session, so its time is kept; a
+  // kept refresh token keeps the time of its own sign-in.
   const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<Result<void, AuthError>> => {
     const existing = await readCache();
     const kept: Partial<CachedToken> = existing !== null && sameAccount(existing.access_token, access) ? existing : {};
     const claims = decodeJwtPayload(access);
     const exp = claims.exp as number | undefined;
-    const refreshToken = refresh !== null && refresh !== '' ? refresh : keptRefreshToken(kept);
-    const cached: CachedToken = { ...kept, access_token: access, expires_on: exp ?? 0, refresh_token: refreshToken };
+    const captured = refresh !== null && refresh !== '';
+    const refreshToken = captured ? refresh : keptRefreshToken(kept);
+    const signedIn = captured ? { signed_in_at: Math.floor(Date.now() / 1000) } : {};
+    const cached: CachedToken = { ...kept, access_token: access, expires_on: exp ?? 0, refresh_token: refreshToken, ...signedIn };
     if (elevated) {
       const elevatedClaims = decodeJwtPayload(elevated);
       const elevatedExp = elevatedClaims.exp as number | undefined;
@@ -1041,10 +1071,19 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return { available: freshIc3Token(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.ic3_access_token) };
   };
 
+  // Decode-only: the end of the sign-in session that the cache predicts.
+  const getSessionEnd = async (): Promise<SessionEnd | undefined> => {
+    const signedInAt = (await readCache())?.signed_in_at;
+    if (typeof signedInAt !== 'number') return undefined;
+    const endsAt = signedInAt + SIGN_IN_SESSION_SECONDS;
+    return { endsAt: new Date(endsAt * 1000).toISOString(), endsInSeconds: Math.floor(endsAt - Date.now() / 1000) };
+  };
+
   // Decode-only, like the readers above. The elevated token has no refresh token
   // of its own, so its refresh is `interactive`. The two substrate tokens heal
   // from the shared refresh token, so their refresh is `automatic`, but only
-  // while the cache holds one: with none, only a sign-in renews them.
+  // while the cache holds one and the sign-in session did not end: else only a
+  // sign-in renews them.
   const getTokenInfo = async (): Promise<Result<TokenInfo, TokenReportError>> => {
     const basic = await getCachedBasicToken();
     if (basic === undefined) return err({ type: 'auth_failed', message: NO_CACHED_SESSION_MESSAGE, code: NOT_AUTHENTICATED_CODE });
@@ -1052,16 +1091,18 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const aud = claims['aud'];
     const exp = claims['exp'];
     const refreshTokenCached = await hasRefreshToken();
-    const substrateRoute = refreshTokenCached ? SELF_HEAL_ROUTE : NO_REFRESH_TOKEN_ROUTE;
+    const session = await getSessionEnd();
+    const route = substrateRoute(refreshTokenCached, session);
     return ok({
       scopes: decodeScopes(basic),
       audience: typeof aud === 'string' ? aud : undefined,
       expiresAt: typeof exp === 'number' ? new Date(exp * 1000).toISOString() : undefined,
       expiresInSeconds: typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined,
       refreshTokenCached,
+      ...(session === undefined ? {} : { session }),
       elevated: buildTier(await getCachedElevatedInfo(), ELEVATED_ROUTE),
-      chatsvcagg: buildTier(await getCachedChatsvcaggInfo(), substrateRoute),
-      ic3: buildTier(await getCachedIc3Info(), substrateRoute),
+      chatsvcagg: buildTier(await getCachedChatsvcaggInfo(), route),
+      ic3: buildTier(await getCachedIc3Info(), route),
     });
   };
 
@@ -1213,6 +1254,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     getCachedElevatedInfo,
     getCachedChatsvcaggInfo,
     getCachedIc3Info,
+    getSessionEnd,
     getTokenInfo,
     issueToken,
     cachedRegion,
@@ -1230,6 +1272,7 @@ export type {
   FetchFn,
   LoginAuthFactory,
   SecondaryTokenCommands,
+  SessionEnd,
   SignInMode,
   TokenCacheAccess,
   TokenLadder,
