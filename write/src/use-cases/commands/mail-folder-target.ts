@@ -14,6 +14,8 @@ import { isNotThere } from './mail-folder-reader.ts';
  * a delete, a junk report or a send, so the guard walks up the parents of the
  * target and refuses it. delete-mail-draft is the one command that puts a
  * message (a draft) in Deleted Items, and it does not use this guard.
+ * create-mail-folder uses the same guard on the parent of a new folder, with
+ * its own words.
  */
 
 /** The folders that a move never puts mail in, by well-known name. Some mailboxes do not show each Recoverable Items folder. */
@@ -79,29 +81,36 @@ export const resolveMailFolder = async (folders: FolderReader, spec: string, wha
   );
 };
 
+/**
+ * The words of a refusal of the guard: the refused folder as a noun phrase,
+ * the sentence that says why, and the refusal when the guard cannot read the
+ * refused folders. A move and the create of a folder each have their words.
+ */
+export type FolderGuardWords = { readonly refusedFolder: string; readonly why: string; readonly blind: string };
+
+const MOVE_WORDS: FolderGuardWords = {
+  refusedFolder: 'a folder that no move puts mail in',
+  why: 'A move into Deleted Items, Recoverable Items, Junk Email or Outbox, or into a folder in one of them, is a delete, a junk report or a send. To delete a draft, use delete-mail-draft.',
+  blind: 'The folders that a move never puts mail in (Deleted Items, Junk Email, Outbox) cannot be read, so the move is refused.',
+};
+
 // The ids of the refused folders that this mailbox has.
-const refusedIds = async (folders: FolderReader): Promise<Result<ReadonlyMap<string, MailFolder>, GraphError>> => {
+const refusedIds = async (folders: FolderReader, words: FolderGuardWords): Promise<Result<ReadonlyMap<string, MailFolder>, GraphError>> => {
   const found = new Map<string, MailFolder>();
   for (const name of REFUSED_FOLDERS) {
     const folder = await folders.folder(wellKnown(name));
     if (folder.ok) found.set(folder.value.id, folder.value);
     else if (!isNotThere(folder.error)) return folder;
   }
-  return found.size === 0 ? err(guardBlind) : ok(found);
-};
-
-const guardBlind: GraphError = {
-  type: 'validation_error',
-  code: 'folder_guard_failed',
-  message: 'The folders that a move never puts mail in (Deleted Items, Junk Email, Outbox) cannot be read, so the move is refused.',
+  return found.size === 0 ? err({ type: 'validation_error', code: 'folder_guard_failed', message: words.blind }) : ok(found);
 };
 
 const placeOf = (target: MailFolder, refusedFolder: MailFolder): string => (target.id === refusedFolder.id ? 'is' : `is in "${refusedFolder.displayName}", which is`);
 
-const refused = (what: string, target: MailFolder, refusedFolder: MailFolder): GraphError => ({
+const refused = (what: string, target: MailFolder, refusedFolder: MailFolder, words: FolderGuardWords): GraphError => ({
   type: 'validation_error',
   code: 'folder_refused',
-  message: `${what}: "${target.displayName}" ${placeOf(target, refusedFolder)} a folder that no move puts mail in. A move into Deleted Items, Recoverable Items, Junk Email or Outbox, or into a folder in one of them, is a delete, a junk report or a send. To delete a draft, use delete-mail-draft.`,
+  message: `${what}: "${target.displayName}" ${placeOf(target, refusedFolder)} ${words.refusedFolder}. ${words.why}`,
 });
 
 // The parent of the folder, or undefined at the root: the user cannot read the parent of the root.
@@ -111,15 +120,24 @@ const parentOf = async (folders: FolderReader, folder: MailFolder): Promise<Resu
   return !parent.ok && isNotThere(parent.error) ? ok(undefined) : parent;
 };
 
-/** The folder `target`, or a refusal when it or a parent of it is a refused folder. The walk ends at the root, or at a folder it saw already. */
-export const refuseFolderInRefused = async (folders: FolderReader, target: MailFolder, what: string): Promise<Result<MailFolder, GraphError>> => {
-  const ids = await refusedIds(folders);
+/**
+ * The folder `target`, or a refusal when it or a parent of it is a refused
+ * folder. The walk ends at the root, or at a folder it saw already. `words`
+ * are those of a move unless the caller gives its own.
+ */
+export const refuseFolderInRefused = async (
+  folders: FolderReader,
+  target: MailFolder,
+  what: string,
+  words: FolderGuardWords = MOVE_WORDS
+): Promise<Result<MailFolder, GraphError>> => {
+  const ids = await refusedIds(folders, words);
   if (!ids.ok) return ids;
   const seen = new Set<string>();
   let current: MailFolder | undefined = target;
   while (current !== undefined && !seen.has(current.id)) {
     const hit = ids.value.get(current.id);
-    if (hit !== undefined) return err(refused(what, target, hit));
+    if (hit !== undefined) return err(refused(what, target, hit, words));
     seen.add(current.id);
     const parent = await parentOf(folders, current);
     if (!parent.ok) return parent;
