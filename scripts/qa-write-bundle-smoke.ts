@@ -7,9 +7,9 @@
  *      (unpdf, mammoth, jszip, turndown), no playwright, no read graph
  *      (createReadGraph) and no member of the read tiers (getElevated,
  *      teamsChatIc3);
- *   2. `--version` answers the package version; `--help` lists the 46 write
+ *   2. `--version` answers the package version; `--help` lists the 47 write
  *      commands, `help-json`, `docs` and `undo` (not `mcp`: the bin serves it
- *      before commander); `help-json` gives the package and 50 entries, `mcp`
+ *      before commander); `help-json` gives the package and 51 entries, `mcp`
  *      and `undo` among them; `docs create-mail-draft` prints its page;
  *   3. a missing required flag and an unknown flag each exit 1 with the
  *      commander code and no crash line, before any token request (the run has
@@ -68,6 +68,7 @@ const WRITE_COMMANDS = [
   'create-calendar-draft',
   'create-forward-draft',
   'create-mail-draft',
+  'create-mail-folder',
   'create-planner-bucket',
   'create-planner-task',
   'create-reply-draft',
@@ -181,13 +182,13 @@ const probeCli = (rt: string): ReadonlyArray<Check> => {
   return [
     ['--version answers the package version', exited(version.p, 0) && version.out.trim() === PACKAGE.version, `${exitNote(version.p)}, ${version.out.trim()}`],
     [
-      '--help lists the 46 write commands, help-json, docs and undo, and not mcp',
+      '--help lists the 47 write commands, help-json, docs and undo, and not mcp',
       exited(help.p, 0) && missingHelp.length === 0 && !helpListed('mcp'),
       missingHelp.length === 0 ? exitNote(help.p) : `missing ${missingHelp.join(', ')}`,
     ],
     [
-      'help-json gives the package and 50 entries, mcp and undo among them',
-      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 50 && names.includes('mcp') && names.includes('undo'),
+      'help-json gives the package and 51 entries, mcp and undo among them',
+      exited(helpJson.p, 0) && manifest.package === PACKAGE.name && names.length === 51 && names.includes('mcp') && names.includes('undo'),
       `${manifest.package ?? 'no package'}, ${names.length} entries`,
     ],
     ['docs create-mail-draft prints its page', exited(docs.p, 0) && docs.out.startsWith('# `create-mail-draft`'), exitNote(docs.p)],
@@ -272,8 +273,8 @@ const probeLibrary = (rt: string): ReadonlyArray<Check> => {
   const out = p.stdout?.toString() ?? '';
   return [
     [
-      'the library loads by name with its exports and the 46 commands',
-      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 46',
+      'the library loads by name with its exports and the 47 commands',
+      exited(p, 0) && out === 'commands,createEnvThenHelperTokenSource,createWriteClient,createWriteGraph 47',
       out || (p.stderr?.toString().slice(0, 200) ?? exitNote(p)),
     ],
   ];

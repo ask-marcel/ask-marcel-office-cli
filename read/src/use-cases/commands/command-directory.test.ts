@@ -37,6 +37,7 @@ describe('the command-to-package directory', () => {
       'create-calendar-draft',
       'create-forward-draft',
       'create-mail-draft',
+      'create-mail-folder',
       'create-reply-draft',
       'create-todo-list',
       'create-todo-task',
