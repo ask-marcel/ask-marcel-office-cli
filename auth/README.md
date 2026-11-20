@@ -47,8 +47,14 @@ and `mcp`. `token` is not a `help-json` entry. The full list is in
    a plain `login`. It clears the browser session, so you usually type your
    password again.
 
+Microsoft limits the sign-in session to about 24 hours after the browser
+sign-in. `ask-marcel-office-auth status` shows its end as `session.endsAt`.
+After the end, no token renews itself, and a plain `login` starts a new
+session. To start a new session before the end, run
+`ask-marcel-office-auth login --renew`. It keeps the browser cookies.
+
 The basic token refreshes itself while the token cache holds a good refresh
-token. The elevated token
+token, until the sign-in session ends. The elevated token
 has no refresh token, and it lapses after about an hour. Only `login` can
 capture it again. `ask-marcel-office-auth status` shows each token and the
 time before it expires.
