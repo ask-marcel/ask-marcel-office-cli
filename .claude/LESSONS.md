@@ -6,6 +6,46 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [gotcha] 2026-11-20 | a test of a command meta must use `toStrictEqual`, and a refusal test must assert its `source`
+
+An option with `argumentHint: undefined` passes `toEqual`, so a mutant that removes the hint stays alive. The runner of a command hides the `type` of a refusal but gives its `source`, so a test that asserts only the code does not kill the mutant of the type (Planner step, 2026-11-20).
+Rule for next time: compare a meta with `toStrictEqual`, and assert `source: 'validation'` together with the code of a refusal.
+
+## [gotcha] 2026-11-20 | the strict lint, the per-file mutation gate and the smoke counts fail only in CI
+
+The pre-commit hook runs the fast lint and the mutation of the staged files. CI runs `lint:strict`, the mutation gate for each changed file (90 or more) and `scripts/qa-write-bundle-smoke.ts`, which pins the count of the commands and of the `help-json` entries. Three write steps had a red CI for one of these after a green local run.
+Rule for next time: before the push, run `bun run lint:strict` in the folder. When a step adds a command, raise the counts in `scripts/qa-write-bundle-smoke.ts` in the same commit. On Windows, read the mutation score from CI.
+
+## [mistake] 2026-11-19 | `gh pr merge --delete-branch` removed the local worktree of the branch
+
+The landing of a pull request with `gh pr merge --rebase --delete-branch` also tried to remove the local worktree that had the branch checked out. Git removed its registration and a part of its files, and the folder stayed with leftovers. No commit was lost, because all of them were on `main`.
+Rule for next time: land with `gh pr merge <n> --rebase` and no `--delete-branch`, then `git fetch origin --prune`. Remove a worktree only with its own command, after its owner is done.
+
+## [gotcha] 2026-11-19 | the refresh token of the Teams client lives 24 hours from the interactive sign-in
+
+Entra answers `invalid_grant` with `AADSTS700084` when the CLI redeems the refresh token more than 24 hours after the sign-in in the browser (probe at 24 h 31 min, 2026-11-19). A redemption does not move that limit. Before the limit, the tiers renew with no browser. After it, only a new `login` gives tokens.
+Rule for next time: do not look for a defect in the silent refresh when a session is older than 24 hours. Plan a live run inside the 24 hours after a sign-in, and do not start a sign-in that you cannot complete.
+
+## [gotcha] 2026-11-17 | Bun leaves the old shim files of a global package when its bins change
+
+After the global install of the facade 3.0.0, the bin folder of Bun still held the `.exe` and `.bunx` shim files of the removed `ask-marcel-office` bin. The old name still started, and failed, because its target was gone.
+Rule for next time: when a release removes or renames a bin, tell the user to delete the old shim files from the bin folder of Bun, and check `which <old bin>` after the install.
+
+## [gotcha] 2026-11-17 | on Windows, the Stryker command runner does not run the tests, so each mutant stays alive
+
+A local `bun run mutate:changed` on Windows gives a score of 0 %: the command runner starts, the tests do not run, and Stryker counts each mutant as alive. The same commit gets its real score on the Linux runners of CI.
+Rule for next time: on Windows, do not read a local mutation score as a result. Write the tests for the mutants that you can see in the code, and read the score from CI.
+
+## [gotcha] 2026-11-17 | a tarball that depends on workspace packages that are not on npm cannot install
+
+`bun add -g` of the packed facade failed while its three packages were not on npm: the registry has no `@ask-marcel/office-auth`, `-read` or `-write`. `scripts/facade-bundle.ts` makes one tarball that holds the three packed packages as `bundledDependencies`, and Bun installs that tarball.
+Rule for next time: to install unpublished workspace packages on a computer, use the local bundle (`CONTRIBUTING.md`, "The local install of the facade"), not `bun link` and not a plain `bun pm pack`.
+
+## [decision] 2026-11-17 | `ask-marcel-office-cli` 3.x is a facade of the three packages, with no `ask-marcel-office` bin
+
+The user wanted one global install for the three packages. Version 3.0.0 of `ask-marcel-office-cli` holds no command: it depends on `@ask-marcel/office-auth`, `-read` and `-write` and installs their three bins (ADR 0005). Rejected: one bin that sends each command to its package, because a host that must never write could then not leave the write commands out.
+Rule for next time: do not add a command or a combined MCP server to the facade. A script of 2.8.0 calls the bin of the package that owns the command.
+
 ## [decision] 2026-11-17 | the MCP `params` take the flag name and the camelCase key, as two spellings of one name
 
 The docs and each error name a parameter as a flag (`--message-id`), but `run-command` and `run-write-command` ran only the camelCase key, and the unknown-parameter error named the key that it refused (QA 2026-11-16, P2-1). The user decided that the MCP shell maps `message-id` and `--message-id` to `messageId` (`core/src/use-cases/commands/param-keys.ts`), that two spellings of one key in one call fail with `duplicate_parameter`, and that a value can be a string, a number or a boolean. This is not an alias, so the 2026-07-24 decision (one name for each flag) stays: the CLI and the library keep one spelling. Rejected: camelCase only with an error that names the camelCase key, because the docs pages and the "is missing" errors still show the flag form.
