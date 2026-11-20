@@ -79,6 +79,7 @@ describe('a redemption that Entra refuses because the sign-in session ended', ()
     const result = await ladderOn(sessionOnDisk(), refusing(SESSION_ENDED)).getGuestAccessToken(PARTNER);
     expectSessionEnded(result, 'secondary_token_unavailable');
     expect(JSON.stringify(result)).not.toContain('you may not be a guest');
+    expect(JSON.stringify(result)).not.toContain(PARTNER);
   });
 
   it('gives the same error to a replay of a refused basic token', async () => {

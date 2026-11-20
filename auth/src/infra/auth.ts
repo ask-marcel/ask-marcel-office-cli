@@ -8,7 +8,7 @@ import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fing
 import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
-import type { AuthError, CachedTierInfo, SessionEnd } from '../use-cases/ports/auth-session.ts';
+import type { AuthError, AuthFailureCause, CachedTierInfo, SessionEnd } from '../use-cases/ports/auth-session.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
@@ -760,7 +760,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return writeCache({ ...latest, refresh_token: rotated });
   };
 
-  const causeOf = (error: AuthError): { readonly cause?: 'session_ended' } => (error.type === 'auth_failed' && error.cause !== undefined ? { cause: error.cause } : {});
+  const causeOf = (error: AuthError): { readonly cause?: AuthFailureCause } => (error.type === 'auth_failed' && error.cause !== undefined ? { cause: error.cause } : {});
 
   const refreshSubstrateToken = async (
     cached: CachedToken,
@@ -936,7 +936,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     if (error.type === 'auth_failed' && error.cause === 'session_ended') {
       return err({
         type: 'auth_failed',
-        message: sessionEndedMessage(`a guest token for tenant ${tenant} (${detail})`),
+        message: sessionEndedMessage(`a guest token (${detail})`),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
         cause: 'session_ended',
       });
