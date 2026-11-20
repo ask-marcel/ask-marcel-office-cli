@@ -189,7 +189,6 @@ Graph limits that the calendar drafts meet:
 | `delete-created-planner-item` | create a bucket or a task | the fields that the run set, as the answer of Planner gave them; for a task also its counts of checklist items and references and `hasDescription`; for a bucket also that it has no task | deletes the item with the ETag of its read |
 | `restore-planner-fields` | update a bucket, a task, the details of a task, a checklist item, a link, the name or the label names of a plan | the fields and the entries of a map (assignments, labels, checklist, references, label names) that the run set, as the answer of Planner gave them | writes the values of before back with the ETag of its read |
 | `recreate-planner-bucket` | delete an empty bucket | that the plan is there | makes the bucket again (new id) between the buckets that were next to it |
-| `planner-bucket-deleted-with-tasks` | delete a bucket with tasks | none | none: the status is `failed`, with the reason (`planner_bucket_no_undo`) |
 | `recreate-planner-task` | delete a task | that the plan is there | makes the task again from the copy in the journal (new id), then its details |
 | `delete-uploaded-planner-file` | the file of `add-planner-task-file` | the `cTag` (content) of the file in OneDrive | moves the file to the recycle bin of OneDrive |
 
@@ -225,11 +224,12 @@ Graph limits that the Planner commands meet:
   (`write/src/domain/planner-reference.ts`).
 - A checklist item has a key that the client makes. The undo of a removed item
   gives it a new key.
-- A DELETE of a bucket with tasks: Planner can delete the tasks, or keep them
-  with the `bucketId` of the deleted bucket (live on 2026-11-19, on a plan of
-  the user, the task was still there 8 minutes later). This CLI cannot put a
-  bucket and its tasks back, so that delete has no undo, and the dry-run says
-  so.
+- A DELETE of a bucket with tasks: Planner kept the task, with the `bucketId`
+  of the deleted bucket (live on 2026-11-19, on a plan of the user, the task
+  was still there 8 minutes later). So `delete-planner-bucket` refuses a
+  bucket with tasks (`planner_bucket_has_tasks`), and each delete of a bucket
+  has an undo. The tasks of a bucket come in pages: an empty first page with a
+  next page counts as a bucket with tasks.
 - A deleted task cannot come back with its id. The comments, the dates of
   creation and completion and the order hint of the task are lost.
 - Planner keeps the file of a task of a group plan in the document library of
