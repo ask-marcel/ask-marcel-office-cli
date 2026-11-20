@@ -237,6 +237,19 @@ Graph limits that the Planner commands meet:
   group plan (`planner_group_plan_file`), and puts the file of another plan in
   the OneDrive of the user.
 
+## The undo of create-mail-folder
+
+| Kind | Change | What the check compares | What the undo does |
+|:--|:--|:--|:--|
+| `delete-created-mail-folder` | create a mail folder | the name, the parent, the number of messages and of child folders | deletes the folder, only while it has no message and no child folder |
+
+The journal keeps `{ folderId, name, parentFolderId }` of the new folder
+(`write/src/use-cases/commands/mail-folder-create.ts`). The check reads
+`displayName`, `parentFolderId`, `childFolderCount` and `totalItemCount`. A
+folder that a person renamed, moved or filled is `changed`, and the undo leaves
+it. A live run of 2026-11-20 found the deleted folder neither at the top of the
+mailbox nor in Deleted Items.
+
 ## Local files
 
 A command that reads a local file that a param names (`--ids-file`, `--file`,
