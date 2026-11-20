@@ -99,6 +99,7 @@ describe('the docs of the draft commands', () => {
       'create-calendar-draft',
       'create-forward-draft',
       'create-mail-draft',
+      'create-mail-folder',
       'create-planner-bucket',
       'create-planner-task',
       'create-reply-draft',
