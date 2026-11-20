@@ -44,6 +44,11 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 - `delete-planner-bucket` and `delete-planner-task` are in the `delete` class
   (MCP tool `run-destructive-command`); the 12 other Planner commands are in
   the `task-write` class.
+- The words of the `delete` class name the Planner task and the empty Planner
+  bucket, and say that the delete of a bucket with tasks has no undo. The words
+  of `task-write` say that the file of a Planner task goes into the OneDrive of
+  the user. `run-destructive-command` says that each run has an undo unless
+  those words say that it has none.
 - Write package now: 46 commands, 50 entries in `help-json`, 10 commands in the
   `delete` class, `run-write-command` runs 36, 254 commands in the directory.
 

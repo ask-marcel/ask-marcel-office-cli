@@ -24,13 +24,13 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
   'task-write': {
     destructive: false,
     action:
-      'create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove)',
+      'create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove). The file of a Planner task goes into the folder "Planner attachments" of your OneDrive',
   },
   // The one destructive class: MCP serves it on run-destructive-command, so the host sees the mark on these commands only.
   delete: {
     destructive: true,
     action:
-      'delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, or a calendar draft, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link)',
+      'delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, a calendar draft, a Planner task, or an empty Planner bucket, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link). The delete of a Planner bucket with tasks has no undo',
   },
   'calendar-draft': {
     destructive: false,

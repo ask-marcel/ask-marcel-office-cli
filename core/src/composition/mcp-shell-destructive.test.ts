@@ -46,7 +46,7 @@ describe('the destructive write class', () => {
   it('is destructive, and says what a delete does', () => {
     expect(WRITE_EFFECTS.delete.destructive).toBe(true);
     expect(describeWrites({ 'drop-widget-draft': fakeCommand({ effect: 'delete' }) })).toBe(
-      'drop-widget-draft: delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, or a calendar draft, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link)'
+      'drop-widget-draft: delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, a calendar draft, a Planner task, or an empty Planner bucket, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link). The delete of a Planner bucket with tasks has no undo'
     );
   });
 });
@@ -71,7 +71,7 @@ describe('the MCP tool of the commands that delete', () => {
   it('names its commands, and run-write-command sends a delete there', async () => {
     const tools = await toolsOf(await connect());
     expect(descriptionOf(tools, 'run-destructive-command')).toBe(
-      'Run one of the 1 commands that DELETE in Microsoft 365. drop-widget-draft: delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, or a calendar draft, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link). Each one takes dryRun, and each run has an undo. The other writes are on run-write-command, and the reads on run-command.'
+      'Run one of the 1 commands that DELETE in Microsoft 365. drop-widget-draft: delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, a calendar draft, a Planner task, or an empty Planner bucket, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link). The delete of a Planner bucket with tasks has no undo. Each one takes dryRun, and each run has an undo unless the words above say that it has none. The other writes are on run-write-command, and the reads on run-command.'
     );
     expect(descriptionOf(tools, 'run-write-command')).toBe(
       'Run one of the 1 commands that WRITE to Microsoft 365. save-widget-draft: create or update an UNSENT mail draft (this CLI cannot send mail). The commands that delete are on run-destructive-command: drop-widget-draft. Read commands are rejected here; use run-command.'
