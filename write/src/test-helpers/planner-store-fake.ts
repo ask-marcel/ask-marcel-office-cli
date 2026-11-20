@@ -43,11 +43,21 @@ const badRequest = (message: string): GraphError => ({ type: 'api_error', status
 
 const MAPS = ['assignments', 'appliedCategories', 'checklist', 'references', 'categoryDescriptions'];
 
+// A map field changes only the entries that the body names: an entry that is an object merges its fields (a checklist item keeps its hint), null removes it.
+const mergedMap = (now: Item, body: Item): Item => {
+  const next: Item = { ...now };
+  for (const [entry, value] of Object.entries(body)) {
+    const kept = now[entry];
+    next[entry] = value !== null && typeof value === 'object' && kept !== null && typeof kept === 'object' ? { ...(kept as Item), ...(value as Item) } : value;
+  }
+  return Object.fromEntries(Object.entries(next).filter(([, value]) => value !== null));
+};
+
 const merged = (item: Item, body: Item): Item => {
   const next: Item = { ...item };
   for (const [key, value] of Object.entries(body)) {
     if (!MAPS.includes(key)) next[key] = value;
-    else next[key] = Object.fromEntries(Object.entries({ ...(item[key] as Item | undefined), ...(value as Item) }).filter(([, entry]) => entry !== null));
+    else next[key] = mergedMap((item[key] as Item | undefined) ?? {}, value as Item);
   }
   return next;
 };
