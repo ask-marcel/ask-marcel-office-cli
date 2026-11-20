@@ -45,11 +45,13 @@ import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachmen
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as createForwardDraft from './create-forward-draft.ts';
 import * as createMailDraft from './create-mail-draft.ts';
+import * as createMailFolder from './create-mail-folder.ts';
 import * as createReplyDraft from './create-reply-draft.ts';
 import * as deleteMailDraft from './delete-mail-draft.ts';
 import { DRAFT_UNDO_HANDLERS } from './draft-runs.ts';
 import { DRAFT_ATTACHMENT_UNDO_HANDLERS } from './mail-attachment-undo.ts';
 import { FIELD_UNDO_HANDLERS } from './mail-field-write.ts';
+import { MAIL_FOLDER_UNDO_HANDLERS } from './mail-folder-create.ts';
 import { MOVE_UNDO_HANDLERS } from './mail-move-write.ts';
 import { ITEM_UNDO_HANDLERS } from './todo-item-undo.ts';
 import { TASK_UNDO_HANDLERS } from './todo-task-undo.ts';
@@ -81,6 +83,7 @@ const modules: Readonly<Record<string, WriteCommand>> = {
   'set-mail-flag': setMailFlag,
   'set-mail-categories': setMailCategories,
   'delete-mail-draft': deleteMailDraft,
+  'create-mail-folder': createMailFolder,
   'add-mail-draft-attachment': addMailDraftAttachment,
   'remove-mail-draft-attachment': removeMailDraftAttachment,
   'create-todo-task': createTodoTask,
@@ -129,6 +132,7 @@ const undoHandlers: UndoHandlers = {
   ...DRAFT_ATTACHMENT_UNDO_HANDLERS,
   ...MOVE_UNDO_HANDLERS,
   ...FIELD_UNDO_HANDLERS,
+  ...MAIL_FOLDER_UNDO_HANDLERS,
   ...TASK_UNDO_HANDLERS,
   ...ITEM_UNDO_HANDLERS,
   ...CALENDAR_UNDO_HANDLERS,
