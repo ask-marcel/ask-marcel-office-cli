@@ -1,4 +1,5 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { SessionEnd } from './auth-session.ts';
 
 /**
  * Decode-only status for one non-basic token tier: availability, remaining runway,
@@ -38,6 +39,12 @@ type TokenInfo = {
    * sign-in. It never carries the refresh token itself.
    */
   readonly refreshTokenCached: boolean;
+  /**
+   * The predicted end of the sign-in session, about 24 hours after the browser
+   * sign-in that gave the refresh token. Absent when the token cache does not
+   * hold the time of that sign-in (a cache written before the time was kept).
+   */
+  readonly session?: SessionEnd;
   /**
    * Whether the *persisted* elevated (M365ChatClient) token — the one the
    * historical-version download / convert commands need — is present and still
