@@ -54,14 +54,18 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
       '--force',
       'Ignore the cache and re-capture every token via the browser. Rarely needed, and NOT free: it clears the browser session first so the token grant re-fires, which deletes the 90-day "Stay signed in" cookie and usually means entering your password again. A plain `login` already re-captures the elevated (M365) token when it is missing and leaves that session intact, so reach for `--force` only when a tier is stuck and a plain `login` has not fixed it.'
     )
+    .option(
+      '--renew',
+      'Start a new sign-in session before the current one ends. Microsoft limits the session to about 24 hours after the browser sign-in, and `status` shows its end as `session.endsAt`. It re-captures every token and a new refresh token in the browser, and keeps the browser cookies, so it usually asks for no password. A plain `login` opens no browser while the session is good. With `--force`, `--force` wins.'
+    )
     .action(async () => {
-      const force = loginCmd.opts<{ force?: boolean }>().force ?? false;
+      const { force = false, renew = false } = loginCmd.opts<{ force?: boolean; renew?: boolean }>();
       // The composition root supplies `makeLoginAuth` (a login-configured
       // manager that may recapture secondary tokens via the browser); tests
       // omit it and the injected `auth` fake drives both execute and the
       // token-status read.
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
-      const result = await login.execute(loginAuth, { force });
+      const result = await login.execute(loginAuth, { force, renew });
       if (!result.ok) {
         output.fail(result.error.type === 'auth_cancelled' ? AUTH_CANCELLED_MESSAGE : result.error.message);
         return;
@@ -82,6 +86,7 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
         elevatedAvailable: info.value.elevated.available,
         chatsvcaggAvailable: info.value.chatsvcagg.available,
         ic3Available: info.value.ic3.available,
+        ...(info.value.session === undefined ? {} : { session: info.value.session }),
       });
       output.print(fillNamesIn(summary, names));
     });
@@ -91,6 +96,7 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
       [
         '',
         'Examples:      {auth-bin} login          (sign in the first time, or show all four token statuses if already signed in)',
+        '               {auth-bin} login --renew  (start a new sign-in session of about 24 hours, browser cookies kept)',
         '               {auth-bin} login --force  (re-capture every token via the browser, ignoring the cache)',
         'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
         'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',

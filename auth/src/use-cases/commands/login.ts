@@ -1,14 +1,26 @@
 import { z } from 'zod';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { AuthError, AuthSession } from '../ports/auth-session.ts';
+import { sessionHasEnded } from './session-report.ts';
 
 const schema = z.object({}).strict();
 
-// A session that cannot renew itself: the cache holds no refresh token, or the
-// headless refresh of a substrate tier failed. A read the manager does not
-// supply is no evidence, so it does not count.
+// `force`: the capture that clears the browser cookies. `renew`: the capture
+// with the cookies kept, which starts a new sign-in session of about 24 hours.
+// With both, `force` wins (the ladder's sign-in mode): it also captures every
+// token and a new refresh token.
+type LoginOptions = { readonly force?: boolean; readonly renew?: boolean };
+
+// `--force` and `--renew` run the browser capture of every tier at once.
+const browserCaptureRan = (options: LoginOptions | undefined): boolean => options?.force === true || options?.renew === true;
+
+// A session that cannot renew itself: the cache holds no refresh token, the
+// sign-in session is past its predicted end (about 24 hours after the browser
+// sign-in), or the headless refresh of a substrate tier failed. A read the
+// manager does not supply is no evidence, so it does not count.
 const cannotRenewItself = async (auth: AuthSession): Promise<boolean> => {
   if ((await auth.hasRefreshToken?.()) === false) return true;
+  if (sessionHasEnded(await auth.getSessionEnd?.())) return true;
   if ((await auth.getCachedChatsvcaggInfo?.())?.available === false) return true;
   return (await auth.getCachedIc3Info?.())?.available === false;
 };
@@ -44,12 +56,12 @@ const cannotRenewItself = async (auth: AuthSession): Promise<boolean> => {
  * `freshElevatedToken`. Verified live 2026-08-30: silent capture in 17s with no
  * prompt, and the same call failing against a profile a forced login had wiped.
  */
-const execute = async (auth: AuthSession, options?: { force?: boolean }): Promise<Result<string, AuthError>> => {
+const execute = async (auth: AuthSession, options?: LoginOptions): Promise<Result<string, AuthError>> => {
   const authenticated = await auth.getAccessToken(options);
-  // Already forced: the dance just ran. If elevated is still missing (a
-  // federated tenant whose capture failed), escalating again would open a
+  // Already forced or renewed: the dance just ran. If elevated is still missing
+  // (a federated tenant whose capture failed), escalating again would open a
   // second browser for nothing.
-  if (!authenticated.ok || options?.force === true) return authenticated;
+  if (!authenticated.ok || browserCaptureRan(options)) return authenticated;
   // The two substrate tiers self-heal from the shared refresh token over HTTP, so
   // warming them costs one round trip each and no browser. Without it a warm-cache
   // `login` reported them missing having attempted nothing, and its remedy pointed
