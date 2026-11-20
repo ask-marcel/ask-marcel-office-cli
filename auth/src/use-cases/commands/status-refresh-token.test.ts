@@ -8,7 +8,7 @@ import { execute } from './status.ts';
 // promises no self-heal. It never shows the refresh token or a part of it.
 
 const REFRESH_HINT =
-  'To refresh: run `{auth-bin} login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token. Run `{auth-bin} login --force` to re-capture every tier unconditionally.';
+  'To refresh: run `{auth-bin} login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token until the sign-in session ends (`session.endsAt`, about 24 hours after the browser sign-in). Run `{auth-bin} login --renew` to start a new session before that time; it keeps the browser cookies. Run `{auth-bin} login --force` to re-capture every tier unconditionally.';
 const NO_REFRESH_TOKEN_HINT =
   'The token cache holds no refresh token, so no token renews itself. Run `{auth-bin} login`: it captures every token and a new refresh token, and it keeps the browser session. If the refresh token is still missing after that, run `{auth-bin} login --force`.';
 const BASIC_REASON_NO_REFRESH_TOKEN =
@@ -39,8 +39,8 @@ describe('status when the token cache holds the refresh token', () => {
     expect(report['hint']).toBe(REFRESH_HINT);
   });
 
-  it('puts the refreshToken key between the four tiers and the hint', async () => {
-    expect(Object.keys(await statusOf(tokenInfo(true, 3600)))).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'hint']);
+  it('puts the refreshToken key between the four tiers and the session', async () => {
+    expect(Object.keys(await statusOf(tokenInfo(true, 3600)))).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'session', 'hint']);
   });
 });
 
