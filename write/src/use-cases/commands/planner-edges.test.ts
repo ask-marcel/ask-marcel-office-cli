@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
-import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err } from '@ask-marcel/office-core/domain/result.ts';
 import { createRunJournalFake } from '@ask-marcel/office-core/test-helpers/run-journal-fake.ts';
 import { createLocalBytesFake, utf8Bytes } from '../../test-helpers/local-bytes-fake.ts';
 import { createPlannerStoreFake } from '../../test-helpers/planner-store-fake.ts';
 import { RUN_ID, runWrite, statusesOf, undoWrite } from '../../test-helpers/run-write.ts';
-import { PLANNER_UNDO_HANDLERS } from './planner-undo.ts';
 
 /*
  * The edges of the Planner commands: an older plan of a group (an owner and no
@@ -113,18 +110,21 @@ describe('the edges of the Planner commands', () => {
     expect(planner.items.get('/planner/tasks/task-new-1/details')).toMatchObject({ description: 'The text', previewType: 'automatic', checklist: {}, references: {} });
   });
 
-  it('refuses the undo of a bucket deleted with its tasks, in the check and in the write', async () => {
-    const handler = PLANNER_UNDO_HANDLERS['planner-bucket-deleted-with-tasks'];
+  it('refuses a bucket whose first page of tasks is empty but has a next page, as a bucket with tasks', async () => {
     const planner = createPlannerStoreFake();
-    const refusal: Result<never, GraphError> = err({
-      type: 'validation_error',
-      code: 'planner_bucket_no_undo',
-      message:
-        'The bucket had 2 task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.',
+    planner.answers.set('GET /planner/buckets/bucket-b/tasks', { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/planner/buckets/bucket-b/tasks?$skiptoken=x' });
+    expect(await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-b' })).toMatchObject({
+      error: { code: 'planner_bucket_has_tasks', message: expect.stringContaining('the bucket has 1 task(s) or more') },
     });
-    expect(await handler?.check(planner.graph, { bucketId: 'bucket-a', tasks: 2 })).toEqual(refusal);
-    expect(await handler?.apply(planner.graph, { bucketId: 'bucket-a', tasks: 2 })).toEqual(refusal);
-    expect(planner.calls).toEqual([]);
+    expect(planner.calls.filter((call) => !call.startsWith('GET'))).toEqual([]);
+  });
+
+  it('counts the tasks of the first page and one more for a next page', async () => {
+    const planner = createPlannerStoreFake();
+    planner.answers.set('GET /planner/buckets/bucket-a/tasks', { value: [{}, {}], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/next' });
+    expect(await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' })).toMatchObject({
+      error: { message: expect.stringContaining('the bucket has 3 task(s) or more') },
+    });
   });
 
   it('refuses a journal whose undo names a kind of item or an id that this CLI did not write', async () => {

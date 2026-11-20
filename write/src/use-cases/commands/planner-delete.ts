@@ -11,35 +11,30 @@ import { deletePlanner, sameItem } from './planner-patch.ts';
 
 /*
  * The delete of a Planner bucket or task. Just before the write the op reads
- * the item again and passes over one that changed; a bucket that got or lost
- * a task is passed over too, as its undo depends on it. A bucket with tasks
- * has no undo (Planner can delete the tasks or keep them with no bucket, and
- * this CLI cannot put them back): the plan says so before the run.
+ * the item again and passes over one that changed. The plan refuses a bucket
+ * that has tasks, so a bucket that gets a task after the plan is passed over
+ * too: the delete of a bucket is always the delete of an empty bucket, and its
+ * undo makes the bucket again.
  */
 
-/** The words that the dry-run and the answer give to a bucket that has tasks. */
-export const noBucketUndoNote = (tasks: number): string =>
-  `none: the bucket has ${tasks} task(s). Planner can delete them with it or keep them with no bucket, and this CLI cannot put them back: move or delete them first`;
-
-// Both the bucket and the count of its tasks are as the plan read them.
-const sameBucket = async (reads: GraphReads, bucket: PlannerItem, tasks: number): Promise<Result<boolean, GraphError>> => {
+// The bucket is as the plan read it, and still has no task.
+const sameEmptyBucket = async (reads: GraphReads, bucket: PlannerItem): Promise<Result<boolean, GraphError>> => {
   const same = await sameItem(reads, 'bucket', bucket);
   if (!same.ok || !same.value) return same;
   const count = await countBucketTasks(reads, bucket.id);
-  return count.ok ? ok(count.value === tasks) : count;
+  return count.ok ? ok(count.value === 0) : count;
 };
 
 /** The place of a bucket: the ids of the buckets next to it, for an undo that puts it back there. */
 export type BucketPlace = { readonly after?: GraphId; readonly before?: GraphId };
 
-/** The op that deletes the bucket. `tasks` is the count of its tasks, `place` the buckets next to it. */
-export const deleteBucketOp = (bucket: PlannerItem, planId: GraphId, name: string, tasks: number, place: BucketPlace, before: ItemIds): TodoOp => {
+/** The op that deletes the empty bucket. `place` names the buckets next to it, so the undo makes it again there. */
+export const deleteBucketOp = (bucket: PlannerItem, planId: GraphId, name: string, place: BucketPlace, before: ItemIds): TodoOp => {
   const change: PlannedChange = { action: 'delete-planner-bucket', target: plannerPath('bucket', bucket.id), before };
-  const undo: UndoStep =
-    tasks > 0 ? { kind: 'planner-bucket-deleted-with-tasks', data: { bucketId: bucket.id, tasks } } : { kind: 'recreate-planner-bucket', data: { planId, name, place } };
+  const undo: UndoStep = { kind: 'recreate-planner-bucket', data: { planId, name, place } };
   return {
     change,
-    recheck: async (reads) => sameBucket(reads, bucket, tasks),
+    recheck: async (reads) => sameEmptyBucket(reads, bucket),
     write: async (graph) => {
       const deleted = await deletePlanner(graph, 'bucket', bucket.id, bucket.etag);
       return outcomeOf(deleted.ok ? ok({ ...change, after: {}, undo }) : deleted);

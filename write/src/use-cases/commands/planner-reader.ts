@@ -80,12 +80,17 @@ export const readBuckets = async (reads: GraphReads, planId: GraphId): Promise<R
   return ok(page.data.value.map(({ id, name, orderHint }) => ({ id: id as GraphId, name, orderHint })).toSorted((a, b) => byHint(a.orderHint, b.orderHint)));
 };
 
-const tasksSchema = z.object({ value: z.array(z.unknown()) });
+const tasksSchema = z.object({ value: z.array(z.unknown()), '@odata.nextLink': z.string().optional() }).loose();
 
-/** How many tasks the bucket has. */
+/**
+ * How many tasks the bucket has, at least: the tasks of the first page, and
+ * one more when Graph gives a next page. So a bucket is empty only when its
+ * first page is empty and has no next page.
+ */
 export const countBucketTasks = async (reads: GraphReads, bucketId: GraphId): Promise<Result<number, GraphError>> => {
   const read = await reads.get(`/planner/buckets/${bucketId}/tasks`);
   if (!read.ok) return read;
   const page = tasksSchema.safeParse(read.value);
-  return page.success ? ok(page.data.value.length) : err(unreadable('the tasks of a Planner bucket'));
+  if (!page.success) return err(unreadable('the tasks of a Planner bucket'));
+  return ok(page.data.value.length + (page.data['@odata.nextLink'] === undefined ? 0 : 1));
 };

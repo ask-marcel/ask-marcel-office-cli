@@ -57,10 +57,10 @@ describe('the place of a bucket', () => {
     expect(last.items.get('/planner/buckets/bucket-new-1')).toMatchObject({ name: 'Doing', orderHint: 'a !' });
   });
 
-  it('says nothing of an undo on the dry-run of an empty bucket', async () => {
+  it('gives the ids and the name of an empty bucket on the dry-run of its delete', async () => {
     const planner = createPlannerStoreFake();
     const dry = await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-b' }, { dryRun: true });
-    expect((dry['changes'] as ReadonlyArray<{ before: unknown }>)[0]?.before).toEqual({ bucketId: 'bucket-b', name: 'Doing', planId: 'plan-1', tasks: '0' });
+    expect((dry['changes'] as ReadonlyArray<{ before: unknown }>)[0]?.before).toEqual({ bucketId: 'bucket-b', name: 'Doing', planId: 'plan-1' });
   });
 });
 

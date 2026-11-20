@@ -98,7 +98,7 @@ describe('the docs of the Planner bucket commands', () => {
   it('pins the meta of delete-planner-bucket', () => {
     expect(deletePlannerBucket).toStrictEqual({
       summary:
-        'Delete a Planner bucket. The dry-run gives the count of its tasks, and a bucket with tasks has NO undo: Planner can delete its tasks or keep them with no bucket, so move or delete them first. Over MCP it runs on run-destructive-command.',
+        'Delete an empty Planner bucket. A bucket with tasks is refused before any write: delete or move its tasks first. The undo makes the bucket again with a new id. Over MCP it runs on run-destructive-command.',
       category: 'tasks',
       graphMethod: 'DELETE',
       graphPathTemplate: '/planner/buckets/{bucket-id}',
@@ -117,7 +117,7 @@ describe('the docs of the Planner bucket commands', () => {
       example: '{write-bin} delete-planner-bucket --bucket-id "hsOf2dhOJkqyYYZEtdzDe2QAIUCR" --dry-run',
       bodyTemplate: 'no body, with If-Match: <ETag of the bucket>',
       effect: 'delete',
-      undo: 'for a bucket with no task: makes the bucket again (new id) between the buckets that were next to it. For a bucket with tasks: none (this CLI cannot put a bucket and its tasks back)',
+      undo: 'makes the bucket again (new id) between the buckets that were next to it, if the plan is still there',
       scopesRequired: ['Tasks.ReadWrite'],
       responseShape:
         '`{ done, skipped: [{ target, before, reason }], failed: [{ target, before, reason }], runId, changes: [{ action, target, before, after }] }`. `before` has the ids and the name of the item before the change, and `after` the ids after it: a new item shows its new id there. An item that changed between the plan and the write is in `skipped`; a write that Planner refused is in `failed` (an item changed after the read gives the code `planner_item_changed`: run the command again). With --dry-run: `{ dryRun: true, changes, skipped }`, and nothing changes.',

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
-import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { UndoCheck, UndoHandlers } from '@ask-marcel/office-core/use-cases/commands/undo-run.ts';
 import type { GraphReads } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import type { WriteGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
@@ -80,14 +80,6 @@ const applyCreated = async (graph: WriteGraph, data: z.infer<typeof createdSchem
 };
 
 const bucketSchema = z.object({ planId: graphIdSchema, name: z.string().min(1), place: neighboursSchema });
-const keptSchema = z.object({ bucketId: graphIdSchema, tasks: z.number().int().positive() });
-
-const noBucketUndo = (tasks: number): Result<never, GraphError> =>
-  err({
-    type: 'validation_error',
-    code: 'planner_bucket_no_undo',
-    message: `The bucket had ${tasks} task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.`,
-  });
 
 const applyBucket = async (graph: WriteGraph, data: z.infer<typeof bucketSchema>): Promise<Result<unknown, GraphError>> => {
   const hint = await hintOfPlace(graph, data.planId, data.place);
@@ -109,10 +101,5 @@ export const PLANNER_UNDO_HANDLERS: UndoHandlers = {
       return plan.ok ? ok('ready') : notThere(plan.error);
     },
     applyBucket
-  ),
-  'planner-bucket-deleted-with-tasks': createTodoUndoHandler(
-    keptSchema,
-    async (_reads, data) => noBucketUndo(data.tasks),
-    async (_graph, data) => noBucketUndo(data.tasks)
   ),
 };
