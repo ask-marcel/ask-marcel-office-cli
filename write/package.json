@@ -1,7 +1,7 @@
 {
   "name": "@ask-marcel/office-write",
   "version": "1.0.0",
-  "description": "Microsoft Graph write commands for agents: mail drafts and attachment-to-PDF conversion.",
+  "description": "Microsoft Graph write commands for agents: mail drafts, mail state, To Do, Planner, calendar drafts and attachment-to-PDF conversion.",
   "license": "MIT",
   "author": "Vincent Delacourt <vincent.delacourt@adama-development.com>",
   "repository": {

@@ -4,7 +4,7 @@ This page lists the commands of the `ask-marcel-office-read` bin of `@ask-marcel
 
 The 204 commands are in 11 categories. `help-json` lists 207 entries: the 204 commands and the 3 lifecycle commands below.
 
-`help-json` adds `docs`, `help-json` and `mcp` to the commands. The sign-in commands (`login`, `status` and `logout`) are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`. The commands that write (mail drafts and PDF conversions) are in the `ask-marcel-office-write` bin of `@ask-marcel/office-write`.
+`help-json` adds `docs`, `help-json` and `mcp` to the commands. The sign-in commands (`login`, `status` and `logout`) are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`. The commands that write (mail and calendar drafts, the state of mail, To Do, Planner and PDF conversions) are in the `ask-marcel-office-write` bin of `@ask-marcel/office-write`.
 
 `bun run docs:gen` in this folder makes the two tables below from the registry. CI fails when a table is out of date. Do not edit the tables by hand.
 

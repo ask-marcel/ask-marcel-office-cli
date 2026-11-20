@@ -76,6 +76,14 @@ bun scripts/facade-bundle.ts ~/.ask-marcel-office-local --global
 ask-marcel-office-auth status
 ```
 
+In PowerShell:
+
+```powershell
+foreach ($folder in 'auth', 'read', 'write', 'cli') { Push-Location $folder; bun run build; Pop-Location }
+bun scripts/facade-bundle.ts "$HOME\.ask-marcel-office-local" --global
+ask-marcel-office-auth status
+```
+
 `scripts/facade-bundle.ts` writes one tarball that holds the facade and the
 three packed packages. With `--global` it runs `bun add -g` on that tarball,
 which replaces an installed `ask-marcel-office-cli`. Keep the tarball: Bun

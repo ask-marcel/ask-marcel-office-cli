@@ -31,7 +31,10 @@ describe('the write package the shells are wired with', () => {
   it('says in its own words what it writes, that it sends nothing, and where the reads and the sign-in are', () => {
     const { description } = commandPackage;
     expect(description).toContain('mail drafts');
+    expect(description).toContain('Planner');
+    expect(description).toContain('calendar drafts');
     expect(description).toContain('It sends no mail');
+    expect(description).toContain('no meeting invitation');
     expect(description).toContain('@ask-marcel/office-read');
     expect(description).toContain('@ask-marcel/office-auth');
   });
