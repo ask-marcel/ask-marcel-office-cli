@@ -300,6 +300,14 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   // second step. Matched on the message, not on the code
   // alone: the auth bin gives the same codes with a message that already names
   // `login`, and a helper failure with no code it knows keeps the bare message.
+  // The helper says why when it knows: Entra refused the refresh token because
+  // the sign-in session ended. Placed above the two rules below, so the remedy
+  // is given one time only.
+  {
+    source: 'cli',
+    matchMessage: (m) => m.startsWith('The token helper gave no ') && m.includes(', cause session_ended,'),
+    hint: 'The sign-in session ended: Microsoft limits it to about 24 hours after the browser sign-in, and a renewal does not move that limit. Run `{auth-bin} login` in a terminal (a plain login starts a new session), then retry. `{auth-bin} status` shows when the new session ends.',
+  },
   {
     source: 'cli',
     matchMessage: (m) => helperGaveNoToken(m, 'not_authenticated'),

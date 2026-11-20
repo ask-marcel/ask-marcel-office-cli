@@ -1,11 +1,13 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { SessionEnd } from './auth-session.ts';
 
 /**
  * Decode-only status for one non-basic token tier: availability, remaining runway,
  * the scopes granted to that token (decoded from its `scp`), and how it refreshes
  * (`automatic` = rides the shared refresh token that the cache holds; `interactive`
  * = needs a login: always for elevated, and for every tier when the cache holds no
- * refresh token).
+ * refresh token or the sign-in session ended, about 24 hours after the browser
+ * sign-in).
  */
 type TokenTierInfo = {
   readonly available: boolean;
@@ -39,6 +41,12 @@ type TokenInfo = {
    */
   readonly refreshTokenCached: boolean;
   /**
+   * The predicted end of the sign-in session, about 24 hours after the browser
+   * sign-in that gave the refresh token. Absent when the token cache does not
+   * hold the time of that sign-in (a cache written before the time was kept).
+   */
+  readonly session?: SessionEnd;
+  /**
    * Whether the *persisted* elevated (M365ChatClient) token — the one the
    * historical-version download / convert commands need — is present and still
    * usable, plus its raw seconds-to-expiry (`undefined` when absent). Lets
@@ -49,7 +57,8 @@ type TokenInfo = {
   /**
    * The two Teams-chat substrate tokens (chatsvcagg / ic3), same `TokenTierInfo`
    * shape as `elevated`. Both self-heal from the shared refresh token (refresh:
-   * automatic), so they are informational rather than a preflight gate.
+   * automatic) until the sign-in session ends, so they are informational rather
+   * than a preflight gate.
    */
   readonly chatsvcagg: TokenTierInfo;
   readonly ic3: TokenTierInfo;

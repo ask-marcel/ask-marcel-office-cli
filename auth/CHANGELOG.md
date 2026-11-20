@@ -6,6 +6,28 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the end of the sign-in session of about 24 hours
+
+On 2026-11-19 Entra refused the refresh token 24 hours after the browser
+sign-in (`AADSTS700084`). A renewal does not move that limit. `status` still
+showed `refresh: automatic`, and the errors did not name the cause.
+
+- The token cache keeps the time of the browser sign-in that gave the refresh
+  token (`signed_in_at`, optional). A redemption does not change it. A cache
+  with no time still loads.
+- `status` and the answer of `login` give `session`: `endsAt` and
+  `endsInSeconds`, or a `reason` when the end is not known. After the end,
+  `basic`, `chatsvcagg` and `ic3` show `refresh: interactive`, and the hint
+  tells you to run a plain `login`.
+- When Entra refuses the refresh token with `AADSTS700084`, the error says that
+  the sign-in session ended and that a plain `login` starts a new one. The
+  error codes stay. The line of the token helper adds
+  `"cause":"session_ended"`. The end that the CLI predicts never stops a
+  redemption.
+- New option `login --renew` (and `renew` on the MCP `login` tool): the browser
+  capture with the cookies kept, which starts a new session. With `--force`,
+  `--force` wins. A plain `login` past the predicted end runs the same capture.
+
 ### Fixed: a session with no refresh token
 
 On 2026-11-18 the token cache held no refresh token after a sign-in. No tier

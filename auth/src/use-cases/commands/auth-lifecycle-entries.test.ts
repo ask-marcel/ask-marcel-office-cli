@@ -58,8 +58,11 @@ describe('the lifecycle entries of the auth package', () => {
     expect(named.length).toBeGreaterThan(0);
   });
 
-  it('keeps `login --force` optional, so a bare `login` still runs', () => {
-    expect(entry('login').options.map((option) => [option.name, option.key, option.required])).toEqual([['force', 'force', false]]);
+  it('keeps `login --force` and `login --renew` optional, so a bare `login` still runs', () => {
+    expect(entry('login').options.map((option) => [option.name, option.key, option.required])).toEqual([
+      ['force', 'force', false],
+      ['renew', 'renew', false],
+    ]);
   });
 
   it('asks `docs` for the name of a command as a required positional argument', () => {

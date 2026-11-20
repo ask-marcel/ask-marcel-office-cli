@@ -12,11 +12,11 @@ different service.
 
 | Tier | What it reads | How it refreshes |
 |:--|:--|:--|
-| `basic` | Mail, files, calendar, people, tasks and notes (most commands) | Automatically, while the token cache holds a good refresh token |
+| `basic` | Mail, files, calendar, people, tasks and notes (most commands) | Automatically, while the token cache holds a good refresh token and the sign-in session did not end (about 24 hours) |
 | `elevated` | The file version history and the Teams chat list | Only `login` captures it again (a browser) |
-| `chatsvcagg` | The content of Teams chat messages | Automatically, while the token cache holds a good refresh token |
-| `ic3` | The history of Teams chats | Automatically, while the token cache holds a good refresh token |
-| `guest` | Files in a partner tenant where you are a guest (`--tenant <guid>`) | Automatically, while the token cache holds a good refresh token |
+| `chatsvcagg` | The content of Teams chat messages | Automatically, while the token cache holds a good refresh token and the sign-in session did not end (about 24 hours) |
+| `ic3` | The history of Teams chats | Automatically, while the token cache holds a good refresh token and the sign-in session did not end (about 24 hours) |
+| `guest` | Files in a partner tenant where you are a guest (`--tenant <guid>`) | Automatically, while the token cache holds a good refresh token and the sign-in session did not end (about 24 hours) |
 
 `ask-marcel-office-auth status` shows the first four tiers. For each tier, it
 shows if the token is available, the seconds before it expires, its scopes and
@@ -45,6 +45,35 @@ expiry.
   `auth.refresh.redeem_skipped` with the tier. A sign-in that captures no
   refresh token writes the warn event `auth.refresh.not_captured`. Set
   `ASKMARCEL_LOG_LEVEL=warn` to see them.
+
+### The sign-in session of about 24 hours
+
+Microsoft limits the refresh token of the Teams web client to about 24 hours
+after the browser sign-in that gave it. A renewal does not move that limit.
+After the end, Entra refuses the refresh token (`AADSTS700084`), and no tier
+renews itself. Only a browser sign-in starts a new session.
+
+- The token cache keeps the time of the browser sign-in that gave the refresh
+  token. A redemption does not change it. `status` and the answer of `login`
+  show the end of the session as `session.endsAt` (an ISO time) and
+  `session.endsInSeconds` (negative after the end).
+- A cache written before this version holds no time. Then `session` gives only
+  a `reason`, and the tiers show what they showed before. The next browser
+  sign-in records the time.
+- After the end, `status` shows `refresh: interactive` for `basic`,
+  `chatsvcagg` and `ic3`, and the hint tells you to run a plain `login`.
+- The end is a prediction only. A command still sends the refresh token to
+  Entra. When Entra refuses it with `AADSTS700084`, the error says that the
+  sign-in session ended. The error code stays `not_authenticated` or
+  `secondary_token_unavailable`. The line of the token helper adds
+  `"cause":"session_ended"`, and the read and write packages give the same hint.
+- After the end, run a plain `ask-marcel-office-auth login`. It captures every
+  tier and a new refresh token in the browser, and it keeps the browser
+  cookies, so it usually asks for no password.
+- To start a new session before the end, run
+  `ask-marcel-office-auth login --renew`. It runs the same capture. A plain
+  `login` opens no browser while the session is good. With `--force`,
+  `--force` wins.
 
 ## The elevated token
 
@@ -101,7 +130,7 @@ The full call is `--tier <basic|elevated|chatsvcagg|ic3|guest>`, with
 | Exit | stdout |
 |:--|:--|
 | 0 | `{"accessToken":"…","expiresOn":1760000000}`. `expiresOn` is the `exp` of the token, in seconds since the epoch. The chatsvcagg and ic3 tiers add `"region":"emea"`. |
-| 1 | `{"errorCode":"…","tier":"basic","message":"…","remedy":"…"}`, with the error code `not_authenticated`, `secondary_token_unavailable`, `auth_cancelled`, `sign_in_in_progress` or `token_cache_unwritable` |
+| 1 | `{"errorCode":"…","tier":"basic","message":"…","remedy":"…"}`, with the error code `not_authenticated`, `secondary_token_unavailable`, `auth_cancelled`, `sign_in_in_progress` or `token_cache_unwritable`. When the sign-in session ended, the line adds `"cause":"session_ended"`. |
 | 2 | The same shape with `"errorCode":"invalid_arguments"`. `tier` is `null` when the call names no known tier. |
 
 - `--tenant` goes with the `guest` tier only, and that tier needs it.
@@ -168,8 +197,8 @@ The read and write packages also read `ASKMARCEL_TOKEN_COMMAND` and the
 
 | Code | What to do |
 |:--|:--|
-| `not_authenticated` | You are not signed in. Run `ask-marcel-office-auth login`. |
-| `secondary_token_unavailable` | The elevated, chatsvcagg or ic3 token is not available. For the elevated token, run `ask-marcel-office-auth login` in a terminal on a machine with a browser. The chat tiers usually refresh on the next chat command. |
+| `not_authenticated` | You are not signed in, or the sign-in session ended (about 24 hours after the browser sign-in). Run `ask-marcel-office-auth login`. |
+| `secondary_token_unavailable` | The elevated, chatsvcagg or ic3 token is not available. For the elevated token, run `ask-marcel-office-auth login` in a terminal on a machine with a browser. The chat tiers usually refresh on the next chat command, until the sign-in session ends. When the message says that the session ended, run `ask-marcel-office-auth login`. |
 | `auth_cancelled` | The sign-in stopped. If you closed the window, run `login` again. If the browser stayed on a blank page, security software can block it. Try the Node install, and set `ASKMARCEL_TRACE=1` to see the cause. |
 | `sign_in_in_progress` | Another process signs in or refreshes. Wait, then ask again. `ask-marcel-office-auth status` shows the tokens when it is done. |
 | `token_cache_unwritable` | Make `~/.ask-marcel` writable by this user, then run `ask-marcel-office-auth login`. |

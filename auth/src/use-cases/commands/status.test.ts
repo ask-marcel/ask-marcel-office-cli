@@ -29,15 +29,16 @@ describe('status', () => {
         chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic', reads: 'Teams chat message content' },
         ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic', reason: 'not cached', reads: 'Teams chat history' },
         refreshToken: 'cached',
+        session: { reason: expect.stringContaining('not known') },
         hint: expect.stringContaining('{auth-bin} login'),
       })
     );
   });
 
-  it('has only the keys basic, elevated, chatsvcagg, ic3, refreshToken and hint, with no loose fields of the basic token', async () => {
+  it('has only the keys basic, elevated, chatsvcagg, ic3, refreshToken, session and hint, with no loose fields of the basic token', async () => {
     const result = await statusOf(tokenInfo());
     expect(result.ok).toBe(true);
-    if (result.ok) expect(Object.keys(result.value)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'hint']);
+    if (result.ok) expect(Object.keys(result.value)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'session', 'hint']);
   });
 
   it('reports the basic token as available, with no reason, when more than 5 minutes remain before its expiry', async () => {

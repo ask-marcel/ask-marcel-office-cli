@@ -28,6 +28,11 @@ const KNOWN_CODES: ReadonlyArray<string> = [
   'invalid_arguments',
 ];
 
+// The causes that the helper can add to a failure line. `session_ended`: Entra
+// refused the refresh token because the sign-in session ended (about 24 hours
+// after the browser sign-in). A cause not in this list goes nowhere.
+const KNOWN_CAUSES: ReadonlyArray<string> = ['session_ended'];
+
 // The helper's own rule: a failure that carries no code gets its tier's.
 export const tierCode = (tier: TokenTier): string => (tier === 'basic' ? 'not_authenticated' : 'secondary_token_unavailable');
 
@@ -39,11 +44,17 @@ const knownCode = (parsed: unknown): string | undefined => {
   return KNOWN_CODES.find((known) => known === code);
 };
 
+const knownCause = (parsed: unknown): string | undefined => {
+  const cause = fieldOf(parsed, 'cause');
+  return KNOWN_CAUSES.find((known) => known === cause);
+};
+
 const byHand = (tier: TokenTier): string => `{auth-bin} token --tier ${tier}${tier === 'guest' ? ' --tenant <guid>' : ''}`;
 
 const failed = (tier: TokenTier, run: ProcessRunResult, parsed: unknown): Result<never, TokenError> => {
   const code = knownCode(parsed);
-  const told = code === undefined ? 'no errorCode it knows' : `errorCode ${code}`;
+  const cause = knownCause(parsed);
+  const told = (code === undefined ? 'no errorCode it knows' : `errorCode ${code}`) + (cause === undefined ? '' : `, cause ${cause}`);
   const bytes = new TextEncoder().encode(run.stdout).byteLength;
   return err({
     type: 'auth_failed',
