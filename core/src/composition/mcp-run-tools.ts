@@ -76,5 +76,5 @@ export const writeToolDescription = (registry: Registry, names: RunToolNames, re
 /** The description of run-destructive-command; `readsTool` names the tool or the server of the reads. */
 export const deleteToolDescription = (registry: Registry, names: RunToolNames, readsTool: string): string => {
   const deletes = names['run-destructive-command'];
-  return `Run one of the ${deletes.length} commands that DELETE in Microsoft 365. ${describeWrites(only(registry, deletes))}. Each one takes dryRun, and each run has an undo unless the words above say that it has none. The other writes are on run-write-command, and the reads on ${readsTool}.`;
+  return `Run one of the ${deletes.length} commands that DELETE in Microsoft 365. ${describeWrites(only(registry, deletes))}. Each one takes dryRun, and each run has an undo. The other writes are on run-write-command, and the reads on ${readsTool}.`;
 };
