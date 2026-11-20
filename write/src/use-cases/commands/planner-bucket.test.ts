@@ -173,7 +173,7 @@ describe('delete-planner-bucket', () => {
     const run = await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-b' }, { journal });
     expect(run).toMatchObject({
       done: 1,
-      changes: [{ action: 'delete-planner-bucket', before: { bucketId: 'bucket-b', name: 'Doing', planId: 'plan-1', tasks: '0' }, after: {} }],
+      changes: [{ action: 'delete-planner-bucket', before: { bucketId: 'bucket-b', name: 'Doing', planId: 'plan-1' }, after: {} }],
     });
     expect(planner.calls).toContain('DELETE /planner/buckets/bucket-b');
     const undo = await undoWrite(planner.graph, journal, true);
@@ -181,17 +181,20 @@ describe('delete-planner-bucket', () => {
     expect(planner.items.get('/planner/buckets/bucket-new-1')).toMatchObject({ name: 'Doing', planId: 'plan-1', orderHint: 'a c!' });
   });
 
-  it('says on the dry-run that a bucket with tasks has no undo, and the undo refuses it', async () => {
+  it('refuses a bucket with tasks before any write, on a dry-run and on a run, and asks to delete or move them first', async () => {
     const planner = createPlannerStoreFake();
-    const note = 'none: the bucket has 1 task(s). Planner can delete them with it or keep them with no bucket, and this CLI cannot put them back: move or delete them first';
-    const dry = await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' }, { dryRun: true });
-    expect(dry).toMatchObject({ changes: [{ before: { bucketId: 'bucket-a', name: 'To do', planId: 'plan-1', tasks: '1', undo: note } }] });
-    const journal = createRunJournalFake();
-    await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' }, { journal });
-    expect(planner.items.has('/planner/tasks/task-1')).toBe(false);
-    expect(statusesOf(await undoWrite(planner.graph, journal, true))).toEqual([
-      'failed: The bucket had 1 task(s) when the run deleted it. This CLI cannot make a bucket and its tasks again, so this change has no undo. Look for the tasks in Planner: they can be gone, or have no bucket.',
-    ]);
+    const refusal = {
+      error: {
+        code: 'planner_bucket_has_tasks',
+        source: 'validation',
+        message:
+          '--bucket-id: the bucket has 1 task(s) or more. Delete them first with delete-planner-task, or move them to another bucket with update-planner-task --bucket, then delete the bucket.',
+      },
+    };
+    expect(await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' }, { dryRun: true })).toMatchObject(refusal);
+    expect(await runWrite(planner.graph, 'delete-planner-bucket', { bucketId: 'bucket-a' })).toMatchObject(refusal);
+    expect(planner.calls.filter((call) => !call.startsWith('GET'))).toEqual([]);
+    expect([planner.items.has('/planner/buckets/bucket-a'), planner.items.has('/planner/tasks/task-1')]).toEqual([true, true]);
   });
 
   it('passes over a bucket that got a task after the plan', async () => {

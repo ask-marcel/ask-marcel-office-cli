@@ -4,16 +4,16 @@ import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/command
 import type { PlanWrite } from '@ask-marcel/office-core/use-cases/commands/write-plan.ts';
 import { createExecute, parseParams } from './mail-state-command.ts';
 import { readBucket } from './planner-bucket-reader.ts';
-import { deleteBucketOp, noBucketUndoNote } from './planner-delete.ts';
-import { countBucketTasks } from './planner-reader.ts';
+import { deleteBucketOp } from './planner-delete.ts';
+import { countBucketTasks, refused } from './planner-reader.ts';
 import { BUCKET_ID_OPTION, PLANNER_RESPONSE, PLANNER_SCOPES } from './planner-texts.ts';
 import { todoPlan } from './todo-batch.ts';
 
 /*
- * Deletes a bucket. The dry-run gives the count of its tasks, and a bucket
- * with tasks has no undo: Planner can delete the tasks with it, or keep them
- * with no bucket (live, 2026-11-19), and this CLI cannot put them back.
- * The undo of an empty bucket makes it again (new id) at its place.
+ * Deletes an empty bucket. A bucket with tasks is refused before any write:
+ * a live run of 2026-11-19 found that Planner kept the task of a deleted
+ * bucket, with the id of a bucket that is gone. The user deletes or moves the
+ * tasks first. The undo makes the bucket again (new id) at its place.
  */
 
 const schema = z.object({ bucketId: z.string().min(1) });
@@ -26,15 +26,19 @@ const plan: PlanWrite = async (reads, params) => {
   const { item, planId, name, place } = bucket.value;
   const tasks = await countBucketTasks(reads, item.id);
   if (!tasks.ok) return tasks;
-  const before = { bucketId: item.id, name, planId, tasks: String(tasks.value), ...(tasks.value > 0 ? { undo: noBucketUndoNote(tasks.value) } : {}) };
-  return ok(todoPlan({ ops: [deleteBucketOp(item, planId, name, tasks.value, place, before)] }));
+  if (tasks.value > 0)
+    return refused(
+      'planner_bucket_has_tasks',
+      `--bucket-id: the bucket has ${tasks.value} task(s) or more. Delete them first with delete-planner-task, or move them to another bucket with update-planner-task --bucket, then delete the bucket.`
+    );
+  return ok(todoPlan({ ops: [deleteBucketOp(item, planId, name, place, { bucketId: item.id, name, planId })] }));
 };
 
 const execute = createExecute(plan);
 
 const meta: WriteCommandMeta = {
   summary:
-    'Delete a Planner bucket. The dry-run gives the count of its tasks, and a bucket with tasks has NO undo: Planner can delete its tasks or keep them with no bucket, so move or delete them first. Over MCP it runs on run-destructive-command.',
+    'Delete an empty Planner bucket. A bucket with tasks is refused before any write: delete or move its tasks first. The undo makes the bucket again with a new id. Over MCP it runs on run-destructive-command.',
   category: 'tasks',
   graphMethod: 'DELETE',
   graphPathTemplate: '/planner/buckets/{bucket-id}',
@@ -43,7 +47,7 @@ const meta: WriteCommandMeta = {
   example: '{write-bin} delete-planner-bucket --bucket-id "hsOf2dhOJkqyYYZEtdzDe2QAIUCR" --dry-run',
   bodyTemplate: 'no body, with If-Match: <ETag of the bucket>',
   effect: 'delete',
-  undo: 'for a bucket with no task: makes the bucket again (new id) between the buckets that were next to it. For a bucket with tasks: none (this CLI cannot put a bucket and its tasks back)',
+  undo: 'makes the bucket again (new id) between the buckets that were next to it, if the plan is still there',
   scopesRequired: [...PLANNER_SCOPES],
   responseShape: PLANNER_RESPONSE,
 };
