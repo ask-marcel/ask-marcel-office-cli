@@ -6,7 +6,8 @@ import type { SessionEnd } from './auth-session.ts';
  * the scopes granted to that token (decoded from its `scp`), and how it refreshes
  * (`automatic` = rides the shared refresh token that the cache holds; `interactive`
  * = needs a login: always for elevated, and for every tier when the cache holds no
- * refresh token).
+ * refresh token or the sign-in session ended, about 24 hours after the browser
+ * sign-in).
  */
 type TokenTierInfo = {
   readonly available: boolean;
@@ -56,7 +57,8 @@ type TokenInfo = {
   /**
    * The two Teams-chat substrate tokens (chatsvcagg / ic3), same `TokenTierInfo`
    * shape as `elevated`. Both self-heal from the shared refresh token (refresh:
-   * automatic), so they are informational rather than a preflight gate.
+   * automatic) until the sign-in session ends, so they are informational rather
+   * than a preflight gate.
    */
   readonly chatsvcagg: TokenTierInfo;
   readonly ic3: TokenTierInfo;

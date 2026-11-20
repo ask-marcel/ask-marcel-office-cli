@@ -133,7 +133,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'status']));
     const parsed = JSON.parse(out) as { ok: boolean; data: Record<string, { available?: boolean }> };
     expect(parsed.ok).toBe(true);
-    expect(Object.keys(parsed.data)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'hint']);
+    expect(Object.keys(parsed.data)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'refreshToken', 'session', 'hint']);
     expect(parsed.data['basic']?.available).toBe(true);
     expect(parsed.data['elevated']?.available).toBe(false);
   });
