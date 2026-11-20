@@ -30,7 +30,7 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
   delete: {
     destructive: true,
     action:
-      'delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, a calendar draft, a Planner task, or an empty Planner bucket, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link). The delete of a Planner bucket with tasks has no undo',
+      'delete or move an item: a mail draft goes to Deleted Items, from where the undo moves it back to Drafts. A To Do task, step or attachment, an attachment of a mail draft, a calendar draft, a Planner task, or an empty Planner bucket, is deleted (a To Do move deletes the original after its copy), and the undo makes it again from the run journal, with a new id (a calendar draft also gets a new Teams link)',
   },
   'calendar-draft': {
     destructive: false,
