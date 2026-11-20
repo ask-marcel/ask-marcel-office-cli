@@ -4,8 +4,8 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
 import { teamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import type { AuthError } from '../ports/auth-session.ts';
 import type { TokenIssuer, TokenTier } from '../ports/token-issuer.ts';
-import type { TokenError } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { TokenArgs, TokenFailureLine } from './token-args.ts';
 
 // The one line the helper prints when it hands out a token. `expiresOn` is the
@@ -36,20 +36,25 @@ const REMEDY: Readonly<Record<Exclude<FailureCode, 'secondary_token_unavailable'
   token_cache_unwritable: 'Make the folder `~/.ask-marcel` writable by this user, then run `{auth-bin} login`. Check with `{auth-bin} status`.',
 };
 
+// The message of an ended session already tells to run a plain `login`, so its
+// remedy does not say it a second time.
+const SESSION_ENDED_REMEDY = 'After the sign-in, `{auth-bin} status` shows when the new session ends.';
+
 const INVALID_REGION_MESSAGE = 'The token cache names a Teams region that is not a region name, so no token was handed out.';
 const INVALID_REGION_REMEDY = 'Run `{auth-bin} login --force` in a terminal to capture the region again. Check with `{auth-bin} status`.';
 
-const codeOf = (tier: TokenTier, error: TokenError): FailureCode => {
+const codeOf = (tier: TokenTier, error: AuthError): FailureCode => {
   if (error.type === 'auth_cancelled') return 'auth_cancelled';
   const passed = PASSED_THROUGH.find((code) => code === error.code);
   if (passed !== undefined) return passed;
   return tier === 'basic' ? 'not_authenticated' : 'secondary_token_unavailable';
 };
 
-const failureLine = (tier: TokenTier, error: TokenError): TokenFailureLine => {
+const failureLine = (tier: TokenTier, error: AuthError): TokenFailureLine => {
   const errorCode = codeOf(tier, error);
-  const message = error.type === 'auth_cancelled' ? 'The sign-in was cancelled.' : error.message;
-  return { errorCode, tier, message, remedy: errorCode === 'secondary_token_unavailable' ? SECONDARY_REMEDY[tier] : REMEDY[errorCode] };
+  if (error.type === 'auth_cancelled') return { errorCode, tier, message: 'The sign-in was cancelled.', remedy: REMEDY.auth_cancelled };
+  if (error.cause === 'session_ended') return { errorCode, tier, message: error.message, remedy: SESSION_ENDED_REMEDY, cause: error.cause };
+  return { errorCode, tier, message: error.message, remedy: errorCode === 'secondary_token_unavailable' ? SECONDARY_REMEDY[tier] : REMEDY[errorCode] };
 };
 
 const expiresOn = (token: AccessToken): number => {

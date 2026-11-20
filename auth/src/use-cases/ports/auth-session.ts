@@ -1,7 +1,12 @@
 import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 
-type AuthError = { type: 'auth_failed'; message: string; code?: string } | { type: 'auth_cancelled' };
+// `session_ended`: Entra refused the refresh token because the sign-in session
+// ended (AADSTS700084, about 24 hours after the browser sign-in). The code stays
+// the one of the tier; the cause tells the caller why.
+type AuthFailureCause = 'session_ended';
+
+type AuthError = { type: 'auth_failed'; message: string; code?: string; cause?: AuthFailureCause } | { type: 'auth_cancelled' };
 
 // Decode-only preflight info for one token tier: availability, remaining runway,
 // and the scopes granted to that token (decoded from its `scp` claim; empty when
@@ -35,4 +40,4 @@ type AuthSession = {
   readonly logout: () => Promise<Result<void, AuthError>>;
 };
 
-export type { AuthError, AuthSession, CachedTierInfo, SessionEnd };
+export type { AuthError, AuthFailureCause, AuthSession, CachedTierInfo, SessionEnd };

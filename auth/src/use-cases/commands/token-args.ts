@@ -7,7 +7,9 @@ import type { TokenRequest, TokenTier } from '../ports/token-issuer.ts';
 
 // The one line the helper prints when it hands out no token. `tier` is null when
 // the caller named none the helper knows.
-type TokenFailureLine = { readonly errorCode: string; readonly tier: TokenTier | null; readonly message: string; readonly remedy: string };
+// `cause` is there only when the ladder knows why: `session_ended` when Entra
+// refused the refresh token because the sign-in session ended.
+type TokenFailureLine = { readonly errorCode: string; readonly tier: TokenTier | null; readonly message: string; readonly remedy: string; readonly cause?: 'session_ended' };
 
 type TokenArgs = { readonly request: TokenRequest; readonly rejected?: TokenFingerprint };
 
