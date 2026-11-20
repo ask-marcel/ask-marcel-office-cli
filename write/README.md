@@ -1,7 +1,7 @@
 # @ask-marcel/office-write
 
-`@ask-marcel/office-write` holds the 46 write commands: 5 mail-draft operations,
-3 PDF conversions, 5 mail state changes, 21 To Do and Planner changes, 2
+`@ask-marcel/office-write` holds the 47 write commands: 5 mail-draft operations,
+3 PDF conversions, 6 mail state changes, 21 To Do and Planner changes, 2
 calendar draft changes and 10 deletes. These Microsoft Graph commands change the state of your
 tenant. Its bin is `ask-marcel-office-write`. It sends no mail and no meeting
 invitation: a draft stays unsent until you send it from Outlook, and a calendar
@@ -36,6 +36,7 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write set-mail-flag` | Sets the follow-up flag of a message, with an optional due day. |
 | `ask-marcel-office-write set-mail-categories` | Replaces the categories of a message. |
 | `ask-marcel-office-write delete-mail-draft` | Moves an unsent draft to Deleted Items. |
+| `ask-marcel-office-write create-mail-folder` | Creates a mail folder, at the top of the mailbox or in another folder. |
 | `ask-marcel-office-write add-mail-draft-attachment` | Attaches a local file to an unsent draft, up to 150 MB. |
 | `ask-marcel-office-write remove-mail-draft-attachment` | Removes a file attachment of an unsent draft. |
 | `ask-marcel-office-write create-todo-task` | Creates a To Do task. |
@@ -75,7 +76,7 @@ The package needs Node 20 or later, or Bun 1.0 or later.
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-`help-json` lists 50 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
+`help-json` lists 51 entries: the commands, and `docs`, `help-json`, `mcp` and `undo`.
 The tables are in
 [COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
 The draft flow and the rules of each command are in
@@ -92,7 +93,8 @@ Each draft, attachment, mail state, To Do, calendar draft and Planner command ta
 changes and makes none. A run that is not a dry-run gives a `runId`, and
 `undo <runId> --apply` reverses it: a new draft goes to Deleted Items, an update
 gets its old fields back, a moved message goes back to its folder, a read
-state, a flag or categories get their old value, a new To Do task or step is
+state, a flag or categories get their old value, a new mail folder is deleted
+while it is empty, a new To Do task or step is
 deleted, and a deleted To Do task, step or attachment comes back with a new id.
 An attachment added to a draft is removed, and a removed one comes back from
 the run journal with a new id. A new calendar draft is deleted, an updated one
@@ -107,7 +109,8 @@ keeps a run 30 days. The details are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#dry-run-and-undo).
 
 A move never puts mail in Deleted Items, Recoverable Items, Junk Email or
-Outbox, or in a folder in one of them. `delete-mail-draft` is the one command
+Outbox, or in a folder in one of them, and `create-mail-folder` makes no folder
+there. `delete-mail-draft` is the one command
 that puts a message in Deleted Items, and it takes only an unsent draft. The
 mail state commands are in
 [USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#mail-state),
@@ -213,7 +216,7 @@ const draft = await commands['create-mail-draft']?.execute(graph, {
 
 The library exports:
 
-- `commands`: the 46 write commands, each on the write graph alone;
+- `commands`: the 47 write commands, each on the write graph alone;
 - `createWriteGraph(tokens)`: the write graph over a token source;
 - `createEnvThenHelperTokenSource()`: the tier variables of the process, else the
   token helper of `@ask-marcel/office-auth`;

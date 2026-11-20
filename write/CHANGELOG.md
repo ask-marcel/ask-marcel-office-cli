@@ -14,6 +14,27 @@ error names `cause session_ended`, and the hint tells you to run a plain
 `ask-marcel-office-auth login`. The error codes stay `not_authenticated` and
 `secondary_token_unavailable`.
 
+### Added: create-mail-folder
+
+- `create-mail-folder --name` makes a mail folder at the top of the mailbox,
+  or in `--parent`: a well-known name, a path of folder names from the top, a
+  folder name at the top or a folder id. The folder resolution is that of the
+  mail state commands.
+- Before any write, the plan refuses a parent that is, or is in, Deleted
+  Items, Recoverable Items, Junk Email or Outbox (`folder_refused`), a name
+  that the parent has already, with no case (`folder_exists`), and a name that
+  is empty, longer than 255 characters, or has `/`, `\` or a control character
+  (`invalid_folder_name`).
+- `--dry-run` shows the parent and the name. The output gives the id of the
+  new folder in `after.folderId`.
+- The undo deletes the folder, only if it has no message and no child folder,
+  and its name and its parent did not change. If not, the undo passes over it
+  (`changed`).
+- The command is in the `mail-state` class: over MCP it runs on
+  `run-write-command`.
+- Write package now: 47 commands, 51 entries in `help-json`, 10 commands in the
+  `delete` class, `run-write-command` runs 37, 255 commands in the directory.
+
 ### Added: the Planner commands
 
 - `create-planner-bucket --plan --name`, `update-planner-bucket --bucket-id`
