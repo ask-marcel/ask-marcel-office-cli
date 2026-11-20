@@ -6,6 +6,14 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Changed: the hint of a sign-in session that ended
+
+When the token helper of `@ask-marcel/office-auth` says that the sign-in session
+ended (Microsoft limits it to about 24 hours after the browser sign-in), the
+error names `cause session_ended`, and the hint tells you to run a plain
+`ask-marcel-office-auth login`. The error codes stay `not_authenticated` and
+`secondary_token_unavailable`.
+
 ### Added: the Planner commands
 
 - `create-planner-bucket --plan --name`, `update-planner-bucket --bucket-id`
