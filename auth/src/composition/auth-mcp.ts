@@ -47,12 +47,18 @@ const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
           .describe(
             'Ignore the cache and re-capture every token via the browser. A plain login already recaptures the elevated token when it is missing and leaves the browser session alone; force clears that session first, which deletes the 90-day "Stay signed in" cookie and usually forces the user to enter their password. Use it only when a tier is stuck after a plain login.'
           ),
+        renew: z
+          .boolean()
+          .optional()
+          .describe(
+            'Start a new sign-in session before the current one ends. Microsoft limits the session to about 24 hours after the browser sign-in, and status shows its end as session.endsAt. It re-captures every token and a new refresh token in the browser and keeps the browser cookies, so it usually asks for no password. A plain login opens no browser while the session is good. With force, force wins.'
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
-    async ({ force }): Promise<CallToolResult> => {
+    async ({ force, renew }): Promise<CallToolResult> => {
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
-      const result = await login.execute(loginAuth, { force: force ?? false });
+      const result = await login.execute(loginAuth, { force: force ?? false, renew: renew ?? false });
       if (!result.ok) return failText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
       const info = await loginAuth.getTokenInfo();
       if (!info.ok) return failText(info.error.message);
@@ -61,6 +67,7 @@ const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
         elevatedAvailable: info.value.elevated.available,
         chatsvcaggAvailable: info.value.chatsvcagg.available,
         ic3Available: info.value.ic3.available,
+        ...(info.value.session === undefined ? {} : { session: info.value.session }),
       });
       return okText(renderToString(fillNamesIn(summary, names), 'text'));
     }

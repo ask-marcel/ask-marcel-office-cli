@@ -9,6 +9,9 @@
 // nothing about what a caller can actually read, and an absent tier is otherwise
 // invisible until a command fails later for reasons the output never mentioned.
 
+import type { SessionEnd } from '../ports/auth-session.ts';
+import type { SessionReport } from './session-report.ts';
+import { sessionReport } from './session-report.ts';
 import type { OptionalTier } from './token-tier-capability.ts';
 import { OPTIONAL_TIERS, TIER_CAPABILITY } from './token-tier-capability.ts';
 
@@ -17,6 +20,8 @@ type LoginSummary = {
   available: ReadonlyArray<string>;
   unlocked: Readonly<Record<string, string>>;
   missing: Readonly<Record<string, string>>;
+  // The end of the sign-in session, about 24 hours after the browser sign-in.
+  session: SessionReport;
   hint: string;
 };
 
@@ -24,9 +29,11 @@ type LoginSummaryInput = {
   readonly elevatedAvailable: boolean;
   readonly chatsvcaggAvailable: boolean;
   readonly ic3Available: boolean;
+  readonly session?: SessionEnd;
 };
 
-const LOGIN_HINT = "For each token's scopes + expiry, run `{auth-bin} status`. To re-capture every token, run `{auth-bin} login --force`.";
+const LOGIN_HINT =
+  "For each token's scopes + expiry, run `{auth-bin} status`. To start a new sign-in session of about 24 hours before `session.endsAt`, run `{auth-bin} login --renew`. To re-capture every token, run `{auth-bin} login --force`.";
 
 // Per tier, because they do not fail the same way. Elevated is browser-only and
 // simply was not captured. The two substrate tiers are only ever reported missing
@@ -60,6 +67,7 @@ const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => {
     available: ['basic', ...present],
     unlocked,
     missing,
+    session: sessionReport(input.session),
     hint: LOGIN_HINT,
   };
 };
