@@ -11,8 +11,6 @@
 # Adapted from the atelier asset: actions/checkout stays on v4, as in ci.yml.
 name: branches
 on:
-  schedule:
-    - cron: "30 6 * * *" # daily
   workflow_dispatch:
 permissions:
   contents: read
