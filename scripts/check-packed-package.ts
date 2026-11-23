@@ -44,7 +44,7 @@
 
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
 import { bundleTargets } from './package-targets.ts';
 
@@ -259,6 +259,10 @@ const controlProblems = async (consumer: string, manifest: Manifest, { types, va
   };
   const passed: string[] = [];
   for (const [name, text] of Object.entries(controls)) {
+    // Bun can hard-link an installed file to its install cache. Remove the link
+    // first: a write through it changes the cached copy, and the next install
+    // of the same tarball then gets the control text.
+    rmSync(index, { force: true });
     await Bun.write(index, text);
     if (typeProblems(consumer, expected).length === 0) passed.push(`control: the consumer typecheck passed ${name}`);
   }
@@ -277,12 +281,15 @@ const pack = (): { readonly tarball: string; readonly dir: string } => {
 };
 
 const tarballProblems = async (tarball: string, dir: string): Promise<{ readonly problems: ReadonlyArray<string>; readonly manifest: Manifest }> => {
-  const listed = run(['tar', '-tzf', tarball], dir);
+  // The tar calls name the tarball relative to its folder: a GNU tar reads `C:` in
+  // an absolute Windows path as a remote host.
+  const listed = run(['tar', '-tzf', basename(tarball)], dir);
+  // The tar of Windows ends each line with \r\n.
   const files = listed.out
-    .split('\n')
+    .split(/\r?\n/)
     .filter(Boolean)
     .map((path) => path.replace(/^package\//, ''));
-  run(['tar', '-xzf', tarball, '-C', dir], dir);
+  run(['tar', '-xzf', basename(tarball)], dir);
   const manifest = (await Bun.file(join(dir, 'package', 'package.json')).json()) as Manifest;
   const declarations = Object.fromEntries(
     await Promise.all(files.filter((f) => f.endsWith('.d.ts')).map(async (f) => [f, await Bun.file(join(dir, 'package', f)).text()] as const))
