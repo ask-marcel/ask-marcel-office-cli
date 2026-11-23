@@ -4,11 +4,29 @@ Entries that the atelier compaction pass retired from `.claude/LESSONS.md`, verb
 
 ---
 
+## [gotcha] 2026-11-17 | a tarball that depends on workspace packages that are not on npm cannot install
+
+`bun add -g` of the packed facade failed while its three packages were not on npm: the registry has no `@ask-marcel/office-auth`, `-read` or `-write`. `scripts/facade-bundle.ts` makes one tarball that holds the three packed packages as `bundledDependencies`, and Bun installs that tarball.
+Rule for next time: to install unpublished workspace packages on a computer, use the local bundle (`CONTRIBUTING.md`, "The local install of the facade"), not `bun link` and not a plain `bun pm pack`.
+Archived 2026-11-24: graduate, `CONTRIBUTING.md:67-72` and `:87-91` (the local bundle, "not on npm"), `scripts/facade-bundle.ts`, `scripts/check-packed-facade.ts`.
+
+## [decision] 2026-11-17 | `ask-marcel-office-cli` 3.x is a facade of the three packages, with no `ask-marcel-office` bin
+
+The user wanted one global install for the three packages. Version 3.0.0 of `ask-marcel-office-cli` holds no command: it depends on `@ask-marcel/office-auth`, `-read` and `-write` and installs their three bins (ADR 0005). Rejected: one bin that sends each command to its package, because a host that must never write could then not leave the write commands out.
+Rule for next time: do not add a command or a combined MCP server to the facade. A script of 2.8.0 calls the bin of the package that owns the command.
+Archived 2026-11-24: graduate, `docs/adr/0005-facade-package-ask-marcel-office-cli-3.md:26` (no command), `:49-50` (one bin refused), `:58-62` (old scripts stop, no combined MCP server), `CONTRIBUTING.md:18`.
+
 ## [gotcha] 2026-11-13 | on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too
 
 The CI runs the suites on Linux only, so about 50 tests failed on Windows and nobody saw it. Three causes were the path separator. `Bun.Glob.scan` gave `src\infra\x.ts`, so `path.startsWith('src/test-helpers/')` in the bin placeholder sweeps matched nothing. The coverage report gave the same paths, so `scripts/check-coverage.ts` found no tier for each file. Tests seeded `createFileSystemFake` with `/virtual/home/.ask-marcel/...`, but `resolveAuthPaths` builds the path with `join`, which gives backslashes on Windows, so the fake answered `not_found`. The other causes were POSIX file modes, signals and pid 1, which Windows does not have.
 Rule for next time: change `\` to `/` in a path that Bun reports before a prefix check, and prove it with a Windows row in the selftest. Build each expected or seeded path of a test with `join`, as production does. Skip on `win32` only the check that Windows cannot do (a file mode, a signal), not the full test: the infra tier needs 100 % coverage on Windows too.
 Archived 2026-11-15: tighten, rewritten to five sentences (6 sentences, and "CI runs on Linux only" is no longer true (`windows-helper` job, `e0c6937`), the rewrite says so), rewritten as "on Windows, Bun gives backslash paths in `Bun.Glob.scan` and in the coverage report, and `join` gives them too".
+
+## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
+
+Each claim of `check-doc-numbers.ts` checks one anchored sentence, so a new sentence such as "the 12 mail commands" matched no anchor and passed with no check, and a table row "The 204 read commands by name" did not match "the N … commands" (the rows became "Each of the N … commands, by name"). Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
+Rule for next time: write each count of a doc in digits, in an anchored form of its own package, and add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names (the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check), so write a count of another noun once, in a sentence that a claim checks.
+Archived 2026-11-24: graduate, `CONTRIBUTING.md:180-184` (digits, an anchored sentence, a new claim in the same commit), `scripts/check-doc-numbers.ts:228-230` (the sweep) and `:254-255` (its selftest).
 
 ## [gotcha] 2026-10-25 | a conventional commit scope cannot hold a comma, and the commit-msg hook refuses it only after the pre-commit gates pass
 

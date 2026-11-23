@@ -36,16 +36,6 @@ Rule for next time: when a release removes or renames a bin, tell the user to de
 A local `bun run mutate:changed` on Windows gives a score of 0 %: the command runner starts, the tests do not run, and Stryker counts each mutant as alive. The same commit gets its real score on the Linux runners of CI.
 Rule for next time: on Windows, do not read a local mutation score as a result. Write the tests for the mutants that you can see in the code, and read the score from CI.
 
-## [gotcha] 2026-11-17 | a tarball that depends on workspace packages that are not on npm cannot install
-
-`bun add -g` of the packed facade failed while its three packages were not on npm: the registry has no `@ask-marcel/office-auth`, `-read` or `-write`. `scripts/facade-bundle.ts` makes one tarball that holds the three packed packages as `bundledDependencies`, and Bun installs that tarball.
-Rule for next time: to install unpublished workspace packages on a computer, use the local bundle (`CONTRIBUTING.md`, "The local install of the facade"), not `bun link` and not a plain `bun pm pack`.
-
-## [decision] 2026-11-17 | `ask-marcel-office-cli` 3.x is a facade of the three packages, with no `ask-marcel-office` bin
-
-The user wanted one global install for the three packages. Version 3.0.0 of `ask-marcel-office-cli` holds no command: it depends on `@ask-marcel/office-auth`, `-read` and `-write` and installs their three bins (ADR 0005). Rejected: one bin that sends each command to its package, because a host that must never write could then not leave the write commands out.
-Rule for next time: do not add a command or a combined MCP server to the facade. A script of 2.8.0 calls the bin of the package that owns the command.
-
 ## [decision] 2026-11-17 | the MCP `params` take the flag name and the camelCase key, as two spellings of one name
 
 The docs and each error name a parameter as a flag (`--message-id`), but `run-command` and `run-write-command` ran only the camelCase key, and the unknown-parameter error named the key that it refused (QA 2026-11-16, P2-1). The user decided that the MCP shell maps `message-id` and `--message-id` to `messageId` (`core/src/use-cases/commands/param-keys.ts`), that two spellings of one key in one call fail with `duplicate_parameter`, and that a value can be a string, a number or a boolean. This is not an alias, so the 2026-07-24 decision (one name for each flag) stays: the CLI and the library keep one spelling. Rejected: camelCase only with an error that names the camelCase key, because the docs pages and the "is missing" errors still show the flag form.
@@ -80,11 +70,6 @@ Rule for next time: give each failure of a gate its own exit code, and catch a c
 
 Commit 22 made `gen-docs.ts` and `check-doc-numbers.ts` take one package per run. With `--package` as a plain string option, `node:util` `parseArgs` silently keeps the last of two `--package` values, so a run with two packages documents the second one only. The option keeps `multiple: true`, and the scripts refuse a second value with exit 2.
 Rule for next time: when a script takes an option once, declare it `multiple: true` and refuse more than one value. Do not trust `parseArgs` to refuse a repeated option.
-
-## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
-
-Each claim of `check-doc-numbers.ts` checks one anchored sentence, so a new sentence such as "the 12 mail commands" matched no anchor and passed with no check, and a table row "The 204 read commands by name" did not match "the N … commands" (the rows became "Each of the N … commands, by name"). Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
-Rule for next time: write each count of a doc in digits, in an anchored form of its own package, and add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names (the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check), so write a count of another noun once, in a sentence that a claim checks.
 
 ## [gotcha] 2026-10-24 | When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit
 
