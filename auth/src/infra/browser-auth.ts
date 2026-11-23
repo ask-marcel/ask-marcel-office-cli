@@ -99,11 +99,12 @@ type BrowserAuth = {
    * Teams web client token lacks for historical-version stream
    * content). Launches a HEADED browser (`launchContext(false)`) and
    * relies, best-effort, on the persistent profile's cookies to complete
-   * sign-in silently. This is NOT guaranteed: on tenants that do not
-   * persist SSO cookies (or once they lapse) the navigation lands on a
-   * sign-in wall and the capture times out (verified headed AND headless
-   * 2026-07-19). That is why it stays headed and why the caller treats a
-   * miss as non-fatal and points the user at an interactive `login`.
+   * sign-in silently. This is NOT guaranteed: when the SSO cookies lapse
+   * the navigation lands on a sign-in wall and the capture times out, so the
+   * caller treats a miss as non-fatal and points the user at an interactive
+   * `login`. A headless window gets no token (2026-05-06). The 2026-07-19
+   * probe that saw no persistent cookie ran on a profile that our own
+   * `login --force` had wiped (corrected 2026-08-31, see auth/TOKEN-TIERS.md).
    *
    * Returns a discriminated union so the caller can distinguish the three
    * failure modes (browser-launch hang, navigation failure, silent-SSO
