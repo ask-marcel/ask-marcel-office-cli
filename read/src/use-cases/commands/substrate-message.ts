@@ -75,6 +75,12 @@ const substratePeople = (messages: ReadonlyArray<SubstrateMessage>): People => {
   return people;
 };
 
+// Probed 2026-09-27 on 25 chats. Each entry of `properties.files` is
+// `{ fileName, fileType, itemid, fileInfo: { fileUrl, shareUrl, siteUrl, serverRelativeUrl, shareID } }`.
+// `itemid` is a SharePoint GUID, not a Graph driveItem id, so the links resolve
+// the file. Each entry of `properties.emotions` is
+// `{ key, users: [{ mri: '8:orgid:<id>', time: <epoch ms>, value }] }`. IC3 also
+// gives one message at `/v1/users/ME/conversations/{chat}/messages/{id}`.
 /** The files shared in a message, from `properties.files`: name, type, and the links to resolve. */
 const filesOf = (m: SubstrateMessage): ReadonlyArray<Entry> =>
   propertyList(m, 'files').flatMap((f) => {

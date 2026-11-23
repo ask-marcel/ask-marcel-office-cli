@@ -15,7 +15,7 @@ const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupI
 
 const meta: ReadCommandMeta = {
   summary:
-    "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling. Bodies live two levels down: `list-group-threads` then `list-group-thread-posts`, or `--expand 'threads($expand=posts)'` here to fetch conversations, threads and posts in one call.",
+    "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling. Bodies live two levels down: `list-group-threads` then `list-group-thread-posts`, or `--expand 'threads($expand=posts)'` here to fetch conversations, threads and posts in one call. A nested `$select` trims the posts (`--expand 'threads($expand=posts($select=body,from,receivedDateTime))'` gives those fields plus `id` and `changeKey`). Access is membership-gated: a group the user is not a member of answers `ErrorAccessDenied` (probed live 2026-08-30), so this does not replace `Mail.Read.Shared`.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/conversations',
