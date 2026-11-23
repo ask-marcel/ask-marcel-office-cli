@@ -7,7 +7,7 @@ const { execute } = buildCommand(() => '/me/mailFolders/delta()', schema);
 
 const meta: ReadCommandMeta = {
   summary:
-    "Track incremental changes to the mail-folder tree itself (folders added / renamed / deleted). The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed. Companion to `list-mail-folder-messages-delta` which tracks message changes inside one folder. Note: Graph explicitly rejects `$top`, `$filter`, `$orderby`, and `$search` on this delta endpoint (`ErrorInvalidUrlQuery: not supported with change tracking over the 'Folders' resource`), so the OData passthrough is intentionally NOT exposed here.",
+    "Track incremental changes to the mail-folder tree itself (folders added / renamed / deleted). The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed. Companion to `list-mail-folder-messages-delta` which tracks message changes inside one folder. Note: Graph explicitly rejects `$top`, `$filter`, `$orderby`, and `$search` on this delta endpoint (`ErrorInvalidUrlQuery: not supported with change tracking over the 'Folders' resource`), so the OData passthrough is intentionally NOT exposed here. Graph also ignores `includeHiddenFolders=true` here with no error (probed live 2026-08-30: the same 33 folders with and without it, none hidden): for hidden folders, use the hidden-folder option of `list-mail-folders` and `list-mail-child-folders`.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailFolders/delta()',

@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand(() => '/me/informationProtection/se
 
 const meta: ReadCommandMeta = {
   summary:
-    'List the Microsoft Information Protection sensitivity labels available to the signed-in user — the labels Outlook / Word / SharePoint surfaces in the "Sensitivity" picker (e.g. Public / Internal / Confidential / Highly Confidential). Each label has `id`, `displayName`, `priority`, `isAppliable`, `tooltip`.',
+    'List the Microsoft Information Protection sensitivity labels available to the signed-in user — the labels Outlook / Word / SharePoint surfaces in the "Sensitivity" picker (e.g. Public / Internal / Confidential / Highly Confidential). Each label has `id`, `displayName`, `priority`, `isAppliable`, `tooltip`. This is the catalog only: the label of one document needs `POST /drives/{d}/items/{i}/extractSensitivityLabels` with `InformationProtectionContent.Read.All`, which the Teams web client token does not carry (it has `InformationProtectionPolicy.Read` only, 2026-06-01).',
   category: 'user',
   graphMethod: 'GET',
   graphPathTemplate: '/me/informationProtection/sensitivityLabels',
