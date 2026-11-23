@@ -74,6 +74,11 @@ const insertCommentAboveQuote = (html: string, commentHtml: string): SpliceResul
   // always emit `appendonsend`: on tenants where it doesn't, the earliest quote
   // boundary is `divRplyFwdMsg` sitting BELOW the plain `<hr>`, so inserting at
   // the boundary parked the comment under the separator (reported 2026-07-19).
+  // `POST /createReplyAll` can answer with `divRplyFwdMsg` and no `appendonsend`,
+  // and Exchange keeps `divRplyFwdMsg` through `PATCH /me/messages/{id}` (three
+  // PATCH calls, 2026-07-17), where each `--comment` replaces the one before it.
+  // Do not reduce `QUOTE_BOUNDARIES` to one marker family, and do not trust a
+  // marker from the sample of one tenant.
   // Body-start is above every scaffolding variant, so the author's text always
   // leads the body. The revise path (`replaceCommentAboveQuote`) already writes
   // from body-start, so create and revise agree on where the comment lives.
