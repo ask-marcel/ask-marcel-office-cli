@@ -41,12 +41,6 @@ never write.
 
 ## Install
 
-> The three packages and `ask-marcel-office-cli` 3.0.0 are not on npm yet. npm
-> installs `ask-marcel-office-cli` 2.8.0 now. Its docs are
-> [docs/USAGE.md](docs/USAGE.md) and [docs/COMMANDS.md](docs/COMMANDS.md). To
-> install this code from a checkout, read
-> [CONTRIBUTING.md](CONTRIBUTING.md#the-local-install-of-the-facade).
-
 To read only, install auth and read, then sign in:
 
 ```sh

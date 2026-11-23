@@ -3,9 +3,9 @@
 All notable changes to `ask-marcel-office-cli` from 3.0.0 are documented here.
 The history of 2.8.0 and before is in the root `CHANGELOG.md`.
 
-## Unreleased
+## 3.0.0
 
-### 3.0.0: the package is a facade of the three packages
+### Changed: the package is a facade of the three packages
 
 `ask-marcel-office-cli` 3.0.0 holds no command. It installs
 `@ask-marcel/office-auth`, `@ask-marcel/office-read` and
