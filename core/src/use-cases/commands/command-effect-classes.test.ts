@@ -16,7 +16,7 @@ describe('the write classes of mail state and tasks', () => {
       'create-widget-task': fakeCommand({ effect: 'task-write' }),
     };
     expect(describeWrites(registry)).toBe(
-      'set-widget-flag: change the state of a mail message: mark it read or unread, flag it, set its categories, or move it to another folder (nothing is sent). create-widget-task: create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove). The file of a Planner task goes into the folder "Planner attachments" of your OneDrive'
+      'set-widget-flag: change the state of a mail message (mark it read or unread, flag it, set its categories, or move it to another folder), or create a mail folder (nothing is sent). create-widget-task: create or change a To Do list, a To Do or Planner task, a Planner bucket or the names of a Planner plan, or a part of a task (a step, a checklist item, an attachment or a link, which a change can also remove). The file of a Planner task goes into the folder "Planner attachments" of your OneDrive'
     );
   });
 

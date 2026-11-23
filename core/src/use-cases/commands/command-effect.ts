@@ -19,7 +19,7 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
   },
   'mail-state': {
     destructive: false,
-    action: 'change the state of a mail message: mark it read or unread, flag it, set its categories, or move it to another folder (nothing is sent)',
+    action: 'change the state of a mail message (mark it read or unread, flag it, set its categories, or move it to another folder), or create a mail folder (nothing is sent)',
   },
   'task-write': {
     destructive: false,

@@ -178,7 +178,8 @@ type CommandMeta = {
    * included). Every other value is a write class, worded in `command-effect.ts`:
    * `draft` creates or updates an UNSENT mail draft; `transient-upload` puts a
    * temporary file in the user's OneDrive and tries to delete it; `mail-state`
-   * changes the state of a mail message (read, flag, categories, folder);
+   * changes the state of a mail message (read, flag, categories, folder) or creates
+   * a mail folder;
    * `task-write` creates or changes a To Do or Planner item; `delete` deletes an
    * item (a mail draft goes to Deleted Items; a To Do task, step or attachment is
    * deleted, and a To Do move deletes the original), the one destructive class, which
