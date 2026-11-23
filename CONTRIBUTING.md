@@ -188,5 +188,6 @@ The maintainer sets these repository settings by hand, one time.
   not change them for the packages.
 - [docs/QA-PLAYBOOK.md](docs/QA-PLAYBOOK.md) is the full health check of the
   command surface. Run it before a release.
+- [auth/TOKEN-TIERS.md](auth/TOKEN-TIERS.md) gives the probe facts of the token tiers (scopes, captures, lifetimes, guest tier). Read it before you change auth code. It is not in the npm package.
 - The decisions are in [docs/adr/](docs/adr/), and the lessons are in
   `.claude/LESSONS.md`.
