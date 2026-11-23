@@ -4,7 +4,7 @@ All notable changes to `@ask-marcel/office-auth` are documented here. The histor
 before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 2.8.0 and before).
 
-## Unreleased
+## 1.0.0
 
 ### Added: the end of the sign-in session of about 24 hours
 

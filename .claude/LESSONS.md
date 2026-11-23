@@ -6,6 +6,11 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [gotcha] 2026-11-24 | a write into `node_modules` can change the Bun install cache
+
+Bun can hard-link an installed file to its install cache. The control step of `scripts/check-packed-package.ts` wrote a new `index.d.ts` into the installed package, and the write went through the link: the cached copy of that tarball got the control text, and the next run with the same build failed ("expected 4:TS2322, not reported"). CI did not show it, because each job starts with an empty cache. The same day showed two more Windows faults of that script: an absolute `C:` path given to a GNU `tar`, and a `tar` list split on `\n` only.
+Rule for next time: remove an installed file before you write it again (`rmSync`, then `Bun.write`), give `tar` a name relative to its folder, and split the output of a command on `/\r?\n/`.
+
 ## [gotcha] 2026-11-20 | a test of a command meta must use `toStrictEqual`, and a refusal test must assert its `source`
 
 An option with `argumentHint: undefined` passes `toEqual`, so a mutant that removes the hint stays alive. The runner of a command hides the `type` of a refusal but gives its `source`, so a test that asserts only the code does not kill the mutant of the type (Planner step, 2026-11-20).

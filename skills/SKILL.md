@@ -53,9 +53,6 @@ ask-marcel-office-write --version  # write installed? (only for drafts)
 
 If one is missing: `npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-write` (Node 20 or later, or Bun 1.0 or later). For read-only use, leave out `@ask-marcel/office-write`. Then restart the terminal (or load PATH again). Sign in once with `ask-marcel-office-auth login`: a browser opens one time, and auth keeps the token in its cache. The read and write bins get their tokens from auth. If a command later says that you are **not signed in**, or that a token has lapsed (people lookups use a separate "elevated" token that lapses on its own), run `ask-marcel-office-auth login` with no flag. It gets a lapsed token again through silent SSO with the saved browser profile (a window flash, no prompt), and it does a full sign-in only if that fails. Do not reach for `--force` (`ask-marcel-office-auth login --force`). Use it only when a tier stays stuck after a plain `login`: it clears the browser session, so the user usually types the password again.
 
-Only `ask-marcel-office` 2.8.0 installed? Use it in place of each of the three bins, and use `scopes-check` in place of `status`.
-The three packages are not on npm yet; until then, 2.8.0 is what npm installs.
-
 ## Workflow
 
 **1. Know who you are** — once per session:

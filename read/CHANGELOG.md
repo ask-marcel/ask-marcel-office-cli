@@ -4,7 +4,7 @@ All notable changes to `@ask-marcel/office-read` are documented here. The histor
 before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 2.8.0 and before).
 
-## Unreleased
+## 1.0.0
 
 ### Changed: the hint of a sign-in session that ended
 

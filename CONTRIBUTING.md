@@ -66,9 +66,8 @@ hand.
 
 ## The local install of the facade
 
-`ask-marcel-office-cli` 3.0.0 and the three packages are not on npm. To install
-this code on your computer, build the four folders, then make the local bundle
-and install it:
+npm has the released versions. To install the code of a checkout on your
+computer, build the four folders, then make the local bundle and install it:
 
 ```sh
 for folder in auth read write cli; do (cd "$folder" && bun run build); done

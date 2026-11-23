@@ -15,10 +15,6 @@ the same exit codes. The docs of each package apply with no change.
 
 ## Install
 
-> Version 3.0.0 is not on npm yet. npm installs `ask-marcel-office-cli` 2.8.0
-> now. To install 3.0.0 from a checkout, read
-> [CONTRIBUTING.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/CONTRIBUTING.md#the-local-install-of-the-facade).
-
 ```sh
 npm i -g ask-marcel-office-cli
 ask-marcel-office-auth login
