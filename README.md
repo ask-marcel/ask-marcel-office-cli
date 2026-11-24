@@ -66,7 +66,7 @@ call the bin of the package that owns the command:
 
 | Command of 2.8.0 | Bin to call now |
 |:--|:--|
-| `login`, `logout`, `status` | `ask-marcel-office-auth` |
+| `login`, `logout`, `scopes-check` (now `status`) | `ask-marcel-office-auth` |
 | The mail draft commands and the `*-to-pdf` conversions | `ask-marcel-office-write` |
 | All the other commands | `ask-marcel-office-read` |
 
