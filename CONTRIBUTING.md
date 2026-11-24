@@ -14,8 +14,8 @@ package and no `src/`. It keeps the shared configs, `scripts/` and the docs.
 | `core/` | `@ask-marcel/office-core` | No (private) | The shared code: the domain types, the Graph clients, the CLI and MCP shells, the presenter. Each bundle inlines it. |
 | `auth/` | `@ask-marcel/office-auth` | Yes | The sign-in, the token cache and the token helper |
 | `read/` | `@ask-marcel/office-read` | Yes | The read commands and the converters |
-| `write/` | `@ask-marcel/office-write` | Yes | The mail drafts and the PDF conversions |
-| `cli/` | `ask-marcel-office-cli` | Not yet (3.0.0) | The facade: it depends on the three packages and installs their three bins. It holds no command. |
+| `write/` | `@ask-marcel/office-write` | Yes | The write commands: mail and calendar drafts, the state of mail, To Do, Planner and the PDF conversions |
+| `cli/` | `ask-marcel-office-cli` | Yes (3.0.0) | The facade: it depends on the three packages and installs their three bins. It holds no command. |
 
 Each folder has its own `package.json`, configs, tests and gates, and the same
 layout: `src/{domain,use-cases,infra,presenter,composition}`. The folder of a

@@ -4,7 +4,7 @@ This page lists the commands of the `ask-marcel-office-write` bin of `@ask-marce
 
 The 47 commands are in 3 categories. `help-json` lists 51 entries: the 47 commands and the 4 lifecycle commands below.
 
-`help-json` adds `docs`, `help-json` and `mcp` to the commands. A mail draft is never sent: you send it from Outlook. The read commands are in the `ask-marcel-office-read` bin of `@ask-marcel/office-read`. The sign-in commands are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
+`help-json` adds `docs`, `help-json`, `mcp` and `undo` to the commands. A mail draft is never sent: you send it from Outlook. The read commands are in the `ask-marcel-office-read` bin of `@ask-marcel/office-read`. The sign-in commands are in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
 
 `bun run docs:gen` in this folder makes the two tables below from the registry. CI fails when a table is out of date. Do not edit the tables by hand.
 

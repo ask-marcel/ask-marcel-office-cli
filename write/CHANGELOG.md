@@ -228,10 +228,10 @@ If you used `ask-marcel-office-cli` 2.8.0, these changes apply to you:
 - The sign-in is in `@ask-marcel/office-auth` (`ask-marcel-office-auth login`).
   `scopes-check` is gone: use `ask-marcel-office-auth status`.
 - `update` is gone. Update with `npm i -g @ask-marcel/office-write@latest`.
-- The MCP server has three tools: `list-commands`, `get-command-docs` and
-  `run-write-command`.
-- `help-json` and `commands.json` give `effect` (`draft` or `transient-upload`)
-  for each command, not `mutates`.
+- The MCP server has six tools: `list-commands`, `get-command-docs`,
+  `run-write-command`, `run-destructive-command`, `undo` and `undo-apply`.
+- `help-json` and `commands.json` give `effect` for each command, not
+  `mutates`. The commands of 2.8.0 have `draft` or `transient-upload`.
 - A text error has a `code:` line under the `error:` line.
 - When Graph refuses the basic token with a 401 (`InvalidAuthenticationToken`
   or `TokenExpired`), the bin sends the request one more time with a newer

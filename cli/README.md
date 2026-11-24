@@ -36,7 +36,8 @@ example). This package adds no combined server.
 ## If you used 2.8.0
 
 The bin `ask-marcel-office` is gone. Use the bin of the package that owns the
-command: `ask-marcel-office-auth` for `login`, `logout` and `status`,
+command: `ask-marcel-office-auth` for `login`, `logout` and `status` (the
+`scopes-check` of 2.8.0),
 `ask-marcel-office-write` for the mail drafts and the PDF conversions, and
 `ask-marcel-office-read` for all the other commands. The write bin also has
 commands that 2.8.0 did not have. The
